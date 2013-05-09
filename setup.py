@@ -44,7 +44,7 @@ setup(
         'Environment :: Console',
         'Intended Audience :: Developers',
         'Intended Audience :: System Administrators',
-        'License :: OSI Approved :: BSD License',
+        'License :: OSI Approved :: Apache Software License',
         'Topic :: Internet :: WWW/HTTP',
         'Topic :: Software Development',
         'Topic :: System :: Networking',
