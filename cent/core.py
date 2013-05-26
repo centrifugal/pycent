@@ -47,7 +47,7 @@ class Client(object):
         return '/'.join([self.address.rstrip('/'), self.project_id])
 
     def sign_encoded_data(self, encoded_data):
-        sign = hmac.new(six.b(self.secret_key))
+        sign = hmac.new(six.b(str(self.secret_key)))
         sign.update(six.b(self.project_id))
         sign.update(encoded_data)
         return sign.hexdigest()
