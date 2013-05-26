@@ -24,7 +24,6 @@ except ImportError:
     import urlparse
 
 import six
-import zlib
 import hmac
 import json
 import base64
@@ -71,8 +70,7 @@ class Client(object):
     def encode_data(self, data):
         json_data = json.dumps(data)
         base64_data = base64.b64encode(six.b(json_data))
-        compressed_data = zlib.compress(base64_data)
-        return compressed_data
+        return base64_data
 
     def prepare(self, data):
         url = self.prepare_url()

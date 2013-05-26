@@ -75,7 +75,7 @@ def run():
     if not sys.stdin.isatty():
         json_data = sys.stdin.read().strip()
     else:
-        json_data = options.data
+        json_data = options.params
 
     try:
         params = json.loads(json_data)
