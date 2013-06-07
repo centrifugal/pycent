@@ -34,11 +34,10 @@ AUTH_HEADER_NAME = 'X-Centrifuge-Auth'
 
 class Client(object):
 
-    def __init__(self, address, project_id, public_key,
-                 secret_key, timeout=2, send_func=None):
+    def __init__(self, address, project_id, secret_key,
+                 timeout=2, send_func=None):
         self.address = address
         self.project_id = project_id
-        self.public_key = public_key
         self.secret_key = secret_key
         self.timeout = timeout
         self.send_func = send_func
@@ -54,7 +53,6 @@ class Client(object):
 
     def create_auth_header_value(self, encoded_data):
         params = {
-            "public_key": self.public_key,
             "sign": self.sign_encoded_data(encoded_data)
         }
         return " ".join(

@@ -62,7 +62,6 @@ def run():
     try:
         address = config.get(options.section, 'address')
         project_id = config.get(options.section, 'project_id')
-        public_key = config.get(options.section, 'public_key')
         secret_key = config.get(options.section, 'secret_key')
         try:
             timeout = config.getint(options.section, 'timeout')
@@ -90,7 +89,6 @@ def run():
     client = Client(
         address,
         project_id,
-        public_key,
         secret_key,
         timeout=timeout
     )
