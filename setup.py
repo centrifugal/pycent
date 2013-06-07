@@ -20,7 +20,7 @@ def long_description():
 
 setup(
     name='cent',
-    version='0.0.7',
+    version='0.0.8',
     description="python tools to communicate with Centrifuge",
     long_description=long_description(),
     url='https://github.com/FZambia/cent',
