@@ -19,6 +19,13 @@ except ImportError:
     from urllib2 import urlopen, Request
 
 try:
+    from urllib import urlencode
+except ImportError:
+    # python 3
+    # noinspection PyUnresolvedReferences
+    from urllib.parse import urlencode
+
+try:
     import urllib.parse as urlparse
 except ImportError:
     import urlparse
@@ -27,9 +34,6 @@ import six
 import hmac
 import json
 import base64
-
-
-AUTH_HEADER_NAME = 'X-Centrifuge-Auth'
 
 
 class Client(object):
@@ -51,30 +55,19 @@ class Client(object):
         sign.update(encoded_data)
         return sign.hexdigest()
 
-    def create_auth_header_value(self, encoded_data):
-        params = {
-            "sign": self.sign_encoded_data(encoded_data)
-        }
-        return " ".join(
-            ["%s=%s" % (key, value) for key, value in params.items()]
-        )
-
-    def prepare_headers(self, encoded_data):
-        auth_header_value = self.create_auth_header_value(encoded_data)
-        return {
-            AUTH_HEADER_NAME: auth_header_value
-        }
-
     def encode_data(self, data):
         json_data = json.dumps(data)
         base64_data = base64.b64encode(six.b(json_data))
         return base64_data
 
+    def get_sign(self, encoded_data):
+        return self.sign_encoded_data(encoded_data)
+
     def prepare(self, data):
         url = self.prepare_url()
         encoded_data = self.encode_data(data)
-        headers = self.prepare_headers(encoded_data)
-        return url, headers, encoded_data
+        sign = self.get_sign(encoded_data)
+        return url, sign, encoded_data
 
     def send(self, method, params):
         data = {
@@ -85,13 +78,17 @@ class Client(object):
             return self.send_func(*self.prepare(data))
         return self._send(*self.prepare(data))
 
-    def _send(self, url, headers, encoded_data):
+    def _send(self, url, sign, encoded_data):
         """
         Send a request to a remote web server using HTTP POST.
         """
-        req = Request(url, headers=headers)
+        req = Request(url)
         try:
-            response = urlopen(req, encoded_data, timeout=self.timeout)
+            response = urlopen(
+                req,
+                urlencode({'sign': sign, 'data': encoded_data}),
+                timeout=self.timeout
+            )
         except Exception as e:
             return None, e
         else:
