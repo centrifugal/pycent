@@ -76,14 +76,17 @@ def run():
     else:
         json_data = options.params
 
-    try:
-        params = json.loads(json_data)
-    except Exception as e:
-        print(e)
-        sys.exit(1)
+    if json_data:
+        try:
+            params = json.loads(json_data)
+        except Exception as e:
+            print(e)
+            sys.exit(1)
+    else:
+        params = {}
 
-    if not params:
-        print("no params, nothing to do")
+    if not isinstance(params, dict):
+        print("params must be dictionary")
         sys.exit(1)
 
     client = Client(
