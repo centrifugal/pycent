@@ -86,7 +86,7 @@ class Client(object):
         try:
             response = urlopen(
                 req,
-                urlencode({'sign': sign, 'data': encoded_data}),
+                six.b(urlencode({'sign': sign, 'data': encoded_data})),
                 timeout=self.timeout
             )
         except Exception as e:
