@@ -36,7 +36,7 @@ import json
 import base64
 
 
-def generate_token(secret_key, project_id, user, user_info=None):
+def generate_token(secret_key, project_id, user_id, user_info=None):
     """
     When client from browser wants to connect to Centrifuge he must send his
     user ID and ID of project. To validate that data we use HMAC to build
@@ -44,7 +44,7 @@ def generate_token(secret_key, project_id, user, user_info=None):
     """
     sign = hmac.new(six.b(str(secret_key)))
     sign.update(six.b(project_id))
-    sign.update(six.b(user))
+    sign.update(six.b(user_id))
     if user_info is not None:
         sign.update(six.b(user_info))
     token = sign.hexdigest()
