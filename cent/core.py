@@ -33,7 +33,6 @@ except ImportError:
 import six
 import hmac
 import json
-import base64
 
 
 def generate_token(secret_key, project_id, user_id, user_info=None):
@@ -70,18 +69,10 @@ class Client(object):
         sign.update(encoded_data)
         return sign.hexdigest()
 
-    def encode_data(self, data):
-        json_data = json.dumps(data)
-        base64_data = base64.b64encode(six.b(json_data))
-        return base64_data
-
-    def get_sign(self, encoded_data):
-        return self.sign_encoded_data(encoded_data)
-
     def prepare(self, data):
         url = self.prepare_url()
-        encoded_data = self.encode_data(data)
-        sign = self.get_sign(encoded_data)
+        encoded_data = six.b(json.dumps(data))
+        sign = self.sign_encoded_data(encoded_data)
         return url, sign, encoded_data
 
     def send(self, method, params):
