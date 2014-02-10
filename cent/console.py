@@ -100,7 +100,8 @@ def run():
         print("params must be valid JSON object")
         sys.exit(1)
 
-    response = client.send(options.method, params)
+    client.add(options.method, params)
+    response = client.send()
     result, error = response
     if error:
         print(error)

@@ -59,6 +59,7 @@ class Client(object):
         self.secret_key = secret_key
         self.timeout = timeout
         self.send_func = send_func
+        self.messages = []
 
     def prepare_url(self):
         return '/'.join([self.address.rstrip('/'), self.project_id])
@@ -75,14 +76,19 @@ class Client(object):
         sign = self.sign_encoded_data(encoded_data)
         return url, sign, encoded_data
 
-    def send(self, method, params):
+    def add(self, method, params):
         data = {
             "method": method,
             "params": params
         }
+        self.messages.append(data)
+
+    def send(self):
+        messages = self.messages[:]
+        self.messages = []
         if self.send_func:
-            return self.send_func(*self.prepare(data))
-        return self._send(*self.prepare(data))
+            return self.send_func(*self.prepare(messages))
+        return self._send(*self.prepare(messages))
 
     def _send(self, url, sign, encoded_data):
         """
