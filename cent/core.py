@@ -83,7 +83,9 @@ class Client(object):
         }
         self.messages.append(data)
 
-    def send(self):
+    def send(self, method=None, params=None):
+        if method and params is not None:
+            seld.add(method, params)
         messages = self.messages[:]
         self.messages = []
         if self.send_func:
