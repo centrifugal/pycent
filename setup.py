@@ -23,11 +23,11 @@ setup(
     version='0.1.3',
     description="python tools to communicate with Centrifuge",
     long_description=long_description(),
-    url='https://github.com/FZambia/cent',
-    download_url='https://github.com/FZambia/cent',
+    url='https://github.com/centrifugal/cent',
+    download_url='https://github.com/centrifugal/cent',
     author="Alexandr Emelin",
     author_email='frvzmb@gmail.com',
-    license='http://www.apache.org/licenses/LICENSE-2.0',
+    license='MIT',
     packages=['cent'],
     entry_points={
         'console_scripts': [
