@@ -40,12 +40,14 @@ def generate_token(secret_key, project_id, user_id, timestamp, user_info=None):
 class Client(object):
 
     def __init__(self, address, project_id, secret_key,
-                 timeout=2, send_func=None):
+                 timeout=2, send_func=None, json_encoder=None, **kwargs):
         self.address = address
         self.project_id = project_id
         self.secret_key = secret_key
         self.timeout = timeout
         self.send_func = send_func
+        self.json_encoder = json_encoder
+        self.kwargs = kwargs
         self.messages = []
 
     def prepare_url(self):
@@ -59,7 +61,7 @@ class Client(object):
 
     def prepare(self, data):
         url = self.prepare_url()
-        encoded_data = six.b(json.dumps(data))
+        encoded_data = six.b(json.dumps(data, cls=self.json_encoder))
         sign = self.sign_encoded_data(encoded_data)
         return url, sign, encoded_data
 
