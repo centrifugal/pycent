@@ -19,7 +19,7 @@ except ImportError:
 import six
 import hmac
 import json
-from hashlib import md5, sha256
+from hashlib import sha256
 
 
 def generate_token(secret_key, project_id, user_id, timestamp, user_info=None):
@@ -27,24 +27,19 @@ def generate_token(secret_key, project_id, user_id, timestamp, user_info=None):
     When client from browser wants to connect to Centrifuge he must send his
     user ID and ID of project. To validate that data we use HMAC to build
     token.
-
-    TODO:
+    """
     if user_info is None:
         user_info = json.dumps({})
-    And get rid of if condition
-    And rename `user_info` into `info`
-    """
-    sign = hmac.new(six.b(str(secret_key)))
+    sign = hmac.new(six.b(str(secret_key)), digestmod=sha256)
     sign.update(six.b(project_id))
     sign.update(six.b(user_id))
     sign.update(six.b(timestamp))
-    if user_info is not None:
-        sign.update(six.b(user_info))
+    sign.update(six.b(user_info))
     token = sign.hexdigest()
     return token
 
 
-def authenticate(secret_key, client_id, channel, info=None):
+def generate_channel_auth(secret_key, client_id, channel, info=None):
     """
     Generate auth HMAC for private channel subscription
     """
@@ -75,7 +70,7 @@ class Client(object):
         return '/'.join([self.address.rstrip('/'), self.project_id])
 
     def sign_encoded_data(self, encoded_data):
-        sign = hmac.new(six.b(str(self.secret_key)))
+        sign = hmac.new(six.b(str(self.secret_key)), digestmod=sha256)
         sign.update(six.b(self.project_id))
         sign.update(encoded_data)
         return sign.hexdigest()
