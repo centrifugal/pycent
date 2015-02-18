@@ -22,26 +22,26 @@ import json
 from hashlib import sha256
 
 
-def generate_token(secret_key, project_id, user_id, timestamp, user_info=None):
+def generate_token(secret_key, project_id, user_id, timestamp, info=None):
     """
     When client from browser wants to connect to Centrifuge he must send his
     user ID and ID of project. To validate that data we use HMAC to build
     token.
     """
-    if user_info is None:
-        user_info = json.dumps({})
+    if info is None:
+        info = json.dumps({})
     sign = hmac.new(six.b(str(secret_key)), digestmod=sha256)
     sign.update(six.b(project_id))
     sign.update(six.b(user_id))
     sign.update(six.b(timestamp))
-    sign.update(six.b(user_info))
+    sign.update(six.b(info))
     token = sign.hexdigest()
     return token
 
 
-def generate_channel_auth(secret_key, client_id, channel, info=None):
+def generate_channel_sign(secret_key, client_id, channel, info=None):
     """
-    Generate auth HMAC for private channel subscription
+    Generate HMAC sign for private channel subscription
     """
     if info is None:
         info = json.dumps({})
