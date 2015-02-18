@@ -37,7 +37,7 @@ def run():
     config = ConfigParser.ConfigParser()
     config.read(config_file)
 
-    if not options.section in config.sections():
+    if options.section not in config.sections():
         print(
             "Section {0} not found in {1} configuration file".format(
                 options.section, options.config
