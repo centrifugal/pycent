@@ -53,6 +53,16 @@ def generate_channel_sign(secret_key, client_id, channel, info=None):
     return auth.hexdigest()
 
 
+def generate_api_sign(secret_key, project_id, encoded_data):
+    """
+    Generate HMAC sign for api request
+    """
+    sign = hmac.new(six.b(str(secret_key)), digestmod=sha256)
+    sign.update(six.b(project_id))
+    sign.update(encoded_data)
+    return sign.hexdigest()
+
+
 class Client(object):
 
     def __init__(self, address, project_id, secret_key,
@@ -70,10 +80,7 @@ class Client(object):
         return '/'.join([self.address.rstrip('/'), self.project_id])
 
     def sign_encoded_data(self, encoded_data):
-        sign = hmac.new(six.b(str(self.secret_key)), digestmod=sha256)
-        sign.update(six.b(self.project_id))
-        sign.update(encoded_data)
-        return sign.hexdigest()
+        return generate_api_sign(self.secret_key, self.project_id, encoded_data)
 
     def prepare(self, data):
         url = self.prepare_url()
