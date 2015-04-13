@@ -22,7 +22,7 @@ import json
 from hashlib import sha256
 
 
-def generate_token(secret_key, project_id, user_id, timestamp, info=None):
+def generate_token(secret, key, user_id, timestamp, info=None):
     """
     When client from browser wants to connect to Centrifuge he must send his
     user ID and ID of project. To validate that data we use HMAC to build
@@ -30,8 +30,8 @@ def generate_token(secret_key, project_id, user_id, timestamp, info=None):
     """
     if info is None:
         info = json.dumps({})
-    sign = hmac.new(six.b(str(secret_key)), digestmod=sha256)
-    sign.update(six.b(project_id))
+    sign = hmac.new(six.b(str(secret)), digestmod=sha256)
+    sign.update(six.b(key))
     sign.update(six.b(user_id))
     sign.update(six.b(timestamp))
     sign.update(six.b(info))
@@ -39,25 +39,25 @@ def generate_token(secret_key, project_id, user_id, timestamp, info=None):
     return token
 
 
-def generate_channel_sign(secret_key, client_id, channel, info=None):
+def generate_channel_sign(secret, client_id, channel, info=None):
     """
     Generate HMAC sign for private channel subscription
     """
     if info is None:
         info = json.dumps({})
 
-    auth = hmac.new(six.b(str(secret_key)), digestmod=sha256)
+    auth = hmac.new(six.b(str(secret)), digestmod=sha256)
     auth.update(six.b(str(client_id)))
     auth.update(six.b(str(channel)))
     auth.update(six.b(info))
     return auth.hexdigest()
 
 
-def generate_api_sign(secret_key, project_id, encoded_data):
+def generate_api_sign(secret, project_id, encoded_data):
     """
     Generate HMAC sign for api request
     """
-    sign = hmac.new(six.b(str(secret_key)), digestmod=sha256)
+    sign = hmac.new(six.b(str(secret)), digestmod=sha256)
     sign.update(six.b(project_id))
     sign.update(encoded_data)
     return sign.hexdigest()
@@ -65,11 +65,10 @@ def generate_api_sign(secret_key, project_id, encoded_data):
 
 class Client(object):
 
-    def __init__(self, address, project_id, secret_key,
-                 timeout=2, send_func=None, json_encoder=None, **kwargs):
+    def __init__(self, address, key, secret, timeout=2, send_func=None, json_encoder=None, **kwargs):
         self.address = address
-        self.project_id = project_id
-        self.secret_key = secret_key
+        self.key = key
+        self.secret = secret
         self.timeout = timeout
         self.send_func = send_func
         self.json_encoder = json_encoder
@@ -77,10 +76,10 @@ class Client(object):
         self.messages = []
 
     def prepare_url(self):
-        return '/'.join([self.address.rstrip('/'), self.project_id])
+        return '/'.join([self.address.rstrip('/'), self.key])
 
     def sign_encoded_data(self, encoded_data):
-        return generate_api_sign(self.secret_key, self.project_id, encoded_data)
+        return generate_api_sign(self.secret, self.key, encoded_data)
 
     def prepare(self, data):
         url = self.prepare_url()

@@ -47,8 +47,8 @@ def run():
 
     try:
         address = config.get(options.section, 'address')
-        project_id = config.get(options.section, 'project_id')
-        secret_key = config.get(options.section, 'secret_key')
+        key = config.get(options.section, 'key')
+        secret = config.get(options.section, 'secret')
         try:
             timeout = config.getint(options.section, 'timeout')
         except:
@@ -77,8 +77,8 @@ def run():
 
     client = Client(
         address,
-        project_id,
-        secret_key,
+        key,
+        secret,
         timeout=timeout
     )
 
