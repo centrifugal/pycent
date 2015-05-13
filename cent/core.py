@@ -25,8 +25,8 @@ from hashlib import sha256
 def generate_token(secret, key, user, timestamp, info=None):
     """
     When client from browser wants to connect to Centrifuge he must send his
-    user ID and ID of project. To validate that data we use HMAC to build
-    token.
+    user ID, project key, timestamp and optional info. To validate that data 
+    we use HMAC to build token.
     """
     if info is None:
         info = json.dumps({})
