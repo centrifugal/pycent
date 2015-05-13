@@ -22,7 +22,7 @@ import json
 from hashlib import sha256
 
 
-def generate_token(secret, key, user_id, timestamp, info=None):
+def generate_token(secret, key, user, timestamp, info=None):
     """
     When client from browser wants to connect to Centrifuge he must send his
     user ID and ID of project. To validate that data we use HMAC to build
@@ -32,14 +32,14 @@ def generate_token(secret, key, user_id, timestamp, info=None):
         info = json.dumps({})
     sign = hmac.new(six.b(str(secret)), digestmod=sha256)
     sign.update(six.b(key))
-    sign.update(six.b(user_id))
+    sign.update(six.b(user))
     sign.update(six.b(timestamp))
     sign.update(six.b(info))
     token = sign.hexdigest()
     return token
 
 
-def generate_channel_sign(secret, client_id, channel, info=None):
+def generate_channel_sign(secret, client, channel, info=None):
     """
     Generate HMAC sign for private channel subscription
     """
@@ -47,18 +47,18 @@ def generate_channel_sign(secret, client_id, channel, info=None):
         info = json.dumps({})
 
     auth = hmac.new(six.b(str(secret)), digestmod=sha256)
-    auth.update(six.b(str(client_id)))
+    auth.update(six.b(str(client)))
     auth.update(six.b(str(channel)))
     auth.update(six.b(info))
     return auth.hexdigest()
 
 
-def generate_api_sign(secret, project_id, encoded_data):
+def generate_api_sign(secret, key, encoded_data):
     """
     Generate HMAC sign for api request
     """
     sign = hmac.new(six.b(str(secret)), digestmod=sha256)
-    sign.update(six.b(project_id))
+    sign.update(six.b(key))
     sign.update(encoded_data)
     return sign.hexdigest()
 
