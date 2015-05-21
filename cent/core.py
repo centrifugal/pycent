@@ -39,13 +39,10 @@ def generate_token(project_secret, project_key, user, timestamp, info=None):
     return token
 
 
-def generate_channel_sign(project_secret, client, channel, info=None):
+def generate_channel_sign(project_secret, client, channel, info=""):
     """
     Generate HMAC sign for private channel subscription
     """
-    if info is None:
-        info = json.dumps({})
-
     auth = hmac.new(six.b(str(project_secret)), digestmod=sha256)
     auth.update(six.b(str(client)))
     auth.update(six.b(str(channel)))
