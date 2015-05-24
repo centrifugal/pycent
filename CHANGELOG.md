@@ -3,6 +3,10 @@
 
 Cent 0.4.0 reflects Centrifuge 0.8.0 changes. Centrifuge 0.8.0 uses project name as API key instead of project ID
 
+* update console client configuration file option names (see below)
+* empty string (`""`) instead of empty object `"{}"` for default `info`
+
+
 How to migrate
 ==============
 
