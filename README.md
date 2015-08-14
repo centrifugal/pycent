@@ -3,4 +3,4 @@ CENT
 
 Python tools to communicate with Centrifuge
 
-[documentation](https://centrifuge.readthedocs.org/en/latest/content/admin_api.html)
+[documentation](http://fzambia.gitbooks.io/centrifugal/content/libraries/python.html)
