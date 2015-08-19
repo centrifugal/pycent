@@ -22,6 +22,14 @@ import json
 from hashlib import sha256
 
 
+class ClientNotEmpty(Exception):
+    pass
+
+
+class MalformedResponse(Exception):
+    pass
+
+
 def generate_token(project_secret, project_key, user, timestamp, info=""):
     """
     When client from browser wants to connect to Centrifuge he must send his
@@ -122,3 +130,78 @@ class Client(object):
             data = response.read()
             result = json.loads(data.decode('utf-8'))
             return result, None
+
+    def reset(self):
+        self.messages = []
+
+    @staticmethod
+    def get_publish_params(channel, data, client=None):
+        params = {
+            "channel": channel,
+            "data": data
+        }
+        if client:
+            params['client'] = client
+        return params
+
+    @staticmethod
+    def get_unsubscribe_params(user, channel=None):
+        params = {"user": user}
+        if channel:
+            params["channel"] = channel
+        return params
+
+    @staticmethod
+    def get_disconnect_params(user):
+        return {
+            "user": user
+        }
+
+    @staticmethod
+    def get_presence_params(channel):
+        return {
+            "channel": channel
+        }
+
+    @staticmethod
+    def get_history_params(channel):
+        return {
+            "channel": channel
+        }
+
+    def _check_empty(self):
+        if self.messages:
+            raise ClientNotEmpty("client messages not empty, send commands or reset client")
+
+    def _send_one(self):
+        res, err = self.send()
+        if err:
+            return None, err
+        if not res:
+            return None, MalformedResponse("empty response")
+        return res[0], None
+
+    def publish(self, channel, data, client=None):
+        self._check_empty()
+        self.add("publish", self.get_publish_params(channel, data, client=client))
+        return self._send_one()
+
+    def unsubscribe(self, user, channel=None):
+        self._check_empty()
+        self.add("unsubscribe", self.get_unsubscribe_params(user, channel=channel))
+        return self._send_one()
+
+    def disconnect(self, user):
+        self._check_empty()
+        self.add("disconnect", self.get_disconnect_params(user))
+        return self._send_one()
+
+    def presence(self, channel):
+        self._check_empty()
+        self.add("presence", self.get_presence_params(channel))
+        return self._send_one()
+
+    def history(self, channel):
+        self._check_empty()
+        self.add("history", self.get_history_params(channel))
+        return self._send_one()
