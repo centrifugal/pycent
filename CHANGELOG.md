@@ -1,3 +1,26 @@
+0.5.0
+=====
+
+Added several API methods for client to simplify sending single commands to API.
+
+* `client.publish(channel, data, client=None)`
+* `client.presence(channel)`
+* `client.history(channel)`
+* `client.unsubscribe(user_id, channel=None)`
+* `client.disconnect(user_id)`
+
+For example:
+
+```python
+from cent.core import Client
+
+client = Client("http://localhost:8000", "development", "secret")
+
+for i in range(1000):
+    res, err = client.publish("$public:docs", {"json": True})
+    print res
+```
+
 0.4.0
 =====
 
