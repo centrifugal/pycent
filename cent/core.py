@@ -169,6 +169,10 @@ class Client(object):
             "channel": channel
         }
 
+    @staticmethod
+    def get_channels_params():
+        return {}
+
     def _check_empty(self):
         if self.messages:
             raise ClientNotEmpty("client messages not empty, send commands or reset client")
@@ -204,4 +208,9 @@ class Client(object):
     def history(self, channel):
         self._check_empty()
         self.add("history", self.get_history_params(channel))
+        return self._send_one()
+
+    def channels(self):
+        self._check_empty()
+        self.add("channels", self.get_channels_params())
         return self._send_one()
