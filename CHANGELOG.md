@@ -1,3 +1,8 @@
+0.6.0
+=====
+
+* support `channels` command (Centrifugo >= 0.3.0 required)
+
 0.5.0
 =====
 
