@@ -33,7 +33,7 @@ class MalformedResponse(Exception):
 def generate_token(secret, user, timestamp, info=""):
     """
     When client from browser wants to connect to Centrifuge he must send his
-    user ID, project key, timestamp and optional info. To validate that data 
+    user ID, timestamp and optional info. To validate that data
     we use HMAC to build token.
     """
     sign = hmac.new(six.b(str(secret)), digestmod=sha256)
@@ -170,6 +170,10 @@ class Client(object):
     def get_channels_params():
         return {}
 
+    @staticmethod
+    def get_stats_params():
+        return {}
+
     def _check_empty(self):
         if self.messages:
             raise ClientNotEmpty("client messages not empty, send commands or reset client")
@@ -210,4 +214,9 @@ class Client(object):
     def channels(self):
         self._check_empty()
         self.add("channels", self.get_channels_params())
+        return self._send_one()
+
+    def stats(self):
+        self._check_empty()
+        self.add("stats", self.get_stats_params())
         return self._send_one()
