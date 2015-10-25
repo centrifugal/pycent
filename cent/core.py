@@ -30,14 +30,13 @@ class MalformedResponse(Exception):
     pass
 
 
-def generate_token(project_secret, project_key, user, timestamp, info=""):
+def generate_token(secret, user, timestamp, info=""):
     """
     When client from browser wants to connect to Centrifuge he must send his
-    user ID, project key, timestamp and optional info. To validate that data 
+    user ID, timestamp and optional info. To validate that data
     we use HMAC to build token.
     """
-    sign = hmac.new(six.b(str(project_secret)), digestmod=sha256)
-    sign.update(six.b(project_key))
+    sign = hmac.new(six.b(str(secret)), digestmod=sha256)
     sign.update(six.b(user))
     sign.update(six.b(timestamp))
     sign.update(six.b(info))
@@ -45,33 +44,31 @@ def generate_token(project_secret, project_key, user, timestamp, info=""):
     return token
 
 
-def generate_channel_sign(project_secret, client, channel, info=""):
+def generate_channel_sign(secret, client, channel, info=""):
     """
     Generate HMAC sign for private channel subscription
     """
-    auth = hmac.new(six.b(str(project_secret)), digestmod=sha256)
+    auth = hmac.new(six.b(str(secret)), digestmod=sha256)
     auth.update(six.b(str(client)))
     auth.update(six.b(str(channel)))
     auth.update(six.b(info))
     return auth.hexdigest()
 
 
-def generate_api_sign(project_secret, project_key, encoded_data):
+def generate_api_sign(secret, encoded_data):
     """
     Generate HMAC sign for api request
     """
-    sign = hmac.new(six.b(str(project_secret)), digestmod=sha256)
-    sign.update(six.b(project_key))
+    sign = hmac.new(six.b(str(secret)), digestmod=sha256)
     sign.update(encoded_data)
     return sign.hexdigest()
 
 
 class Client(object):
 
-    def __init__(self, address, project_key, project_secret, timeout=2, send_func=None, json_encoder=None, **kwargs):
+    def __init__(self, address, secret, timeout=2, send_func=None, json_encoder=None, **kwargs):
         self.address = address
-        self.key = project_key
-        self.secret = project_secret
+        self.secret = secret
         self.timeout = timeout
         self.send_func = send_func
         self.json_encoder = json_encoder
@@ -80,16 +77,16 @@ class Client(object):
 
     def prepare_url(self):
         """
-        http(s)://centrifuge.example.com/api/PROJECT_KEY
+        http(s)://centrifuge.example.com/api/
         """
         address = self.address.rstrip('/')
-        api_path = "/api"
+        api_path = "/api/"
         if not address.endswith(api_path):
             address += api_path
-        return '/'.join([address, self.key])
+        return address
 
     def sign_encoded_data(self, encoded_data):
-        return generate_api_sign(self.secret, self.key, encoded_data)
+        return generate_api_sign(self.secret, encoded_data)
 
     def prepare(self, data):
         url = self.prepare_url()
@@ -173,6 +170,10 @@ class Client(object):
     def get_channels_params():
         return {}
 
+    @staticmethod
+    def get_stats_params():
+        return {}
+
     def _check_empty(self):
         if self.messages:
             raise ClientNotEmpty("client messages not empty, send commands or reset client")
@@ -213,4 +214,9 @@ class Client(object):
     def channels(self):
         self._check_empty()
         self.add("channels", self.get_channels_params())
+        return self._send_one()
+
+    def stats(self):
+        self._check_empty()
+        self.add("stats", self.get_stats_params())
         return self._send_one()

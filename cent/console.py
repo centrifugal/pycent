@@ -47,7 +47,6 @@ def run():
 
     try:
         address = config.get(options.section, 'address')
-        key = config.get(options.section, 'key')
         secret = config.get(options.section, 'secret')
         try:
             timeout = config.getint(options.section, 'timeout')
@@ -77,7 +76,6 @@ def run():
 
     client = Client(
         address,
-        key,
         secret,
         timeout=timeout
     )
