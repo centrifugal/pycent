@@ -1,3 +1,22 @@
+1.0.0
+=====
+
+* support for Centrifugo 1.0.0
+
+This means that no more project key required.
+
+How to migrate
+--------------
+
+Omit project key when instantiating Client:
+
+```
+from cent.core import Client
+client = Client("http://localhost:8000", "project_secret")
+```
+
+And also note that token and sign generation function do not accept project key anymore.
+
 0.6.0
 =====
 

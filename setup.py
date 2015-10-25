@@ -15,13 +15,13 @@ if sys.version_info[:2] in ((2, 6),):
 
 
 def long_description():
-    return "python tools to communicate with Centrifuge"
+    return "python tools to communicate with Centrifugo"
 
 
 setup(
     name='cent',
-    version='0.6.0',
-    description="python tools to communicate with Centrifuge",
+    version='1.0.0',
+    description="python tools to communicate with Centrifugo",
     long_description=long_description(),
     url='https://github.com/centrifugal/cent',
     download_url='https://github.com/centrifugal/cent',
