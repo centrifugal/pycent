@@ -22,19 +22,31 @@ import json
 from hashlib import sha256
 
 
-class ClientNotEmpty(Exception):
+class CentException(Exception):
     pass
 
 
-class MalformedResponse(Exception):
+class ClientNotEmpty(CentException):
+    pass
+
+
+class MalformedResponse(CentException):
+    pass
+
+
+class ResponseError(CentException):
     pass
 
 
 def generate_token(secret, user, timestamp, info=""):
     """
     When client from browser wants to connect to Centrifuge he must send his
-    user ID, timestamp and optional info. To validate that data
-    we use HMAC to build token.
+    user ID, timestamp and optional info. To validate that data we use HMAC
+    SHA-256 to build token.
+    @param secret: Centrifugo secret key
+    @param user: user ID from your application
+    @param timestamp: current timestamp seconds as string
+    @param info: optional json encoded data for this client connection
     """
     sign = hmac.new(six.b(str(secret)), digestmod=sha256)
     sign.update(six.b(user))
@@ -46,7 +58,11 @@ def generate_token(secret, user, timestamp, info=""):
 
 def generate_channel_sign(secret, client, channel, info=""):
     """
-    Generate HMAC sign for private channel subscription
+    Generate HMAC SHA-256 sign for private channel subscription.
+    @param secret: Centrifugo secret key
+    @param client: client ID
+    @param channel: channel client wants to subscribe to
+    @param info: optional json encoded data for this channel
     """
     auth = hmac.new(six.b(str(secret)), digestmod=sha256)
     auth.update(six.b(str(client)))
@@ -57,7 +73,9 @@ def generate_channel_sign(secret, client, channel, info=""):
 
 def generate_api_sign(secret, encoded_data):
     """
-    Generate HMAC sign for api request
+    Generate HMAC SHA-256 sign for API request.
+    @param secret: Centrifugo secret key
+    @param encoded_data: json encoded data to send
     """
     sign = hmac.new(six.b(str(secret)), digestmod=sha256)
     sign.update(encoded_data)
@@ -184,7 +202,12 @@ class Client(object):
             return None, err
         if not res:
             return None, MalformedResponse("empty response")
-        return res[0], None
+        data = res[0]
+        if "error" in data and data["error"]:
+            return None, ResponseError(data["error"])
+        if "body" not in data:
+            return None, MalformedResponse("response body not found")
+        return data["body"], None
 
     def publish(self, channel, data, client=None):
         self._check_empty()

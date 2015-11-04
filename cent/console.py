@@ -85,8 +85,7 @@ def run():
         sys.exit(1)
 
     client.add(options.method, params)
-    response = client.send()
-    result, error = response
+    result, error = client.send()
     if error:
         print(error)
         sys.exit(1)

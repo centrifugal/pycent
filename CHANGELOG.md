@@ -1,3 +1,50 @@
+1.1.0
+=====
+
+Some improvements in cent public API here.
+
+`publish`, `unsubscribe`, `presence`, `history`, `stats`, `channels` helper methods now return
+response body and error (instead of full response and error). `error` field of response now
+wrapped in `ResponseError` exception. This means that now you don't need to extract response
+body and check response error manually in your code every time you use methods above.
+
+For example calling `stats` method:
+
+```python
+from cent.core import Client
+
+client = Client("http://localhost:8000", "secret")
+
+body, error = client.stats()
+if error:
+    # error occurred, handle it
+    raise error
+
+print body
+```
+
+Compare with code required before:
+
+```python
+from cent.core import Client
+
+client = Client("http://localhost:8000", "secret")
+
+resp, error = client.stats()
+if error:
+    # error occurred, handle it
+    raise error
+if resp["error"]:
+    # handle response error
+    raise Exception(resp["error"])
+
+body = resp["body"]
+print body
+```
+
+Low level sending over calling `add` method not affected in this release.
+
+
 1.0.0
 =====
 
