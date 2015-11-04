@@ -212,34 +212,57 @@ class Client(object):
     def publish(self, channel, data, client=None):
         self._check_empty()
         self.add("publish", self.get_publish_params(channel, data, client=client))
-        return self._send_one()
+        _, error = self._send_one()
+        return error
 
     def unsubscribe(self, user, channel=None):
         self._check_empty()
         self.add("unsubscribe", self.get_unsubscribe_params(user, channel=channel))
-        return self._send_one()
+        _, error = self._send_one()
+        return error
 
     def disconnect(self, user):
         self._check_empty()
         self.add("disconnect", self.get_disconnect_params(user))
-        return self._send_one()
+        _, error = self._send_one()
+        return error
 
     def presence(self, channel):
         self._check_empty()
         self.add("presence", self.get_presence_params(channel))
-        return self._send_one()
+        body, error = self._send_one()
+        if not error:
+            if "data" not in body:
+                return None, ResponseError("presence data not found in response body")
+            return body["data"], None
+        return None, error
 
     def history(self, channel):
         self._check_empty()
         self.add("history", self.get_history_params(channel))
-        return self._send_one()
+        body, error = self._send_one()
+        if not error:
+            if "data" not in body:
+                return None, ResponseError("history data not found in response body")
+            return body["data"], None
+        return None, error
 
     def channels(self):
         self._check_empty()
         self.add("channels", self.get_channels_params())
-        return self._send_one()
+        body, error = self._send_one()
+        if not error:
+            if "data" not in body:
+                return None, ResponseError("channels data not found in response body")
+            return body["data"], None
+        return None, error
 
     def stats(self):
         self._check_empty()
         self.add("stats", self.get_stats_params())
-        return self._send_one()
+        body, error = self._send_one()
+        if not error:
+            if "data" not in body:
+                return None, ResponseError("stats data not found in response body")
+            return body["data"], None
+        return None, error
