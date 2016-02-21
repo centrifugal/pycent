@@ -1,4 +1,4 @@
-1.1.2
+1.2.0
 =====
 
 * add `insecure_api` boolean option to `Client` - when `True` then client
