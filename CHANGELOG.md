@@ -1,3 +1,11 @@
+1.1.2
+=====
+
+* add `insecure_api` boolean option to `Client` - when `True` then client
+    won't generate sign for every request to Centrifugo. This will work when Centrifugo
+    itself started with `--insecure_api` option. Don't forget about firewall rules in production.
+
+
 1.1.0
 =====
 

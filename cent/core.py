@@ -84,12 +84,13 @@ def generate_api_sign(secret, encoded_data):
 
 class Client(object):
 
-    def __init__(self, address, secret, timeout=2, send_func=None, json_encoder=None, **kwargs):
+    def __init__(self, address, secret, timeout=2, send_func=None, json_encoder=None, insecure_api=False, **kwargs):
         self.address = address
         self.secret = secret
         self.timeout = timeout
         self.send_func = send_func
         self.json_encoder = json_encoder
+        self.insecure_api = insecure_api
         self.kwargs = kwargs
         self.messages = []
 
@@ -109,7 +110,11 @@ class Client(object):
     def prepare(self, data):
         url = self.prepare_url()
         encoded_data = six.b(json.dumps(data, cls=self.json_encoder))
-        sign = self.sign_encoded_data(encoded_data)
+        if not self.insecure_api:
+            sign = self.sign_encoded_data(encoded_data)
+        else:
+            # no need to generate sign in case of insecure API option on
+            sign = ""
         return url, sign, encoded_data
 
     def add(self, method, params):
