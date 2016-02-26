@@ -165,6 +165,16 @@ class Client(object):
         return params
 
     @staticmethod
+    def get_broadcast_params(channels, data, client=None):
+        params = {
+            "channels": channels,
+            "data": data
+        }
+        if client:
+            params['client'] = client
+        return params
+
+    @staticmethod
     def get_unsubscribe_params(user, channel=None):
         params = {"user": user}
         if channel:
@@ -217,6 +227,12 @@ class Client(object):
     def publish(self, channel, data, client=None):
         self._check_empty()
         self.add("publish", self.get_publish_params(channel, data, client=client))
+        _, error = self._send_one()
+        return error
+
+    def broadcast(self, channels, data, client=None):
+        self._check_empty()
+        self.add("broadcast", self.get_broadcast_params(channels, data, client=client))
         _, error = self._send_one()
         return error
 

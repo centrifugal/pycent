@@ -1,3 +1,9 @@
+1.3.0
+=====
+
+* add `broadcast` API command support
+
+
 1.2.0
 =====
 
