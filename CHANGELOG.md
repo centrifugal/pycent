@@ -3,7 +3,7 @@
 
 Cent client now uses `requests` lib internally to make requests to Centrifugo. Also it's now
 more pythonic because it does not return exceptions but raises them. It breaks the old API so
-this is a new major release.
+this is a new major release. See updated readme.
 
 1.3.0
 =====
