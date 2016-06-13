@@ -11,7 +11,7 @@ try:
 except ImportError:
     import ConfigParser
 
-from .core import Client
+from .core import Client, CentException
 
 
 def run():
@@ -51,7 +51,7 @@ def run():
         try:
             timeout = config.getint(options.section, 'timeout')
         except:
-            timeout = 2
+            timeout = 1
     except Exception as e:
         print(e)
         sys.exit(1)
@@ -85,9 +85,10 @@ def run():
         sys.exit(1)
 
     client.add(options.method, params)
-    result, error = client.send()
-    if error:
-        print(error)
+    try:
+        result = client.send()
+    except CentException as err:
+        print(err.message)
         sys.exit(1)
     else:
         print(result)

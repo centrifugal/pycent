@@ -8,9 +8,8 @@ if sys.argv[-1] == 'test':
     sys.exit(1 if status > 127 else status)
 
 
-requirements = ['six>=1.3.0']
+requirements = ['six>=1.3.0', 'requests']
 if sys.version_info[:2] in ((2, 6),):
-    # argparse has been added in Python 3.2 / 2.7
     requirements.append('argparse>=1.2.1')
 
 
@@ -20,7 +19,7 @@ def long_description():
 
 setup(
     name='cent',
-    version='1.3.0',
+    version='2.0.0',
     description="python tools to communicate with Centrifugo",
     long_description=long_description(),
     url='https://github.com/centrifugal/cent',
@@ -36,11 +35,13 @@ setup(
     },
     install_requires=requirements,
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 5 - Production/Stable',
         'Programming Language :: Python',
         'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3.3',
+        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
         'Environment :: Console',
         'Intended Audience :: Developers',
         'Intended Audience :: System Administrators',
