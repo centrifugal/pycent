@@ -111,11 +111,19 @@ class Client(object):
     def prepare_url(self):
         """
         http(s)://centrifuge.example.com/api/
+
+        Some work here to prepare valid API url: make it work even if following urls provided
+        during client initialization:
+        http(s)://centrifuge.example.com
+        http(s)://centrifuge.example.com/
+        http(s)://centrifuge.example.com/api
+        http(s)://centrifuge.example.com/api/
         """
-        address = self.address.rstrip('/')
-        api_path = "/api/"
+        address = self.address.rstrip("/")
+        api_path = "/api"
         if not address.endswith(api_path):
             address += api_path
+        address += "/"
         return address
 
     def sign_encoded_data(self, encoded_data):
@@ -156,6 +164,8 @@ class Client(object):
             resp = requests.post(url, data=encoded_data, headers=headers, timeout=self.timeout)
         except requests.RequestException as err:
             raise RequestException(err)
+        if resp.status_code != 200:
+            raise RequestException("wrong status code: %d" % resp.status_code)
         return json.loads(resp.content.decode('utf-8'))
 
     def reset(self):
