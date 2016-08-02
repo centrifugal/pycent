@@ -1,3 +1,9 @@
+2.0.1
+=====
+
+* Wrap wrong status code in RequestException
+* Fix preparing API endpoint url
+
 2.0.0
 =====
 
