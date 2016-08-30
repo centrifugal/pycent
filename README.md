@@ -16,7 +16,7 @@ First see [available API methods in documentation](https://fzambia.gitbooks.io/c
 This library contains `Client` class to send messages to Centrifugo from your python-powered backend:
 
 ```python
-from cent.core import Client
+from cent import Client
 
 url = "http://localhost:8000"
 secret_key = "secret"
@@ -44,7 +44,7 @@ raise an instance of `CentException`.
 I.e.:
 
 ```python
-from cent.core import Client, CentException
+from cent import Client, CentException
 
 client = Client("http://localhost:8000", "secret", timeout=1)
 try:
@@ -59,6 +59,7 @@ Depending on problem occurred exceptions can be:
 * ResponseError - Centrifugo returned some error on request
 
 Both exceptions inherited from `CentException`.
+
 
 ### Low-level library API:
 
@@ -93,6 +94,72 @@ You'll get something like this in response:
 ```
 
 I.e. list of single response to each command sent. So you need to inspect response on errors yourself.
+
+
+### Helper functions
+
+Cent library also has several functions to help generating tokens.
+
+#### get_timestamp()
+
+`get_timestamp` function returns current UNIX timestamp seconds converted to string as required by Centrifugo.
+
+For example:
+
+```python
+>>> from cent import get_timestamp
+>>> print(get_timestamp())
+'1472482903'
+```
+
+#### generate_token(secret, user, timestamp, info="")
+
+`generate_token` function allows to generate client connection token.
+
+So to generate client connection token:
+
+```python
+import json
+import time
+from cent import generate_token, get_timestamp
+
+info = json.dumps({
+    "first_name": "Alexander",
+    "last_name": "Emelin"
+})
+
+generate_token("SECRET", "app user ID", get_timestamp(), info=info)
+```
+
+#### generate_channel_sign(secret, client, channel, info="")
+
+`generate_channel_sign(secret, client, channel, info="")` function generates HMAC SHA-256 sign for private
+channel subscription.
+
+
+#### generate_api_sign(secret, encoded_data)
+
+`generate_api_sign` function allows to generate HTTP API sign. In most cases you don't need this as `Client`
+use this function internally when sending API requests.
+
+
+### Client initialization arguments
+
+Required:
+
+* address - Centrifugo address
+* secret - Centrifugo configuration secret key
+
+Optional:
+
+* timeout (default: `1`) - timeout for HTTP requests to Centrifugo
+* json_encoder (default: `None`) - set custom JSON encoder
+* send_func (default: `None`) - set custom send function
+* insecure_api (default: `False`) - when set to True no signing will be used. This can be very useful if you
+    run Centrifugo with `--insecure_api` option. Enabling this option then allows to reduce resource usage as no need
+    to generate API sign on every request.
+* verify (default: `True`) - when set to `False` no certificate check will be done during requests.
+
 
 ### cent as console client
 
