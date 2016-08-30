@@ -6,6 +6,7 @@ except ImportError:
 
 import sys
 import hmac
+import time
 import json
 from hashlib import sha256
 import requests
@@ -96,15 +97,37 @@ def generate_api_sign(secret, encoded_data):
     return sign.hexdigest()
 
 
-class Client(object):
+def get_timestamp():
+    """
+    Returns current timestamp seconds string required to make connection to Centrifugo.
+    """
+    return str(int(time.time()))
 
-    def __init__(self, address, secret, timeout=1, send_func=None, json_encoder=None, insecure_api=False, **kwargs):
+
+class Client(object):
+    """
+    Core class to communicate with Centrifugo.
+    """
+
+    def __init__(self, address, secret, timeout=1, send_func=None,
+                 json_encoder=None, insecure_api=False, verify=True, **kwargs):
+        """
+        :param address: Centrifugo address
+        :param secret: Centrifugo configuration secret key
+        :param timeout: timeout for HTTP requests to Centrifugo
+        :param send_func: custom send function
+        :param json_encoder: custom JSON encoder
+        :param insecure_api: boolean value, when set to True no signing will be used
+        :param verify: boolean flag, when set to False no certificate check will be done during requests.
+        """
+
         self.address = address
         self.secret = secret
         self.timeout = timeout
         self.send_func = send_func
         self.json_encoder = json_encoder
         self.insecure_api = insecure_api
+        self.verify = verify
         self.kwargs = kwargs
         self._messages = []
 
@@ -161,7 +184,7 @@ class Client(object):
         """
         headers = {'Content-type': 'application/json', 'X-API-Sign': sign}
         try:
-            resp = requests.post(url, data=encoded_data, headers=headers, timeout=self.timeout)
+            resp = requests.post(url, data=encoded_data, headers=headers, timeout=self.timeout, verify=self.verify)
         except requests.RequestException as err:
             raise RequestException(err)
         if resp.status_code != 200:
