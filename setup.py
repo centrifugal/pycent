@@ -8,7 +8,7 @@ if sys.argv[-1] == 'test':
     sys.exit(1 if status > 127 else status)
 
 
-requirements = ['six>=1.3.0', 'requests']
+requirements = ['requests']
 if sys.version_info[:2] in ((2, 6),):
     requirements.append('argparse>=1.2.1')
 
@@ -19,7 +19,7 @@ def long_description():
 
 setup(
     name='cent',
-    version='2.0.1',
+    version='2.0.2',
     description="python tools to communicate with Centrifugo",
     long_description=long_description(),
     url='https://github.com/centrifugal/cent',

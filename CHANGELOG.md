@@ -1,3 +1,10 @@
+2.0.2
+=====
+
+* `verify` boolean `Client` initialization option (default: `True`). When `False` disables SSL certificate
+    verification.
+* `get_timestamp` helper function to get current timestamp seconds string value as required by Centrifugo.
+
 2.0.1
 =====
 
