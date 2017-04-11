@@ -189,7 +189,7 @@ class Client(object):
         headers = {'Content-type': 'application/json', 'X-API-Sign': sign}
         if self.pool is not None:
             try:
-                resp = self.pool.request('POST', '/api/', fields={'data': encoded_data}, headers=headers, timeout=self.timeout)
+                resp = self.pool.request('POST', '/api/', headers=headers, body=encoded_data, timeout=self.timeout)
             except urllib3.exceptions.ConnectionError as err:
                 raise RequestException(err)
             return json.loads(resp.data.decode('utf-8'))
