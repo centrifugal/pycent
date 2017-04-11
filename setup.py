@@ -8,7 +8,7 @@ if sys.argv[-1] == 'test':
     sys.exit(1 if status > 127 else status)
 
 
-requirements = ['requests']
+requirements = ['requests', 'urllib3']
 if sys.version_info[:2] in ((2, 6),):
     requirements.append('argparse>=1.2.1')
 
@@ -22,10 +22,10 @@ setup(
     version='2.0.2',
     description="python tools to communicate with Centrifugo",
     long_description=long_description(),
-    url='https://github.com/centrifugal/cent',
-    download_url='https://github.com/centrifugal/cent',
-    author="Alexandr Emelin",
-    author_email='frvzmb@gmail.com',
+    url='https://github.com/leopeng1995/cent',
+    download_url='https://github.com/leopeng1995/cent',
+    author="Alexandr Emelin, Leo Peng",
+    author_email='frvzmb@gmail.com, leopeng1995@hotmail.com',
     license='MIT',
     packages=['cent'],
     entry_points={
