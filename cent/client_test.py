@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
-from core import Client
+# from core import Client
+from cent import Client
 from urllib3 import HTTPConnectionPool
 
 
