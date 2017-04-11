@@ -1,14 +1,18 @@
 #!/usr/bin/python3
 
-# from core import Client
-from cent import Client
+from core import Client
+# from cent import Client
 from urllib3 import HTTPConnectionPool
 
 
-url = "http://localhost:8000"
-secret_key = "68ccb437-e54b-421a-b536-ddecd6886fd5"
+# url = "http://localhost:8000"
+url = "localhost:8000"
+secret_key = "9a55d4e8-1539-4560-96e8-5fa6ed31fdf5"
 
-client = Client(url, secret_key)
+pool = HTTPConnectionPool(url, maxsize=5)
+
+# client = Client(url, secret_key)
+client = Client(url, secret_key, pool=pool)
 
 channel = "public:chat"
 data = {"input": "test"}
