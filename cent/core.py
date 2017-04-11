@@ -10,6 +10,8 @@ import time
 import json
 from hashlib import sha256
 import requests
+import urllib3
+import urllib3.exceptions
 
 
 PY2 = sys.version_info[0] == 2
@@ -109,11 +111,12 @@ class Client(object):
     Core class to communicate with Centrifugo.
     """
 
-    def __init__(self, address, secret, timeout=1, send_func=None,
+    def __init__(self, address, secret, pool=None, timeout=1, send_func=None,
                  json_encoder=None, insecure_api=False, verify=True, **kwargs):
         """
         :param address: Centrifugo address
         :param secret: Centrifugo configuration secret key
+        :param pool: HTTP connection pool, includes ConnectionPool and PoolManager
         :param timeout: timeout for HTTP requests to Centrifugo
         :param send_func: custom send function
         :param json_encoder: custom JSON encoder
@@ -123,6 +126,7 @@ class Client(object):
 
         self.address = address
         self.secret = secret
+        self.pool = pool
         self.timeout = timeout
         self.send_func = send_func
         self.json_encoder = json_encoder
@@ -183,6 +187,12 @@ class Client(object):
         Send a request to a remote web server using HTTP POST.
         """
         headers = {'Content-type': 'application/json', 'X-API-Sign': sign}
+        if self.pool is not None:
+            try:
+                resp = self.pool.request('POST', '/api/', fields={'data': encoded_data}, headers=headers, timeout=self.timeout)
+            except urllib3.exceptions.ConnectionError as err:
+                raise RequestException(err)
+            return json.loads(resp.data.decode('utf-8'))
         try:
             resp = requests.post(url, data=encoded_data, headers=headers, timeout=self.timeout, verify=self.verify)
         except requests.RequestException as err:
