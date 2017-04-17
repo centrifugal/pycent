@@ -11,8 +11,6 @@ pip install cent
 
 ### High-level library API
 
-这里是业务后端调用的接口。
-
 First see [available API methods in documentation](https://fzambia.gitbooks.io/centrifugal/content/server/api.html).
 
 This library contains `Client` class to send messages to Centrifugo from your python-powered backend:
@@ -62,9 +60,9 @@ Depending on problem occurred exceptions can be:
 
 Both exceptions inherited from `CentException`.
 
-### Connection Pool 连接池模式
+### Connection Pool
 
-请参考`cent/client_test.py`。
+Please refer to `cent/client_test.py`.
 
 ### Low-level library API
 
