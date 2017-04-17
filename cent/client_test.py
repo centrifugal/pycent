@@ -6,7 +6,7 @@ from urllib3 import HTTPConnectionPool
 
 url_requests = "http://localhost:8000"
 url_connpool = "localhost:8000"
-secret_key = ""
+secret_key = "<secret_key>"
 
 pool = HTTPConnectionPool(url_connpool, maxsize=5)
 

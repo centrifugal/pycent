@@ -22,7 +22,7 @@ setup(
     version='2.0.2',
     description="python tools to communicate with Centrifugo",
     long_description=long_description(),
-    url='https://github.com/centrifugal5/cent',
+    url='https://github.com/centrifugal/cent',
     download_url='https://github.com/centrifugal/cent',
     author="Alexandr Emelin",
     author_email='frvzmb@gmail.com',
