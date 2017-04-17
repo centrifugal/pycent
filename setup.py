@@ -8,7 +8,7 @@ if sys.argv[-1] == 'test':
     sys.exit(1 if status > 127 else status)
 
 
-requirements = ['requests']
+requirements = ['requests', 'urllib3']
 if sys.version_info[:2] in ((2, 6),):
     requirements.append('argparse>=1.2.1')
 

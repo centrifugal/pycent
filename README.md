@@ -60,8 +60,11 @@ Depending on problem occurred exceptions can be:
 
 Both exceptions inherited from `CentException`.
 
+### Connection Pool
 
-### Low-level library API:
+Please refer to `cent/client_test.py`.
+
+### Low-level library API
 
 To send lots of commands in one request:
 
@@ -190,7 +193,3 @@ cent bananas publish --params='{"channel": "news", "data": {"title": "World Cup 
 - **bananas** is the name of section in configuration file
 - **publish** is the method name you want to call
 - **--params** is a JSON string with method parameters, in case of publish you should provide channel and data parameters.
-
-
-
-
