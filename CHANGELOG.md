@@ -1,3 +1,20 @@
+2.1.0
+=====
+
+* use `requests.Session` and allow to provide custom session to client initialization via `session` kwarg.
+
+For example:
+
+```python
+import requests
+
+sess = requests.Session()
+adapter = requests.adapters.HTTPAdapter(pool_connections=5, pool_maxsize=5)
+sess.mount('https://', adapter)
+
+client = Client("https://centrifugo.example.com", "secret", session=sess)
+```
+
 2.0.2
 =====
 

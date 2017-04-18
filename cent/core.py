@@ -110,7 +110,8 @@ class Client(object):
     """
 
     def __init__(self, address, secret, timeout=1, send_func=None,
-                 json_encoder=None, insecure_api=False, verify=True, **kwargs):
+                 json_encoder=None, insecure_api=False, verify=True,
+                 session=None, **kwargs):
         """
         :param address: Centrifugo address
         :param secret: Centrifugo configuration secret key
@@ -119,6 +120,7 @@ class Client(object):
         :param json_encoder: custom JSON encoder
         :param insecure_api: boolean value, when set to True no signing will be used
         :param verify: boolean flag, when set to False no certificate check will be done during requests.
+        :param session: custom requests.Session instance
         """
 
         self.address = address
@@ -128,6 +130,7 @@ class Client(object):
         self.json_encoder = json_encoder
         self.insecure_api = insecure_api
         self.verify = verify
+        self.session = session or requests.Session()
         self.kwargs = kwargs
         self._messages = []
 
@@ -184,7 +187,7 @@ class Client(object):
         """
         headers = {'Content-type': 'application/json', 'X-API-Sign': sign}
         try:
-            resp = requests.post(url, data=encoded_data, headers=headers, timeout=self.timeout, verify=self.verify)
+            resp = self.session.post(url, data=encoded_data, headers=headers, timeout=self.timeout, verify=self.verify)
         except requests.RequestException as err:
             raise RequestException(err)
         if resp.status_code != 200:
