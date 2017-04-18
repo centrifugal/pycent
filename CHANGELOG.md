@@ -3,7 +3,7 @@
 
 * use `requests.Session` and allow to provide custom session to client initialization via `session` kwarg.
 
-For example:
+For example to provide custom Session:
 
 ```python
 import requests
