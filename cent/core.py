@@ -53,20 +53,22 @@ class ResponseError(CentException):
     pass
 
 
-def generate_token(secret, user, timestamp, info=""):
+def generate_client_sign(secret, user, exp, info="", opts=""):
     """
     When client from browser wants to connect to Centrifuge he must send his
     user ID, timestamp and optional info. To validate that data we use HMAC
     SHA-256 to build token.
     @param secret: Centrifugo secret key
     @param user: user ID from your application
-    @param timestamp: current timestamp seconds as string
+    @param exp: current timestamp seconds as string
     @param info: optional json encoded data for this client connection
+    @param opts: optional connection options string
     """
     sign = hmac.new(to_bytes(str(secret)), digestmod=sha256)
     sign.update(to_bytes(user))
-    sign.update(to_bytes(timestamp))
+    sign.update(to_bytes(exp))
     sign.update(to_bytes(info))
+    sign.update(to_bytes(opts))
     token = sign.hexdigest()
     return token
 
@@ -86,22 +88,12 @@ def generate_channel_sign(secret, client, channel, info=""):
     return auth.hexdigest()
 
 
-def generate_api_sign(secret, encoded_data):
+def generate_exp_timestamp(lifetime_seconds):
     """
-    Generate HMAC SHA-256 sign for API request.
-    @param secret: Centrifugo secret key
-    @param encoded_data: json encoded data to send
+    Returns exp timestamp string required to make connection to Centrifugo.
+    @param lifetime_seconds: connection lifetime in seconds.
     """
-    sign = hmac.new(to_bytes(str(secret)), digestmod=sha256)
-    sign.update(encoded_data)
-    return sign.hexdigest()
-
-
-def get_timestamp():
-    """
-    Returns current timestamp seconds string required to make connection to Centrifugo.
-    """
-    return str(int(time.time()))
+    return str(int(time.time() + lifetime_seconds))
 
 
 class Client(object):
@@ -109,14 +101,13 @@ class Client(object):
     Core class to communicate with Centrifugo.
     """
 
-    def __init__(self, address, secret, timeout=1, send_func=None,
+    def __init__(self, address, api_key="", timeout=1,
                  json_encoder=None, insecure_api=False, verify=True,
                  session=None, **kwargs):
         """
         :param address: Centrifugo address
-        :param secret: Centrifugo configuration secret key
+        :param api_key: Centrifugo API key
         :param timeout: timeout for HTTP requests to Centrifugo
-        :param send_func: custom send function
         :param json_encoder: custom JSON encoder
         :param insecure_api: boolean value, when set to True no signing will be used
         :param verify: boolean flag, when set to False no certificate check will be done during requests.
@@ -124,9 +115,8 @@ class Client(object):
         """
 
         self.address = address
-        self.secret = secret
+        self.api_key = api_key
         self.timeout = timeout
-        self.send_func = send_func
         self.json_encoder = json_encoder
         self.insecure_api = insecure_api
         self.verify = verify
@@ -149,21 +139,7 @@ class Client(object):
         api_path = "/api"
         if not address.endswith(api_path):
             address += api_path
-        address += "/"
         return address
-
-    def sign_encoded_data(self, encoded_data):
-        return generate_api_sign(self.secret, encoded_data)
-
-    def prepare(self, data):
-        url = self.prepare_url()
-        encoded_data = to_bytes(json.dumps(data, cls=self.json_encoder))
-        if not self.insecure_api:
-            sign = self.sign_encoded_data(encoded_data)
-        else:
-            # no need to generate sign in case of insecure API option on
-            sign = ""
-        return url, sign, encoded_data
 
     def add(self, method, params):
         data = {
@@ -177,44 +153,49 @@ class Client(object):
             self.add(method, params)
         messages = self._messages[:]
         self._messages = []
-        if self.send_func:
-            return self.send_func(*self.prepare(messages))
-        return self._send(*self.prepare(messages))
+        url = self.prepare_url()
+        data = to_bytes("\n".join([json.dumps(x, cls=self.json_encoder) for x in messages]))
+        response = self._send(url, data)
+        return [json.loads(x) for x in response.split("\n") if x]
 
-    def _send(self, url, sign, encoded_data):
+    def _send(self, url, data):
         """
         Send a request to a remote web server using HTTP POST.
         """
-        headers = {'Content-type': 'application/json', 'X-API-Sign': sign}
+        headers = {
+            'Content-type': 'application/json'
+        }
+        if self.api_key:
+            headers['Authorization'] = 'apikey ' + self.api_key
         try:
-            resp = self.session.post(url, data=encoded_data, headers=headers, timeout=self.timeout, verify=self.verify)
+            resp = self.session.post(url, data=data, headers=headers, timeout=self.timeout, verify=self.verify)
         except requests.RequestException as err:
             raise RequestException(err)
         if resp.status_code != 200:
             raise RequestException("wrong status code: %d" % resp.status_code)
-        return json.loads(resp.content.decode('utf-8'))
+        return resp.content.decode('utf-8')
 
     def reset(self):
         self._messages = []
 
     @staticmethod
-    def get_publish_params(channel, data, client=None):
+    def get_publish_params(channel, data, uid=None):
         params = {
             "channel": channel,
             "data": data
         }
-        if client:
-            params['client'] = client
+        if uid:
+            params['uid'] = uid
         return params
 
     @staticmethod
-    def get_broadcast_params(channels, data, client=None):
+    def get_broadcast_params(channels, data, uid=None):
         params = {
             "channels": channels,
             "data": data
         }
-        if client:
-            params['client'] = client
+        if uid:
+            params['uid'] = uid
         return params
 
     @staticmethod
@@ -247,7 +228,7 @@ class Client(object):
         return {}
 
     @staticmethod
-    def get_stats_params():
+    def get_info_params():
         return {}
 
     def _check_empty(self):
@@ -259,17 +240,17 @@ class Client(object):
         data = res[0]
         if "error" in data and data["error"]:
             raise ResponseError(data["error"])
-        return data.get("body")
+        return data.get("result")
 
-    def publish(self, channel, data, client=None):
+    def publish(self, channel, data, uid=None):
         self._check_empty()
-        self.add("publish", self.get_publish_params(channel, data, client=client))
+        self.add("publish", self.get_publish_params(channel, data, uid=uid))
         self._send_one()
         return
 
-    def broadcast(self, channels, data, client=None):
+    def broadcast(self, channels, data, uid=None):
         self._check_empty()
-        self.add("broadcast", self.get_broadcast_params(channels, data, client=client))
+        self.add("broadcast", self.get_broadcast_params(channels, data, uid=uid))
         self._send_one()
         return
 
@@ -288,23 +269,23 @@ class Client(object):
     def presence(self, channel):
         self._check_empty()
         self.add("presence", self.get_presence_params(channel))
-        body = self._send_one()
-        return body["data"]
+        result = self._send_one()
+        return result["presence"]
 
     def history(self, channel):
         self._check_empty()
         self.add("history", self.get_history_params(channel))
-        body = self._send_one()
-        return body["data"]
+        result = self._send_one()
+        return result["history"]
 
     def channels(self):
         self._check_empty()
         self.add("channels", self.get_channels_params())
-        body = self._send_one()
-        return body["data"]
+        result = self._send_one()
+        return result["channels"]
 
-    def stats(self):
+    def info(self):
         self._check_empty()
-        self.add("stats", self.get_stats_params())
-        body = self._send_one()
-        return body["data"]
+        self.add("info", self.get_info_params())
+        result = self._send_one()
+        return result
