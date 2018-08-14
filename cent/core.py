@@ -5,10 +5,7 @@ except ImportError:
     import urlparse
 
 import sys
-import hmac
-import time
 import json
-from hashlib import sha256
 import requests
 
 
@@ -53,63 +50,19 @@ class ResponseError(CentException):
     pass
 
 
-def generate_client_sign(secret, user, exp, info="", opts=""):
-    """
-    When client from browser wants to connect to Centrifuge he must send his
-    user ID, timestamp and optional info. To validate that data we use HMAC
-    SHA-256 to build token.
-    @param secret: Centrifugo secret key
-    @param user: user ID from your application
-    @param exp: current timestamp seconds as string
-    @param info: optional json encoded data for this client connection
-    @param opts: optional connection options string
-    """
-    sign = hmac.new(to_bytes(str(secret)), digestmod=sha256)
-    sign.update(to_bytes(user))
-    sign.update(to_bytes(exp))
-    sign.update(to_bytes(info))
-    sign.update(to_bytes(opts))
-    token = sign.hexdigest()
-    return token
-
-
-def generate_channel_sign(secret, client, channel, info=""):
-    """
-    Generate HMAC SHA-256 sign for private channel subscription.
-    @param secret: Centrifugo secret key
-    @param client: client ID
-    @param channel: channel client wants to subscribe to
-    @param info: optional json encoded data for this channel
-    """
-    auth = hmac.new(to_bytes(str(secret)), digestmod=sha256)
-    auth.update(to_bytes(str(client)))
-    auth.update(to_bytes(str(channel)))
-    auth.update(to_bytes(info))
-    return auth.hexdigest()
-
-
-def generate_exp_timestamp(lifetime_seconds):
-    """
-    Returns exp timestamp string required to make connection to Centrifugo.
-    @param lifetime_seconds: connection lifetime in seconds.
-    """
-    return str(int(time.time() + lifetime_seconds))
-
-
 class Client(object):
     """
     Core class to communicate with Centrifugo.
     """
 
     def __init__(self, address, api_key="", timeout=1,
-                 json_encoder=None, insecure_api=False, verify=True,
+                 json_encoder=None, verify=True,
                  session=None, **kwargs):
         """
         :param address: Centrifugo address
         :param api_key: Centrifugo API key
         :param timeout: timeout for HTTP requests to Centrifugo
         :param json_encoder: custom JSON encoder
-        :param insecure_api: boolean value, when set to True no signing will be used
         :param verify: boolean flag, when set to False no certificate check will be done during requests.
         :param session: custom requests.Session instance
         """
@@ -118,7 +71,6 @@ class Client(object):
         self.api_key = api_key
         self.timeout = timeout
         self.json_encoder = json_encoder
-        self.insecure_api = insecure_api
         self.verify = verify
         self.session = session or requests.Session()
         self.kwargs = kwargs
@@ -224,6 +176,12 @@ class Client(object):
         }
 
     @staticmethod
+    def get_history_remove_params(channel):
+        return {
+            "channel": channel
+        }
+
+    @staticmethod
     def get_channels_params():
         return {}
 
@@ -277,6 +235,12 @@ class Client(object):
         self.add("history", self.get_history_params(channel))
         result = self._send_one()
         return result["history"]
+
+    def history_remove(self, channel):
+        self._check_empty()
+        self.add("history_remove", self.get_history_remove_params(channel))
+        result = self._send_one()
+        return
 
     def channels(self):
         self._check_empty()

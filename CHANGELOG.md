@@ -1,3 +1,8 @@
+3.0.0
+=====
+
+* new major release to work with Centrifugo v2
+
 2.1.0
 =====
 
