@@ -14,13 +14,13 @@ if sys.version_info[:2] in ((2, 6),):
 
 
 def long_description():
-    return "python tools to communicate with Centrifugo"
+    return "Python library to communicate with Centrifugo API"
 
 
 setup(
     name='cent',
     version='3.0.0',
-    description="python tools to communicate with Centrifugo",
+    description="Python library to communicate with Centrifugo API",
     long_description=long_description(),
     url='https://github.com/centrifugal/cent',
     download_url='https://github.com/centrifugal/cent',
@@ -42,6 +42,8 @@ setup(
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
         'Environment :: Console',
         'Intended Audience :: Developers',
         'Intended Audience :: System Administrators',
