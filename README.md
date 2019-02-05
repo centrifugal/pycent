@@ -9,6 +9,12 @@ To install run:
 pip install cent
 ```
 
+### Centrifugo compatibility
+
+Cent v3.0.0 and higher works only with Centrifugo v2.
+
+If you need to work with Centrifugo v1 then use Cent v2.1.0
+
 ### High-level library API
 
 First see [available API methods in documentation](https://fzambia.gitbooks.io/centrifugal/content/server/api.html).
