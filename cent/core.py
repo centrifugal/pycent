@@ -234,7 +234,7 @@ class Client(object):
         self._check_empty()
         self.add("history", self.get_history_params(channel))
         result = self._send_one()
-        return result["history"]
+        return result["publications"]
 
     def history_remove(self, channel):
         self._check_empty()
