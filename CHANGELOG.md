@@ -1,3 +1,8 @@
+3.0.1
+=====
+
+* fix history API method call
+
 3.0.0
 =====
 
