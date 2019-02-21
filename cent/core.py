@@ -5,9 +5,9 @@ except ImportError:
     import urlparse
 
 import sys
-import json
-import requests
 
+import ujson as json
+from aiohttp import ClientSession, ClientError
 
 PY2 = sys.version_info[0] == 2
 
@@ -55,24 +55,20 @@ class Client(object):
     Core class to communicate with Centrifugo.
     """
 
-    def __init__(self, address, api_key="", timeout=1,
-                 json_encoder=None, verify=True,
-                 session=None, **kwargs):
+    def __init__(self, address, api_key="", timeout=1, verify_ssl=True, session=None, **kwargs):
         """
         :param address: Centrifugo address
         :param api_key: Centrifugo API key
         :param timeout: timeout for HTTP requests to Centrifugo
-        :param json_encoder: custom JSON encoder
-        :param verify: boolean flag, when set to False no certificate check will be done during requests.
+        :param ssl: boolean flag, when set to False no certificate check will be done during requests.
         :param session: custom requests.Session instance
         """
 
         self.address = address
         self.api_key = api_key
         self.timeout = timeout
-        self.json_encoder = json_encoder
-        self.verify = verify
-        self.session = session or requests.Session()
+        self.verify_ssl = verify_ssl
+        self.session = session or ClientSession()
         self.kwargs = kwargs
         self._messages = []
 
@@ -100,17 +96,17 @@ class Client(object):
         }
         self._messages.append(data)
 
-    def send(self, method=None, params=None):
+    async def send(self, method=None, params=None):
         if method and params is not None:
             self.add(method, params)
         messages = self._messages[:]
         self._messages = []
         url = self.prepare_url()
-        data = to_bytes("\n".join([json.dumps(x, cls=self.json_encoder) for x in messages]))
-        response = self._send(url, data)
-        return [json.loads(x) for x in response.split("\n") if x]
+        data = to_bytes("\n".join([json.dumps(x) for x in messages]))
+        response = await self._send(url, data)
+        return [json.loads(x) async for x in response if x]
 
-    def _send(self, url, data):
+    async def _send(self, url, data):
         """
         Send a request to a remote web server using HTTP POST.
         """
@@ -120,12 +116,13 @@ class Client(object):
         if self.api_key:
             headers['Authorization'] = 'apikey ' + self.api_key
         try:
-            resp = self.session.post(url, data=data, headers=headers, timeout=self.timeout, verify=self.verify)
-        except requests.RequestException as err:
+            resp = await self.session.post(url, data=data, headers=headers,
+                                           timeout=self.timeout, verify_ssl=self.verify_ssl)
+        except ClientError as err:
             raise RequestException(err)
-        if resp.status_code != 200:
+        if resp.status != 200:
             raise RequestException("wrong status code: %d" % resp.status_code)
-        return resp.content.decode('utf-8')
+        return resp.content
 
     def reset(self):
         self._messages = []
@@ -193,63 +190,63 @@ class Client(object):
         if self._messages:
             raise ClientNotEmpty("client command buffer not empty, send commands or reset client")
 
-    def _send_one(self):
-        res = self.send()
+    async def _send_one(self):
+        res = await self.send()
         data = res[0]
         if "error" in data and data["error"]:
             raise ResponseError(data["error"])
         return data.get("result")
 
-    def publish(self, channel, data, uid=None):
+    async def publish(self, channel, data, uid=None):
         self._check_empty()
         self.add("publish", self.get_publish_params(channel, data, uid=uid))
-        self._send_one()
+        await self._send_one()
         return
 
-    def broadcast(self, channels, data, uid=None):
+    async def broadcast(self, channels, data, uid=None):
         self._check_empty()
         self.add("broadcast", self.get_broadcast_params(channels, data, uid=uid))
-        self._send_one()
+        await self._send_one()
         return
 
-    def unsubscribe(self, user, channel=None):
+    async def unsubscribe(self, user, channel=None):
         self._check_empty()
         self.add("unsubscribe", self.get_unsubscribe_params(user, channel=channel))
-        self._send_one()
+        await self._send_one()
         return
 
-    def disconnect(self, user):
+    async def disconnect(self, user):
         self._check_empty()
         self.add("disconnect", self.get_disconnect_params(user))
-        self._send_one()
+        await self._send_one()
         return
 
-    def presence(self, channel):
+    async def presence(self, channel):
         self._check_empty()
         self.add("presence", self.get_presence_params(channel))
-        result = self._send_one()
+        result = await self._send_one()
         return result["presence"]
 
-    def history(self, channel):
+    async def history(self, channel):
         self._check_empty()
         self.add("history", self.get_history_params(channel))
-        result = self._send_one()
-        return result["history"]
+        result = await self._send_one()
+        return result["publications"]
 
-    def history_remove(self, channel):
+    async def history_remove(self, channel):
         self._check_empty()
         self.add("history_remove", self.get_history_remove_params(channel))
-        result = self._send_one()
+        result = await self._send_one()
         return
 
-    def channels(self):
+    async def channels(self):
         self._check_empty()
         self.add("channels", self.get_channels_params())
-        result = self._send_one()
+        result = await self._send_one()
         return result["channels"]
 
-    def info(self):
+    async def info(self):
         self._check_empty()
         self.add("info", self.get_info_params())
-        result = self._send_one()
+        result = await self._send_one()
         return result
