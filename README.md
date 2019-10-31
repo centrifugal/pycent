@@ -17,7 +17,7 @@ If you need to work with Centrifugo v1 then use Cent [v2.1.0](https://github.com
 
 ### High-level library API
 
-First see [available API methods in documentation](https://centrifugal.github.io/centrifugo/server/api/).
+First see [available API methods in documentation](https://centrifugal.github.io/centrifugo/server/http_api/).
 
 This library contains `Client` class to send messages to Centrifugo from your python-powered backend:
 
