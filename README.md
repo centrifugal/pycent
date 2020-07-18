@@ -11,9 +11,9 @@ pip install cent
 
 ### Centrifugo compatibility
 
-Cent v3.0.0 and higher works only with Centrifugo v2.
+**Cent v3.0.0 and higher works only with Centrifugo v2**.
 
-If you need to work with Centrifugo v1 then use Cent [v2.1.0](https://github.com/centrifugal/cent/tree/v2.1.0)
+If you need to work with Centrifugo v1 then use Cent v2.1.0
 
 ### High-level library API
 
