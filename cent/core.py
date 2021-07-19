@@ -169,10 +169,11 @@ class Client(object):
         }   
 
     @staticmethod
-    def get_history_params(channel, limit=0, since=None):
+    def get_history_params(channel, limit=0, since=None, reverse=False):
         params = {
             "channel": channel,
-            "limit": limit
+            "limit": limit,
+            "reverse": reverse,
         }
         if since:
             params["since"] = {
@@ -253,9 +254,9 @@ class Client(object):
             "num_users": result["num_users"],
         }
 
-    def history(self, channel, limit=0, since=None):
+    def history(self, channel, limit=0, since=None, reverse=False):
         self._check_empty()
-        self.add("history", self.get_history_params(channel, limit=limit, since=since))
+        self.add("history", self.get_history_params(channel, limit=limit, since=since, reverse=reverse))
         result = self._send_one()
         return {
             "publications": result.get("publications", []),
