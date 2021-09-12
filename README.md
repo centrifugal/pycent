@@ -113,3 +113,13 @@ Optional:
 * `json_encoder` (default: `None`) - set custom JSON encoder
 * `send_func` (default: `None`) - set custom send function
 * `verify` (default: `True`) - when set to `False` no certificate check will be done during requests.
+
+## For maintainer
+
+To release:
+
+1. Bump version in `setup.py`
+2. Changelog, push and create new tag
+3. `pip install twine`
+4. `twine check dist/*`
+5. `twine upload dist/*`
