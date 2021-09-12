@@ -78,7 +78,8 @@ class Client(object):
             self.add(method, params)
         messages = self._messages[:]
         self._messages = []
-        data = to_bytes("\n".join([json.dumps(x, cls=self.json_encoder) for x in messages]))
+        data = to_bytes(
+            "\n".join([json.dumps(x, cls=self.json_encoder) for x in messages]))
         response = self._send(self.address, data)
         return [json.loads(x) for x in response.split("\n") if x]
 
@@ -92,7 +93,8 @@ class Client(object):
         if self.api_key:
             headers['Authorization'] = 'apikey ' + self.api_key
         try:
-            resp = self.session.post(url, data=data, headers=headers, timeout=self.timeout, verify=self.verify)
+            resp = self.session.post(
+                url, data=data, headers=headers, timeout=self.timeout, verify=self.verify)
         except requests.RequestException as err:
             raise RequestException(err)
         if resp.status_code != 200:
@@ -162,13 +164,6 @@ class Client(object):
         }
 
     @staticmethod
-    def get_rpc_params(method, params=None):
-        return {
-            "method": method,
-            "params": params or {},
-        }   
-
-    @staticmethod
     def get_history_params(channel, limit=0, since=None, reverse=False):
         params = {
             "channel": channel,
@@ -200,7 +195,8 @@ class Client(object):
 
     def _check_empty(self):
         if self._messages:
-            raise ClientNotEmpty("client command buffer not empty, send commands or reset client")
+            raise ClientNotEmpty(
+                "client command buffer not empty, send commands or reset client")
 
     def _send_one(self):
         res = self.send()
@@ -211,25 +207,29 @@ class Client(object):
 
     def publish(self, channel, data, skip_history=False):
         self._check_empty()
-        self.add("publish", self.get_publish_params(channel, data, skip_history=skip_history))
+        self.add("publish", self.get_publish_params(
+            channel, data, skip_history=skip_history))
         result = self._send_one()
         return result
 
     def broadcast(self, channels, data, skip_history=False):
         self._check_empty()
-        self.add("broadcast", self.get_broadcast_params(channels, data, skip_history=skip_history))
+        self.add("broadcast", self.get_broadcast_params(
+            channels, data, skip_history=skip_history))
         result = self._send_one()
         return result
 
     def subscribe(self, user, channel, client=None):
         self._check_empty()
-        self.add("subscribe", self.get_subscribe_params(user, channel, client=client))
+        self.add("subscribe", self.get_subscribe_params(
+            user, channel, client=client))
         self._send_one()
         return
 
     def unsubscribe(self, user, channel, client=None):
         self._check_empty()
-        self.add("unsubscribe", self.get_unsubscribe_params(user, channel, client=client))
+        self.add("unsubscribe", self.get_unsubscribe_params(
+            user, channel, client=client))
         self._send_one()
         return
 
@@ -256,7 +256,8 @@ class Client(object):
 
     def history(self, channel, limit=0, since=None, reverse=False):
         self._check_empty()
-        self.add("history", self.get_history_params(channel, limit=limit, since=since, reverse=reverse))
+        self.add("history", self.get_history_params(
+            channel, limit=limit, since=since, reverse=reverse))
         result = self._send_one()
         return {
             "publications": result.get("publications", []),
@@ -270,15 +271,9 @@ class Client(object):
         self._send_one()
         return
 
-    def rpc(self, method, params=None):
-        self._check_empty()
-        self.add("rpc", self.get_rpc_params(method, params=params))
-        self._send_one()
-        return
-
     def channels(self, pattern=""):
         self._check_empty()
-        self.rpc("getChannels", params=self.get_channels_params(pattern=pattern))
+        self.add("channels", params=self.get_channels_params(pattern=pattern))
         result = self._send_one()
         return result["channels"]
 
