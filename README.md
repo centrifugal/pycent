@@ -122,5 +122,6 @@ To release:
 1. Changelog, push and create new tag
 1. `pip install twine`
 1. `pip install wheel`
+1. `python setup.py sdist bdist_wheel`
 1. `twine check dist/*`
 1. `twine upload dist/*`
