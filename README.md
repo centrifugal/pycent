@@ -119,7 +119,8 @@ Optional:
 To release:
 
 1. Bump version in `setup.py`
-2. Changelog, push and create new tag
-3. `pip install twine`
-4. `twine check dist/*`
-5. `twine upload dist/*`
+1. Changelog, push and create new tag
+1. `pip install twine`
+1. `pip install wheel`
+1. `twine check dist/*`
+1. `twine upload dist/*`
