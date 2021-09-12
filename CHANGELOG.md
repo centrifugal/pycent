@@ -1,3 +1,11 @@
+v4.0.0
+======
+
+New major release to work with Centrifugo v3
+
+* Client does not add `/api` suffix automatically, developers now need to provide full Centrifugo HTTP API endpoint address explicitly
+* Drop Python 2 support
+
 3.0.1
 =====
 

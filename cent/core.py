@@ -1,22 +1,12 @@
 # coding: utf-8
-try:
-    import urllib.parse as urlparse
-except ImportError:
-    import urlparse
-
+import urllib.parse as urlparse
 import sys
 import json
 import requests
 
 
-PY2 = sys.version_info[0] == 2
-
-if not PY2:
-    def to_bytes(s):
-        return s.encode("latin-1")
-else:
-    def to_bytes(s):
-        return s
+def to_bytes(s):
+    return s.encode("latin-1")
 
 
 class CentException(Exception):
@@ -76,23 +66,6 @@ class Client(object):
         self.kwargs = kwargs
         self._messages = []
 
-    def prepare_url(self):
-        """
-        http(s)://centrifuge.example.com/api/
-
-        Some work here to prepare valid API url: make it work even if following urls provided
-        during client initialization:
-        http(s)://centrifuge.example.com
-        http(s)://centrifuge.example.com/
-        http(s)://centrifuge.example.com/api
-        http(s)://centrifuge.example.com/api/
-        """
-        address = self.address.rstrip("/")
-        api_path = "/api"
-        if not address.endswith(api_path):
-            address += api_path
-        return address
-
     def add(self, method, params):
         data = {
             "method": method,
@@ -105,9 +78,9 @@ class Client(object):
             self.add(method, params)
         messages = self._messages[:]
         self._messages = []
-        url = self.prepare_url()
-        data = to_bytes("\n".join([json.dumps(x, cls=self.json_encoder) for x in messages]))
-        response = self._send(url, data)
+        data = to_bytes(
+            "\n".join([json.dumps(x, cls=self.json_encoder) for x in messages]))
+        response = self._send(self.address, data)
         return [json.loads(x) for x in response.split("\n") if x]
 
     def _send(self, url, data):
@@ -120,7 +93,8 @@ class Client(object):
         if self.api_key:
             headers['Authorization'] = 'apikey ' + self.api_key
         try:
-            resp = self.session.post(url, data=data, headers=headers, timeout=self.timeout, verify=self.verify)
+            resp = self.session.post(
+                url, data=data, headers=headers, timeout=self.timeout, verify=self.verify)
         except requests.RequestException as err:
             raise RequestException(err)
         if resp.status_code != 200:
@@ -131,37 +105,51 @@ class Client(object):
         self._messages = []
 
     @staticmethod
-    def get_publish_params(channel, data, uid=None):
+    def get_publish_params(channel, data, skip_history=False):
         params = {
             "channel": channel,
-            "data": data
+            "data": data,
+            "skip_history": skip_history,
         }
-        if uid:
-            params['uid'] = uid
         return params
 
     @staticmethod
-    def get_broadcast_params(channels, data, uid=None):
+    def get_broadcast_params(channels, data, skip_history=False):
         params = {
             "channels": channels,
-            "data": data
+            "data": data,
+            "skip_history": skip_history,
         }
-        if uid:
-            params['uid'] = uid
         return params
 
     @staticmethod
-    def get_unsubscribe_params(user, channel=None):
-        params = {"user": user}
-        if channel:
-            params["channel"] = channel
+    def get_subscribe_params(user, channel, client=None):
+        params = {
+            "user": user,
+            "channel": channel
+        }
+        if client:
+            params["client"] = client
         return params
 
     @staticmethod
-    def get_disconnect_params(user):
-        return {
+    def get_unsubscribe_params(user, channel, client=None):
+        params = {
+            "user": user,
+            "channel": channel
+        }
+        if client:
+            params["client"] = client
+        return params
+
+    @staticmethod
+    def get_disconnect_params(user, client=None):
+        params = {
             "user": user
         }
+        if client:
+            params["client"] = client
+        return params
 
     @staticmethod
     def get_presence_params(channel):
@@ -170,10 +158,24 @@ class Client(object):
         }
 
     @staticmethod
-    def get_history_params(channel):
+    def get_presence_stats_params(channel):
         return {
             "channel": channel
         }
+
+    @staticmethod
+    def get_history_params(channel, limit=0, since=None, reverse=False):
+        params = {
+            "channel": channel,
+            "limit": limit,
+            "reverse": reverse,
+        }
+        if since:
+            params["since"] = {
+                "offset": since["offset"],
+                "epoch": since["epoch"]
+            }
+        return params
 
     @staticmethod
     def get_history_remove_params(channel):
@@ -182,8 +184,10 @@ class Client(object):
         }
 
     @staticmethod
-    def get_channels_params():
-        return {}
+    def get_channels_params(pattern=""):
+        return {
+            "pattern": pattern
+        }
 
     @staticmethod
     def get_info_params():
@@ -191,7 +195,8 @@ class Client(object):
 
     def _check_empty(self):
         if self._messages:
-            raise ClientNotEmpty("client command buffer not empty, send commands or reset client")
+            raise ClientNotEmpty(
+                "client command buffer not empty, send commands or reset client")
 
     def _send_one(self):
         res = self.send()
@@ -200,27 +205,37 @@ class Client(object):
             raise ResponseError(data["error"])
         return data.get("result")
 
-    def publish(self, channel, data, uid=None):
+    def publish(self, channel, data, skip_history=False):
         self._check_empty()
-        self.add("publish", self.get_publish_params(channel, data, uid=uid))
+        self.add("publish", self.get_publish_params(
+            channel, data, skip_history=skip_history))
+        result = self._send_one()
+        return result
+
+    def broadcast(self, channels, data, skip_history=False):
+        self._check_empty()
+        self.add("broadcast", self.get_broadcast_params(
+            channels, data, skip_history=skip_history))
+        result = self._send_one()
+        return result
+
+    def subscribe(self, user, channel, client=None):
+        self._check_empty()
+        self.add("subscribe", self.get_subscribe_params(
+            user, channel, client=client))
         self._send_one()
         return
 
-    def broadcast(self, channels, data, uid=None):
+    def unsubscribe(self, user, channel, client=None):
         self._check_empty()
-        self.add("broadcast", self.get_broadcast_params(channels, data, uid=uid))
+        self.add("unsubscribe", self.get_unsubscribe_params(
+            user, channel, client=client))
         self._send_one()
         return
 
-    def unsubscribe(self, user, channel=None):
+    def disconnect(self, user, client=None):
         self._check_empty()
-        self.add("unsubscribe", self.get_unsubscribe_params(user, channel=channel))
-        self._send_one()
-        return
-
-    def disconnect(self, user):
-        self._check_empty()
-        self.add("disconnect", self.get_disconnect_params(user))
+        self.add("disconnect", self.get_disconnect_params(user, client=client))
         self._send_one()
         return
 
@@ -230,21 +245,35 @@ class Client(object):
         result = self._send_one()
         return result["presence"]
 
-    def history(self, channel):
+    def presence_stats(self, channel):
         self._check_empty()
-        self.add("history", self.get_history_params(channel))
+        self.add("presence_stats", self.get_presence_stats_params(channel))
         result = self._send_one()
-        return result["publications"]
+        return {
+            "num_clients": result["num_clients"],
+            "num_users": result["num_users"],
+        }
+
+    def history(self, channel, limit=0, since=None, reverse=False):
+        self._check_empty()
+        self.add("history", self.get_history_params(
+            channel, limit=limit, since=since, reverse=reverse))
+        result = self._send_one()
+        return {
+            "publications": result.get("publications", []),
+            "offset": result.get("publications", 0),
+            "epoch": result.get("epoch", ""),
+        }
 
     def history_remove(self, channel):
         self._check_empty()
         self.add("history_remove", self.get_history_remove_params(channel))
-        result = self._send_one()
+        self._send_one()
         return
 
-    def channels(self):
+    def channels(self, pattern=""):
         self._check_empty()
-        self.add("channels", self.get_channels_params())
+        self.add("channels", params=self.get_channels_params(pattern=pattern))
         result = self._send_one()
         return result["channels"]
 
