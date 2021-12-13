@@ -17,7 +17,7 @@ def long_description():
 
 setup(
     name='cent',
-    version='4.0.1',
+    version='4.1.0',
     description="Python library to communicate with Centrifugo v3 HTTP API",
     long_description=long_description(),
     url='https://github.com/centrifugal/cent',

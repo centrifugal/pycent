@@ -261,7 +261,7 @@ class Client(object):
         result = self._send_one()
         return {
             "publications": result.get("publications", []),
-            "offset": result.get("publications", 0),
+            "offset": result.get("offset", 0),
             "epoch": result.get("epoch", ""),
         }
 

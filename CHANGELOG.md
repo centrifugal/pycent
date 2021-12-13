@@ -1,3 +1,8 @@
+v4.1.0
+======
+
+* Fix `offset` field in history result which previously contained `publications`, [#24](https://github.com/centrifugal/cent/issues/24).
+
 v4.0.1
 ======
 
