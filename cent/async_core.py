@@ -7,10 +7,6 @@ from cent.mixins import ParamsMixin
 
 
 class Client(ParamsMixin):
-    """
-    Core class to communicate with Centrifugo.
-    """
-
     def __init__(
         self,
         address: str,
@@ -33,7 +29,7 @@ class Client(ParamsMixin):
         self.api_key = api_key
         self.timeout = timeout
         self.json_encoder = json_encoder
-        self.session = session or httpx.Client()
+        self.session = session or httpx.AsyncClient()
         self._prepare_session()
         self.kwargs = kwargs
 
@@ -41,10 +37,10 @@ class Client(ParamsMixin):
         self.session.headers["Authorization"] = "apikey " + self.api_key
         self.session.timeout = self.timeout
 
-    def send(self, method, payload):
+    async def send(self, method, payload):
         payload["method"] = method
         try:
-            resp = self.session.post(
+            resp: httpx.Response = await self.session.post(
                 url=self.address,
                 json=payload,
                 timeout=self.timeout,
@@ -55,60 +51,57 @@ class Client(ParamsMixin):
             raise RequestException("wrong status code: %d" % resp.status_code)
         return resp
 
-    def reset(self):
-        pass
-
-    def _send_one(self, method: str, payload: dict) -> Optional[dict]:
-        resp = self.send(method, payload)
+    async def _send_one(self, method: str, payload: dict) -> Optional[dict]:
+        resp = await self.send(method, payload)
         resp_json = resp.json()
         if "error" in resp_json:
             raise ResponseError(resp_json["error"])
         return resp_json.get("result", {})
 
-    def publish(self, channel: str, data: dict, skip_history: bool = False) -> Optional[dict]:
-        result = self._send_one(
+    async def publish(self, channel: str, data: dict, skip_history: bool = False) -> Optional[dict]:
+        result = await self._send_one(
             method="publish",
             payload=self.get_publish_params(channel, data, skip_history=skip_history),
         )
         return result
 
-    def broadcast(self, channels: List[str], data: dict, skip_history: bool = False) -> Optional[dict]:
-        result = self._send_one(
+    async def broadcast(self, channels: List[str], data: dict, skip_history: bool = False) -> Optional[dict]:
+        result = await self._send_one(
             method="broadcast",
             payload=self.get_broadcast_params(channels, data, skip_history=skip_history),
         )
         return result
 
-    def subscribe(self, user: str, channel: str, client: Optional[str] = None) -> None:
-        self._send_one(
+    async def subscribe(self, user: str, channel: str, client: Optional[str] = None) -> None:
+        await self._send_one(
             method="subscribe",
             payload=self.get_subscribe_params(user, channel, client=client),
         )
         return
 
-    def unsubscribe(self, user: str, channel: str, client: Optional[str] = None) -> None:
-        self._send_one(
+    async def unsubscribe(self, user: str, channel: str, client: Optional[str] = None) -> None:
+        await self._send_one(
             method="unsubscribe",
             payload=self.get_unsubscribe_params(user, channel, client=client),
         )
         return
 
-    def disconnect(self, user: str, client: Optional[str] = None) -> None:
-        self._send_one(
+    async def disconnect(self, user: str, client: Optional[str] = None) -> None:
+        await self._send_one(
             method="disconnect",
             payload=self.get_disconnect_params(user, client=client),
         )
         return
 
-    def presence(self, channel: str) -> dict:
-        result = self._send_one(
+    async def presence(self, channel: str) -> dict:
+        result = await self._send_one(
             method="presence",
             payload=self.get_presence_params(channel),
         )
         return result["presence"]
 
-    def presence_stats(self, channel: str) -> dict[str, int]:
-        result = self._send_one(
+    async def presence_stats(self, channel: str) -> dict[str, int]:
+        result = await self._send_one(
             method="presence_stats",
             payload=self.get_presence_stats_params(channel),
         )
@@ -117,8 +110,8 @@ class Client(ParamsMixin):
             "num_users": result["num_users"],
         }
 
-    def history(self, channel: str, limit: int = 0, since: dict = None, reverse: bool = False) -> dict:
-        result = self._send_one(
+    async def history(self, channel: str, limit: int = 0, since: dict = None, reverse: bool = False) -> dict:
+        result = await self._send_one(
             method="history",
             payload=self.get_history_params(channel, limit=limit, since=since, reverse=reverse),
         )
@@ -129,22 +122,25 @@ class Client(ParamsMixin):
         }
 
     def history_remove(self, channel: str) -> None:
-        self._send_one(
+        await self._send_one(
             method="history_remove",
             payload=self.get_history_remove_params(channel),
         )
         return
 
-    def channels(self, pattern="") -> List[Optional[str]]:
-        result = self._send_one(
+    async def channels(self, pattern="") -> List[Optional[str]]:
+        result = await self._send_one(
             method="channels",
             payload=self.get_channels_params(pattern=pattern),
         )
         return result["channels"]
 
-    def info(self) -> dict[str, list]:
-        result = self._send_one(
+    async def info(self) -> dict[str, list]:
+        result = await self._send_one(
             method="info",
             payload=self.get_info_params(),
         )
         return result
+
+    async def close(self):
+        await self.session.aclose()

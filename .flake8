@@ -1,0 +1,8 @@
+[flake8]
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+max-line-length = 120
+format = '%(path)s:%(row)d Column:%(col)d: %(code)s %(text)s'
+
