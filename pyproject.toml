@@ -5,6 +5,27 @@ description = "Python library to communicate with Centrifugo v3 HTTP API"
 authors = ["Alexandr Emelin", "Bogdan Evstratenko"]
 license = "MIT"
 readme = 'README.md'
+classifiers = [
+        "Development Status :: 5 - Production/Stable",
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Environment :: Console",
+        "Intended Audience :: Developers",
+        "Intended Audience :: System Administrators",
+        "License :: OSI Approved :: Apache Software License",
+        "Topic :: Internet :: WWW/HTTP",
+        "Topic :: Software Development",
+        "Topic :: System :: Networking",
+        "Topic :: Terminals",
+        "Topic :: Text Processing",
+        "Topic :: Utilities",
+    ]
+
+[tool.poetry.scripts]
+cent = "cent.console:run"
 
 [tool.poetry.dependencies]
 python = "^3.7"
@@ -14,9 +35,9 @@ httpx = "^0.22.0"
 black = "^22.3.0"
 isort = "^5.10.1"
 flake8 = "^4.0.1"
-
-[tool.poetry.extras]
-async = ["httpx"]
+pytest-asyncio = "^0.18.3"
+pytest = "^7.1.2"
+coverage = "^6.3.3"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -25,3 +46,6 @@ build-backend = "poetry.core.masonry.api"
 [tool.isort]
 profile = "black"
 multi_line_output = 3
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
