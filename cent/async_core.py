@@ -6,7 +6,7 @@ from cent import RequestException, ResponseError
 from cent.mixins import ParamsMixin
 
 
-class Client(ParamsMixin):
+class AsyncClient(ParamsMixin):
     def __init__(
         self,
         address: str,
@@ -121,7 +121,7 @@ class Client(ParamsMixin):
             "epoch": result.get("epoch", ""),
         }
 
-    def history_remove(self, channel: str) -> None:
+    async def history_remove(self, channel: str) -> None:
         await self._send_one(
             method="history_remove",
             payload=self.get_history_remove_params(channel),
