@@ -1,19 +1,13 @@
 CENT
 ====
 
-Python tools to communicate with Centrifugo v3/v4 HTTP API. Python >= 3.3 supported.
+Python tools to communicate with Centrifugo HTTP API. Python >= 3.3 supported.
 
 To install run:
 
 ```bash
 pip install cent
 ```
-
-### Centrifugo compatibility
-
-**Cent v4.0.0 and higher works only with Centrifugo v3**.
-
-If you need to work with Centrifugo v2 then use Cent v3
 
 ### High-level library API
 
