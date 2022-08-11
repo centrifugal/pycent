@@ -1,7 +1,7 @@
 CENT
 ====
 
-Python tools to communicate with Centrifugo v3 HTTP API. Python >= 3.3 supported.
+Python tools to communicate with Centrifugo v3/v4 HTTP API. Python >= 3.3 supported.
 
 To install run:
 
