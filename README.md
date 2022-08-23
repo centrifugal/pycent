@@ -11,7 +11,7 @@ pip install cent
 
 ### High-level library API
 
-First see [available API methods in documentation](https://centrifugal.github.io/centrifugo/server/http_api/).
+First see [available API methods in documentation](https://centrifugal.dev/docs/server/server_api#http-api).
 
 This library contains `Client` class to send messages to Centrifugo from your python-powered backend:
 
