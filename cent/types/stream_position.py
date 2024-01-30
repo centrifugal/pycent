@@ -1,7 +1,7 @@
-from cent.types.base import CentObject
+from cent.types.base import CentResult
 
 
-class StreamPosition(CentObject):
+class StreamPosition(CentResult):
     """Stream position."""
 
     offset: int

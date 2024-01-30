@@ -1,5 +1,6 @@
 from typing import Optional, TYPE_CHECKING, cast, Any
 
+import requests
 from aiohttp.hdrs import USER_AGENT, CONTENT_TYPE
 from aiohttp.http import SERVER_SOFTWARE
 from requests import Session
@@ -7,6 +8,7 @@ from requests import Session
 from cent.__meta__ import __version__
 from cent.methods.base import CentMethod, CentType
 from cent.client.session.base_sync import BaseSyncSession
+from cent.exceptions import CentNetworkError
 
 if TYPE_CHECKING:
     from cent.client.client import Client
@@ -39,11 +41,16 @@ class RequestsSession(BaseSyncSession):
 
         url = f"{self._base_url}/{method.__api_method__}"
 
-        raw_result = self._session.post(
-            url=url,
-            json=json_data,
-            timeout=timeout or self._timeout,
-        )
+        try:
+            raw_result = self._session.post(
+                url=url,
+                json=json_data,
+                timeout=timeout or self._timeout,
+            )
+        except requests.exceptions.Timeout:
+            raise CentNetworkError(method=method, message="Request timeout") from None
+        except requests.exceptions.ConnectionError as e:
+            raise CentNetworkError(method=method, message=f"{type(e).__name__}: {e}") from None
         response = self.check_response(
             client=client,
             method=method,

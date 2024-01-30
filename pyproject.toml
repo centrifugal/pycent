@@ -35,9 +35,10 @@ types-requests = "^2.31.0.20240125"
 pre-commit = "^3.6.0"
 ruff = "^0.1.15"
 mypy = "^1.8.0"
+uvloop = "^0.19.0"
 
 [tool.ruff]
-line-length = 88
+line-length = 99
 select = [
     "PL", # pylint
     "F", # pyflakes

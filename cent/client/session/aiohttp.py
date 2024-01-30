@@ -1,13 +1,14 @@
 import asyncio
 from typing import Optional, TYPE_CHECKING, cast, Any
 
-from aiohttp import ClientSession
+from aiohttp import ClientSession, ClientError
 from aiohttp.hdrs import USER_AGENT, CONTENT_TYPE
 from aiohttp.http import SERVER_SOFTWARE
 
 from cent.__meta__ import __version__
 from cent.client.session.base_async import BaseAsyncSession
 from cent.methods.base import CentMethod, CentType
+from cent.exceptions import CentNetworkError
 
 if TYPE_CHECKING:
     from cent.client.async_client import AsyncClient
@@ -49,12 +50,17 @@ class AiohttpSession(BaseAsyncSession):
 
         url = f"{self._base_url}/{method.__api_method__}"
 
-        async with session.post(
-            url=url,
-            json=json_data,
-            timeout=timeout or self._timeout,
-        ) as resp:
-            raw_result = await resp.text()
+        try:
+            async with session.post(
+                url=url,
+                json=json_data,
+                timeout=timeout or self._timeout,
+            ) as resp:
+                raw_result = await resp.text()
+        except asyncio.TimeoutError:
+            raise CentNetworkError(method=method, message="Request timeout") from None
+        except ClientError as e:
+            raise CentNetworkError(method=method, message=f"{type(e).__name__}: {e}") from None
         response = self.check_response(
             client=client,
             method=method,

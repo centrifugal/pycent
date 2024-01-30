@@ -21,25 +21,26 @@ If you need to work with Centrifugo v2 then use Cent v3
 First
 see [available API methods in documentation](https://centrifugal.dev/docs/server/server_api#api-methods).
 
-This library contains `CentClient` class to send messages to Centrifugo from your
-python-powered backend:
+This library contains `Client` and `AsyncClient` class to send messages to
+Centrifugo from your python-powered backend:
 
 ```python
 import asyncio
-from cent import CentClient
+from cent import AsyncClient, Client
 
 url = "http://localhost:8000/api"
 api_key = "XXX"
 
-# Initialize client
-client = CentClient(url, api_key=api_key)
+# Initialize a client (you can use sync or async version)
+async_client = AsyncClient(url, api_key=api_key)
+sync_client = Client(url, api_key=api_key)
+
+response = sync_client.publish("example:channel", {"input": "Hello world!"})
+print(response)
 
 
 async def main():
-    response = await client.publish(
-        "example:2",
-        {"input": "Hello world!"},
-    )
+    response = await async_client.publish("example:channel", {"input": "Hello world!"})
     print(response)
 
 

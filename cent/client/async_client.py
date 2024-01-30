@@ -8,11 +8,11 @@ from cent.methods import (
     SubscribeMethod,
 )
 from cent.types import (
-    SubscribeObject,
+    SubscribeResult,
     StreamPosition,
-    PublishObject,
-    BroadcastObject,
-    Override,
+    PublishResult,
+    BroadcastResult,
+    ChannelOptionsOverride,
 )
 
 T = TypeVar("T")
@@ -38,13 +38,13 @@ class AsyncClient:
     async def publish(
         self,
         channel: str,
-        data: Dict[str, Any],
+        data: Any,
         skip_history: Optional[bool] = None,
         tags: Optional[Dict[str, str]] = None,
         b64data: Optional[str] = None,
         idempotency_key: Optional[str] = None,
-        request_timeout: Optional[int] = None,
-    ) -> PublishObject:
+        request_timeout: Optional[float] = None,
+    ) -> PublishResult:
         call = PublishMethod(
             channel=channel,
             data=data,
@@ -58,13 +58,13 @@ class AsyncClient:
     async def broadcast(
         self,
         channels: List[str],
-        data: Dict[str, Any],
+        data: Any,
         skip_history: Optional[bool] = None,
         tags: Optional[Dict[str, str]] = None,
         b64data: Optional[str] = None,
         idempotency_key: Optional[str] = None,
-        request_timeout: Optional[int] = None,
-    ) -> BroadcastObject:
+        request_timeout: Optional[float] = None,
+    ) -> BroadcastResult:
         call = BroadcastMethod(
             channels=channels,
             data=data,
@@ -79,16 +79,16 @@ class AsyncClient:
         self,
         user: str,
         channel: str,
-        info: Optional[Dict[Any, Any]] = None,
+        info: Optional[Any] = None,
         b64info: Optional[str] = None,
         client: Optional[str] = None,
         session: Optional[str] = None,
-        data: Optional[Dict[Any, Any]] = None,
+        data: Optional[Any] = None,
         b64data: Optional[str] = None,
         recover_since: Optional[StreamPosition] = None,
-        override: Optional[Override] = None,
-        request_timeout: Optional[int] = None,
-    ) -> SubscribeObject:
+        override: Optional[ChannelOptionsOverride] = None,
+        request_timeout: Optional[float] = None,
+    ) -> SubscribeResult:
         call = SubscribeMethod(
             user=user,
             channel=channel,
@@ -103,9 +103,7 @@ class AsyncClient:
         )
         return await self(call, request_timeout=request_timeout)
 
-    async def __call__(
-        self, method: CentMethod[T], request_timeout: Optional[int] = None
-    ) -> T:
+    async def __call__(self, method: CentMethod[T], request_timeout: Optional[float] = None) -> T:
         """
         Call API method
 

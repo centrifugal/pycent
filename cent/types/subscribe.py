@@ -1,5 +1,5 @@
-from cent.types.base import CentObject
+from cent.types.base import CentResult
 
 
-class SubscribeObject(CentObject):
+class SubscribeResult(CentResult):
     """Subscribe result."""

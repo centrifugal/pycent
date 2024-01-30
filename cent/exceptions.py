@@ -7,6 +7,20 @@ class CentError(Exception):
     """
 
 
+class CentNetworkError(CentError):
+    """CentNetworkError raised when Centrifugo is not available."""
+
+    def __init__(self, method: CentMethod[CentType], message: str) -> None:
+        self.method = method
+        self.message = message
+
+    def __str__(self) -> str:
+        return f"HTTP error - {self.message}"
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}('{self}')"
+
+
 class ClientDecodeError(CentError):
     """
     ClientDecodeError raised when response from Centrifugo can't be decoded

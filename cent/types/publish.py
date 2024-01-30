@@ -1,9 +1,9 @@
 from typing import Optional
 
-from cent.types.base import CentObject
+from cent.types.base import CentResult
 
 
-class PublishObject(CentObject):
+class PublishResult(CentResult):
     """Publish result."""
 
     offset: Optional[int] = None

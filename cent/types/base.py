@@ -3,7 +3,7 @@ from pydantic import BaseModel, ConfigDict
 from cent.context_controller import ClientContextController
 
 
-class CentObject(ClientContextController, BaseModel):
+class CentResult(ClientContextController, BaseModel):
     model_config = ConfigDict(
         use_enum_values=True,
         extra="allow",

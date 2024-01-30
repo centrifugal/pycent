@@ -1,18 +1,18 @@
 from typing import Any, Dict, Optional
 
 from cent.methods.base import CentMethod
-from cent.types.publish import PublishObject
+from cent.types.publish import PublishResult
 
 
-class PublishMethod(CentMethod[PublishObject]):
+class PublishMethod(CentMethod[PublishResult]):
     """Publish request."""
 
-    __returning__ = PublishObject
+    __returning__ = PublishResult
     __api_method__ = "publish"
 
     channel: str
     """Name of channel to publish."""
-    data: Dict[Any, Any]
+    data: Any
     """Custom JSON data to publish into a channel."""
     skip_history: Optional[bool] = None
     """Skip adding publication to history for this request."""

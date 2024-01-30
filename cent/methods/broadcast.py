@@ -1,18 +1,18 @@
-from typing import Any, Dict, Optional, List
+from typing import Dict, Optional, List, Any
 
 from cent.methods.base import CentMethod
-from cent.types.broadcast import BroadcastObject
+from cent.types.broadcast import BroadcastResult
 
 
-class BroadcastMethod(CentMethod[BroadcastObject]):
+class BroadcastMethod(CentMethod[BroadcastResult]):
     """Broadcast request."""
 
-    __returning__ = BroadcastObject
+    __returning__ = BroadcastResult
     __api_method__ = "broadcast"
 
     channels: List[str]
     """List of channels to publish data to."""
-    data: Dict[Any, Any]
+    data: Any
     """Custom JSON data to publish into a channel."""
     skip_history: Optional[bool] = None
     """Skip adding publications to channels' history for this request."""
