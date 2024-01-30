@@ -1,33 +1,32 @@
-class CentException(Exception):
+from cent.methods.base import CentMethod, CentType
+
+
+class CentError(Exception):
     """
     Wrapper for all exceptions coming from this library.
     """
 
-    pass
 
-
-class RequestException(CentException):
+class ClientDecodeError(CentError):
     """
-    RequestException means that request to Centrifugo API failed in some way.
-    This is just a wrapper over RequestException from requests library.
+    ClientDecodeError raised when response from Centrifugo can't be decoded
+    from JSON.
     """
 
-    pass
 
-
-class ClientNotEmpty(CentException):
+class DetailedAPIError(CentError):
     """
-    ClientNotEmpty raised when attempting to call single method but internal
-    client command buffer is not empty.
+    DetailedAPIError raised when response from Centrifugo contains any error
+    as a result of API command execution.
     """
 
-    pass
+    def __init__(self, method: CentMethod[CentType], code: int, message: str) -> None:
+        self.method = method
+        self.code = code
+        self.message = message
 
+    def __str__(self) -> str:
+        return f"Centrifuge error #{self.code}: {self.message}"
 
-class ResponseError(CentException):
-    """
-    Raised when response from Centrifugo contains any error as result of API
-    command execution.
-    """
-
-    pass
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}('{self}')"

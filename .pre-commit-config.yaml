@@ -1,0 +1,30 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.2.0
+    hooks:
+      - id: "trailing-whitespace"
+      - id: "check-case-conflict"
+      - id: "check-merge-conflict"
+      - id: "debug-statements"
+      - id: "end-of-file-fixer"
+      - id: "mixed-line-ending"
+      - id: "detect-private-key"
+      - id: "check-yaml"
+      - id: "check-toml"
+
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: 'v0.1.15'
+    hooks:
+      - id: ruff
+        args: [ "--fix" ]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        name: Validate types with MyPy
+        language: system
+        types: [ python ]
+        args:
+          - "cent"
