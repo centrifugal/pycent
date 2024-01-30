@@ -1,6 +1,6 @@
 from typing import List, Optional, Any, Dict, TypeVar
 
-from cent.client.session import BaseSession, AiohttpSession
+from cent.client.session import BaseAsyncSession, AiohttpSession
 from cent.methods.base import CentMethod
 from cent.methods.broadcast import BroadcastMethod
 from cent.methods.publish import PublishMethod
@@ -10,12 +10,12 @@ from cent.types.publish import PublishObject
 T = TypeVar("T")
 
 
-class CentClient:
+class AsyncClient:
     def __init__(
         self,
         base_url: str,
         api_key: str,
-        session: Optional[BaseSession] = None,
+        session: Optional[BaseAsyncSession] = None,
     ) -> None:
         """
         :param base_url: Centrifuge base_url

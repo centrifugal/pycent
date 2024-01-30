@@ -6,7 +6,7 @@ from cent.types.base import CentObject
 class PublishObject(CentObject):
     """Publish result."""
 
-    offset: Optional[str] = None
+    offset: Optional[int] = None
     """Offset of publication in history stream."""
     epoch: Optional[str] = None
     """Epoch of current stream."""

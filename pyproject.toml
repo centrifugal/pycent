@@ -28,6 +28,8 @@ classifiers = [
 python = "^3.9"
 aiohttp = "^3.9.3"
 pydantic = "^2.6.0"
+requests = "^2.31.0"
+types-requests = "^2.31.0.20240125"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.6.0"
@@ -65,7 +67,8 @@ select = [
 ]
 ignore = [
     "PLR0913", # too-many-arguments
-    "PGH003" # use specific rule code when ignore
+    "PGH003", # use specific rule code when ignore
+    "T201"
 ]
 
 [tool.ruff.per-file-ignores]

@@ -1,22 +1,22 @@
 import json
-from abc import ABC, abstractmethod
-from types import TracebackType
-from typing import Final, TYPE_CHECKING, Callable, Any, Optional, cast, Type
+from http import HTTPStatus
+from typing import Final, TYPE_CHECKING, Callable, Any, Union
 
-from pydantic import ValidationError
+from pydantic import ValidationError, TypeAdapter
 
-from cent.exceptions import ClientDecodeError, DetailedAPIError
-from cent.methods.base import CentMethod, CentType, Response
+from cent.exceptions import ClientDecodeError, DetailedAPIError, InvalidApiKeyError
+from cent.methods.base import CentMethod, CentType, Response, Error
 
 if TYPE_CHECKING:
-    from cent.client.cent_client import CentClient
+    from cent.client.client import Client
+    from cent.client.async_client import AsyncClient
 
 DEFAULT_TIMEOUT: Final[float] = 60.0
 _JsonLoads = Callable[..., Any]
 _JsonDumps = Callable[..., str]
 
 
-class BaseSession(ABC):
+class BaseSession:
     """Base class for all sessions."""
 
     def __init__(
@@ -38,71 +38,42 @@ class BaseSession(ABC):
 
     def check_response(
         self,
-        client: "CentClient",
+        client: Union["Client", "AsyncClient"],
         method: CentMethod[CentType],
+        status_code: int,
         content: str,
     ) -> Response[CentType]:
         """Validate response."""
+        if status_code == HTTPStatus.FORBIDDEN:
+            raise InvalidApiKeyError
+
         try:
             json_data = self.json_loads(content)
         except Exception as err:
             raise ClientDecodeError from err
 
+        if not (HTTPStatus.OK <= status_code <= HTTPStatus.IM_USED):
+            error = Error.model_validate(json_data)
+            raise DetailedAPIError(
+                method=method,
+                code=error.code,
+                message=error.message,
+            )
+
         try:
             response_type = Response[method.__returning__]  # type: ignore
-            response = response_type.model_validate(
+            response = TypeAdapter(response_type).validate_python(
                 json_data,
                 context={"client": client},
             )
         except ValidationError as err:
             raise ClientDecodeError from err
 
-        if response.error is None:
-            return response
+        if response.error:
+            raise DetailedAPIError(
+                method=method,
+                code=response.error.code,
+                message=response.error.message,
+            )
 
-        raise DetailedAPIError(
-            method=method,
-            code=response.error.code,
-            message=response.error.message,
-        )
-
-    @abstractmethod
-    async def close(self) -> None:  # pragma: no cover
-        """
-        Close client session
-        """
-
-    @abstractmethod
-    async def make_request(
-        self,
-        client: "CentClient",
-        method: CentMethod[CentType],
-        timeout: Optional[float] = None,
-    ) -> CentType:  # pragma: no cover
-        """
-        Make request to centrifuge API.
-
-        :param client: Centrifuge client.
-        :param method: Centrifuge method.
-        :param timeout: Request timeout.
-        """
-        ...
-
-    async def __call__(
-        self,
-        client: "CentClient",
-        method: CentMethod[CentType],
-        timeout: Optional[float] = None,
-    ) -> CentType:
-        return cast(CentType, await self.make_request(client, method, timeout))
-
-    async def __aenter__(self) -> "BaseSession":
-        return self
-
-    async def __aexit__(
-        self,
-        exc_type: Optional[Type[BaseException]],
-        exc_value: Optional[BaseException],
-        traceback: Optional[TracebackType],
-    ) -> None:
-        await self.close()
+        return response

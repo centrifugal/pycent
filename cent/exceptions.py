@@ -14,6 +14,12 @@ class ClientDecodeError(CentError):
     """
 
 
+class InvalidApiKeyError(CentError):
+    """
+    InvalidApiKeyError raised when Centrifugo returns 401 status code.
+    """
+
+
 class DetailedAPIError(CentError):
     """
     DetailedAPIError raised when response from Centrifugo contains any error

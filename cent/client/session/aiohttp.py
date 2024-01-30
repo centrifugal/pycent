@@ -6,14 +6,14 @@ from aiohttp.hdrs import USER_AGENT, CONTENT_TYPE
 from aiohttp.http import SERVER_SOFTWARE
 
 from cent.__meta__ import __version__
-from cent.client.session.base import BaseSession
+from cent.client.session.base_async import BaseAsyncSession
 from cent.methods.base import CentMethod, CentType
 
 if TYPE_CHECKING:
-    from cent.client.cent_client import CentClient
+    from cent.client.async_client import AsyncClient
 
 
-class AiohttpSession(BaseSession):
+class AiohttpSession(BaseAsyncSession):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._session: Optional[ClientSession] = None
@@ -39,7 +39,7 @@ class AiohttpSession(BaseSession):
 
     async def make_request(
         self,
-        client: "CentClient",
+        client: "AsyncClient",
         method: CentMethod[CentType],
         timeout: Optional[float] = None,
     ) -> CentType:
@@ -58,6 +58,7 @@ class AiohttpSession(BaseSession):
         response = self.check_response(
             client=client,
             method=method,
+            status_code=resp.status,
             content=raw_result,
         )
         return cast(CentType, response.result)
