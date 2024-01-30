@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from cent.client.client import Client
     from cent.client.async_client import AsyncClient
 
-DEFAULT_TIMEOUT: Final[float] = 60.0
+DEFAULT_TIMEOUT: Final[float] = 10.0
 _JsonLoads = Callable[..., Any]
 _JsonDumps = Callable[..., str]
 
@@ -44,7 +44,7 @@ class BaseSession:
         content: str,
     ) -> Response[CentType]:
         """Validate response."""
-        if status_code == HTTPStatus.FORBIDDEN:
+        if status_code == HTTPStatus.UNAUTHORIZED:
             raise InvalidApiKeyError
 
         try:
