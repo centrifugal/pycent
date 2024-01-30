@@ -23,7 +23,7 @@ class ClientContextController(BaseModel):
         return self
 
     @property
-    def client(self) -> Optional["Client"]:
+    def client_instance(self) -> Optional["Client"]:
         """
         Get client instance.
 

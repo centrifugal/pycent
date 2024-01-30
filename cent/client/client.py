@@ -1,11 +1,19 @@
 from typing import List, Optional, Any, Dict, TypeVar
 
 from cent.client.session import BaseSyncSession, RequestsSession
-from cent.methods.base import CentMethod
-from cent.methods.broadcast import BroadcastMethod
-from cent.methods.publish import PublishMethod
-from cent.types.broadcast import BroadcastObject
-from cent.types.publish import PublishObject
+from cent.methods import (
+    CentMethod,
+    BroadcastMethod,
+    PublishMethod,
+    SubscribeMethod,
+)
+from cent.types import (
+    StreamPosition,
+    PublishObject,
+    BroadcastObject,
+    Override,
+    SubscribeObject,
+)
 
 T = TypeVar("T")
 
@@ -64,6 +72,34 @@ class Client:
             tags=tags,
             b64data=b64data,
             idempotency_key=idempotency_key,
+        )
+        return self(call, request_timeout=request_timeout)
+
+    def subscribe(
+        self,
+        user: str,
+        channel: str,
+        info: Optional[Dict[Any, Any]] = None,
+        b64info: Optional[str] = None,
+        client: Optional[str] = None,
+        session: Optional[str] = None,
+        data: Optional[Dict[Any, Any]] = None,
+        b64data: Optional[str] = None,
+        recover_since: Optional[StreamPosition] = None,
+        override: Optional[Override] = None,
+        request_timeout: Optional[int] = None,
+    ) -> SubscribeObject:
+        call = SubscribeMethod(
+            user=user,
+            channel=channel,
+            info=info,
+            b64info=b64info,
+            client=client,
+            session=session,
+            data=data,
+            b64data=b64data,
+            recover_since=recover_since,
+            override=override,
         )
         return self(call, request_timeout=request_timeout)
 
