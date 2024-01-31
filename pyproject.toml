@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "cent"
+name = "new_cent"
 version = "5.0.0b1"
 description = "Python library to communicate with Centrifugo v3 HTTP API"
 authors = ["Alexandr Emelin", "Bogdan Evstratenko", "Katant Savelev"]
@@ -26,16 +26,19 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.9"
-aiohttp = "^3.9.3"
-pydantic = "^2.6.0"
-requests = "^2.31.0"
-types-requests = "^2.31.0.20240125"
+aiohttp = "^3"
+pydantic = "^2"
+requests = "^2"
+types-requests = "^2"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.6.0"
 ruff = "^0.1.15"
 mypy = "^1.8.0"
 uvloop = "^0.19.0"
+pytest = "^8"
+anyio = "^4.2.0"
+pytest-benchmark = "^4.0.0"
 
 [tool.ruff]
 line-length = 99
@@ -98,6 +101,13 @@ warn_return_any = true
 follow_imports_for_stubs = true
 namespace_packages = true
 show_absolute_path = true
+
+
+[[tool.mypy.overrides]]
+module = [
+    "pytest_benchmark.*"
+]
+ignore_missing_imports = true
 
 
 [build-system]
