@@ -16,6 +16,7 @@ from cent.methods import (
     DisconnectMethod,
     InfoMethod,
 )
+from cent.methods.batch import BatchMethod
 from cent.types import (
     PublishResult,
     BroadcastResult,
@@ -33,6 +34,7 @@ from cent.types import (
     ChannelOptionsOverride,
     Disconnect,
 )
+from cent.types.batch_result import BatchResult
 
 T = TypeVar("T")
 
@@ -235,6 +237,14 @@ class AsyncClient:
         request_timeout: Optional[float] = None,
     ) -> InfoResult:
         call = InfoMethod()
+        return await self(call, request_timeout=request_timeout)
+
+    async def batch(
+        self,
+        commands: List[CentMethod[Any]],
+        request_timeout: Optional[float] = None,
+    ) -> BatchResult:
+        call = BatchMethod.model_construct(commands=commands)
         return await self(call, request_timeout=request_timeout)
 
     async def __call__(self, method: CentMethod[T], request_timeout: Optional[float] = None) -> T:

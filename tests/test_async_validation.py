@@ -1,6 +1,7 @@
 from base64 import b64encode
 
 from cent import AsyncClient
+from cent.methods import PublishMethod, BroadcastMethod, PresenceMethod
 from cent.types import StreamPosition, Disconnect
 
 
@@ -101,4 +102,26 @@ async def test_refresh(async_client: AsyncClient) -> None:
         session="session",
         expire_at=1,
         expired=True,
+    )
+
+
+async def test_batch(async_client: AsyncClient) -> None:
+    await async_client.batch(
+        commands=[
+            PublishMethod(
+                channel="personal:1",
+                data={"data": "Second data"},
+            ),
+            PublishMethod(
+                channel="personal:2",
+                data={"data": "First data"},
+            ),
+            BroadcastMethod(
+                channels=["personal:1", "personal:2"],
+                data={"data": "Third data"},
+            ),
+            PresenceMethod(
+                channel="personal:1",
+            ),
+        ]
     )

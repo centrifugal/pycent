@@ -1,5 +1,6 @@
 from base64 import b64encode
 from cent import Client
+from cent.methods import PublishMethod, BroadcastMethod, PresenceMethod
 from cent.types import StreamPosition, Disconnect
 
 
@@ -100,4 +101,26 @@ def test_refresh(sync_client: Client) -> None:
         session="session",
         expire_at=1,
         expired=True,
+    )
+
+
+def test_batch(sync_client: Client) -> None:
+    sync_client.batch(
+        commands=[
+            PublishMethod(
+                channel="personal:1",
+                data={"data": "Second data"},
+            ),
+            PublishMethod(
+                channel="personal:2",
+                data={"data": "First data"},
+            ),
+            BroadcastMethod(
+                channels=["personal:1", "personal:2"],
+                data={"data": "Third data"},
+            ),
+            PresenceMethod(
+                channel="personal:1",
+            ),
+        ]
     )

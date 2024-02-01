@@ -1,11 +1,12 @@
 import json
 from http import HTTPStatus
-from typing import Final, TYPE_CHECKING, Callable, Any, Union
+from typing import Final, TYPE_CHECKING, Callable, Any, Union, Dict, List
 
 from pydantic import ValidationError, TypeAdapter
 
 from cent.exceptions import ClientDecodeError, DetailedAPIError, InvalidApiKeyError
 from cent.methods.base import CentMethod, CentType, Response, Error
+from cent.methods.batch import BatchMethod
 
 try:
     import orjson
@@ -43,6 +44,32 @@ class BaseSession:
         self.json_loads = json_loads
         self._timeout = timeout
 
+    @staticmethod
+    def get_batch_json_data(method: BatchMethod) -> Dict[str, List[Dict[str, Any]]]:
+        commands = [
+            {command.__api_method__: command.model_dump(exclude_none=True)}
+            for command in method.commands
+        ]
+        return {"commands": commands}
+
+    @staticmethod
+    def validate_batch(
+        client: Union["Client", "AsyncClient"],
+        method: BatchMethod,
+        json_replies: List[Dict[str, Any]],
+    ) -> Dict[str, Dict[str, List[Any]]]:
+        """Validate batch method."""
+        replies: List[CentMethod[Any]] = []
+        for command_method, json_data in zip(method.commands, json_replies):
+            validated_method: CentMethod[Any] = TypeAdapter(
+                command_method.__returning__
+            ).validate_python(
+                json_data[command_method.__api_method__],
+                context={"client": client},
+            )
+            replies.append(validated_method)
+        return {"result": {"replies": replies}}
+
     def check_response(
         self,
         client: Union["Client", "AsyncClient"],
@@ -66,6 +93,9 @@ class BaseSession:
                 code=error.code,
                 message=error.message,
             )
+
+        if isinstance(method, BatchMethod):
+            json_data = self.validate_batch(client, method, json_data["replies"])
 
         try:
             response_type = Response[method.__returning__]  # type: ignore

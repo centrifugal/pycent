@@ -22,7 +22,7 @@ class NodeResult(CentResult):
     """Total number of channels."""
     uptime: int
     """Node uptime."""
-    metrics: MetricsResult
+    metrics: Optional[MetricsResult] = None
     """Node metrics."""
     process: Optional[ProcessResult] = None
     """Node process."""

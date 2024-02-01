@@ -9,6 +9,7 @@ from cent.__meta__ import __version__
 from cent.methods.base import CentMethod, CentType
 from cent.client.session.base_sync import BaseSyncSession
 from cent.exceptions import CentNetworkError
+from cent.methods.batch import BatchMethod
 
 if TYPE_CHECKING:
     from cent.client.sync_client import Client
@@ -37,7 +38,10 @@ class RequestsSession(BaseSyncSession):
         timeout: Optional[float] = None,
     ) -> CentType:
         self._session.headers["X-API-Key"] = client.api_key
-        json_data = method.model_dump(exclude_none=True)
+        if isinstance(method, BatchMethod):
+            json_data = self.get_batch_json_data(method)
+        else:
+            json_data = method.model_dump(exclude_none=True)
 
         url = f"{self._base_url}/{method.__api_method__}"
 
