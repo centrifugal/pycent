@@ -1,7 +1,7 @@
-from cent.types.base import CentResult
+from pydantic import BaseModel
 
 
-class BoolValue(CentResult):
+class BoolValue(BaseModel):
     """Bool value."""
 
     value: bool

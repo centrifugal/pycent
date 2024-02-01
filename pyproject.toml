@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "new_cent"
+name = "cent"
 version = "5.0.0b1"
 description = "Python library to communicate with Centrifugo v3 HTTP API"
 authors = ["Alexandr Emelin", "Bogdan Evstratenko", "Katant Savelev"]

@@ -1,6 +1,6 @@
 from typing import List, Optional, Any, Dict, TypeVar
 
-from cent.client.session import BaseAsyncSession, AiohttpSession
+from cent.client.session import BaseSyncSession, RequestsSession
 from cent.methods import (
     CentMethod,
     BroadcastMethod,
@@ -37,12 +37,12 @@ from cent.types import (
 T = TypeVar("T")
 
 
-class AsyncClient:
+class Client:
     def __init__(
         self,
         base_url: str,
         api_key: str,
-        session: Optional[BaseAsyncSession] = None,
+        session: Optional[BaseSyncSession] = None,
     ) -> None:
         """
         :param base_url: Centrifuge base_url
@@ -52,9 +52,9 @@ class AsyncClient:
 
         self._base_url = base_url
         self.api_key = api_key
-        self.session = session or AiohttpSession(base_url=base_url)
+        self.session = session or RequestsSession(base_url=base_url)
 
-    async def publish(
+    def publish(
         self,
         channel: str,
         data: Any,
@@ -72,9 +72,9 @@ class AsyncClient:
             b64data=b64data,
             idempotency_key=idempotency_key,
         )
-        return await self(call, request_timeout=request_timeout)
+        return self(call, request_timeout=request_timeout)
 
-    async def broadcast(
+    def broadcast(
         self,
         channels: List[str],
         data: Any,
@@ -92,9 +92,9 @@ class AsyncClient:
             b64data=b64data,
             idempotency_key=idempotency_key,
         )
-        return await self(call, request_timeout=request_timeout)
+        return self(call, request_timeout=request_timeout)
 
-    async def subscribe(
+    def subscribe(
         self,
         user: str,
         channel: str,
@@ -120,9 +120,9 @@ class AsyncClient:
             recover_since=recover_since,
             override=override,
         )
-        return await self(call, request_timeout=request_timeout)
+        return self(call, request_timeout=request_timeout)
 
-    async def unsubscribe(
+    def unsubscribe(
         self,
         user: str,
         channel: str,
@@ -136,9 +136,9 @@ class AsyncClient:
             client=client,
             session=session,
         )
-        return await self(call, request_timeout=request_timeout)
+        return self(call, request_timeout=request_timeout)
 
-    async def presence(
+    def presence(
         self,
         channel: str,
         request_timeout: Optional[float] = None,
@@ -146,9 +146,9 @@ class AsyncClient:
         call = PresenceMethod(
             channel=channel,
         )
-        return await self(call, request_timeout=request_timeout)
+        return self(call, request_timeout=request_timeout)
 
-    async def presence_stats(
+    def presence_stats(
         self,
         channel: str,
         request_timeout: Optional[float] = None,
@@ -156,9 +156,9 @@ class AsyncClient:
         call = PresenceStatsMethod(
             channel=channel,
         )
-        return await self(call, request_timeout=request_timeout)
+        return self(call, request_timeout=request_timeout)
 
-    async def history(
+    def history(
         self,
         channel: str,
         limit: Optional[int] = None,
@@ -172,9 +172,9 @@ class AsyncClient:
             since=since,
             reverse=reverse,
         )
-        return await self(call, request_timeout=request_timeout)
+        return self(call, request_timeout=request_timeout)
 
-    async def history_remove(
+    def history_remove(
         self,
         channel: str,
         request_timeout: Optional[float] = None,
@@ -182,27 +182,27 @@ class AsyncClient:
         call = HistoryRemoveMethod(
             channel=channel,
         )
-        return await self(call, request_timeout=request_timeout)
+        return self(call, request_timeout=request_timeout)
 
-    async def refresh(
+    def refresh(
         self,
         user: str,
         client: Optional[str] = None,
         session: Optional[str] = None,
-        expire_at: Optional[int] = None,
         expired: Optional[bool] = None,
+        expire_at: Optional[int] = None,
         request_timeout: Optional[float] = None,
     ) -> RefreshResult:
         call = RefreshMethod(
             user=user,
             client=client,
             session=session,
-            expire_at=expire_at,
             expired=expired,
+            expire_at=expire_at,
         )
-        return await self(call, request_timeout=request_timeout)
+        return self(call, request_timeout=request_timeout)
 
-    async def channels(
+    def channels(
         self,
         pattern: Optional[str] = None,
         request_timeout: Optional[float] = None,
@@ -210,9 +210,9 @@ class AsyncClient:
         call = ChannelsMethod(
             pattern=pattern,
         )
-        return await self(call, request_timeout=request_timeout)
+        return self(call, request_timeout=request_timeout)
 
-    async def disconnect(
+    def disconnect(
         self,
         user: str,
         client: Optional[str] = None,
@@ -228,20 +228,20 @@ class AsyncClient:
             whitelist=whitelist,
             disconnect=disconnect,
         )
-        return await self(call, request_timeout=request_timeout)
+        return self(call, request_timeout=request_timeout)
 
-    async def info(
+    def info(
         self,
         request_timeout: Optional[float] = None,
     ) -> InfoResult:
         call = InfoMethod()
-        return await self(call, request_timeout=request_timeout)
+        return self(call, request_timeout=request_timeout)
 
-    async def __call__(self, method: CentMethod[T], request_timeout: Optional[float] = None) -> T:
+    def __call__(self, method: CentMethod[T], request_timeout: Optional[float] = None) -> T:
         """
         Call API method
 
         :param method: Centrifugo method
         :return: Centrifugo response
         """
-        return await self.session(self, method, timeout=request_timeout)
+        return self.session(self, method, timeout=request_timeout)

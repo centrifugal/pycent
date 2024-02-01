@@ -11,7 +11,7 @@ from cent.client.session.base_sync import BaseSyncSession
 from cent.exceptions import CentNetworkError
 
 if TYPE_CHECKING:
-    from cent.client.client import Client
+    from cent.client.sync_client import Client
 
 
 class RequestsSession(BaseSyncSession):

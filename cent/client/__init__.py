@@ -5,7 +5,7 @@ from .session import (
     AiohttpSession,
     RequestsSession,
 )
-from .client import Client
+from .sync_client import Client
 from .async_client import AsyncClient
 
 __all__ = (

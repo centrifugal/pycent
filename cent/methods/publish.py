@@ -1,7 +1,7 @@
 from typing import Any, Dict, Optional
 
 from cent.methods.base import CentMethod
-from cent.types.publish import PublishResult
+from cent.types.publish_result import PublishResult
 
 
 class PublishMethod(CentMethod[PublishResult]):

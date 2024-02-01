@@ -1,7 +1,7 @@
 from typing import Dict, Optional, List, Any
 
 from cent.methods.base import CentMethod
-from cent.types.broadcast import BroadcastResult
+from cent.types.broadcast_result import BroadcastResult
 
 
 class BroadcastMethod(CentMethod[BroadcastResult]):

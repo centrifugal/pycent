@@ -1,7 +1,7 @@
-from cent.types.base import CentResult
+from pydantic import BaseModel
 
 
-class StreamPosition(CentResult):
+class StreamPosition(BaseModel):
     """Stream position."""
 
     offset: int

@@ -1,10 +1,11 @@
 from typing import Optional
 
-from cent.types.base import CentResult
+from pydantic import BaseModel
+
 from cent.types.bool_value import BoolValue
 
 
-class ChannelOptionsOverride(CentResult):
+class ChannelOptionsOverride(BaseModel):
     """Override object."""
 
     presence: Optional[BoolValue] = None

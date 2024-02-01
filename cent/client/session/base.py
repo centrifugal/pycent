@@ -7,8 +7,15 @@ from pydantic import ValidationError, TypeAdapter
 from cent.exceptions import ClientDecodeError, DetailedAPIError, InvalidApiKeyError
 from cent.methods.base import CentMethod, CentType, Response, Error
 
+try:
+    import orjson
+
+    loads = orjson.loads
+except ImportError:
+    loads = json.loads
+
 if TYPE_CHECKING:
-    from cent.client.client import Client
+    from cent.client.sync_client import Client
     from cent.client.async_client import AsyncClient
 
 DEFAULT_TIMEOUT: Final[float] = 10.0
@@ -22,7 +29,7 @@ class BaseSession:
     def __init__(
         self,
         base_url: str,
-        json_loads: _JsonLoads = json.loads,
+        json_loads: _JsonLoads = loads,
         timeout: float = DEFAULT_TIMEOUT,
     ) -> None:
         """

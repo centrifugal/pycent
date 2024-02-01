@@ -5,7 +5,7 @@ from cent.methods.base import CentMethod, CentType
 from cent.client.session.base import BaseSession
 
 if TYPE_CHECKING:
-    from cent.client.client import Client
+    from cent.client.sync_client import Client
 
 DEFAULT_TIMEOUT: Final[float] = 60.0
 _JsonLoads = Callable[..., Any]
