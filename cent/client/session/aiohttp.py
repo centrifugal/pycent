@@ -2,10 +2,7 @@ import asyncio
 from typing import Optional, TYPE_CHECKING, cast, Any
 
 from aiohttp import ClientSession, ClientError
-from aiohttp.hdrs import USER_AGENT, CONTENT_TYPE
-from aiohttp.http import SERVER_SOFTWARE
 
-from cent.__meta__ import __version__
 from cent.client.session.base_async import BaseAsyncSession
 from cent.methods.base import CentMethod, CentType
 from cent.exceptions import CentNetworkError
@@ -22,13 +19,7 @@ class AiohttpSession(BaseAsyncSession):
 
     async def _create_session(self) -> ClientSession:
         if self._session is None or self._session.closed:
-            self._session = ClientSession(
-                headers={
-                    USER_AGENT: f"{SERVER_SOFTWARE} pycent/{__version__}",
-                    CONTENT_TYPE: "application/json",
-                    "X-Centrifugo-Error-Mode": "transport",
-                },
-            )
+            self._session = ClientSession(headers=self._headers)
 
         return self._session
 

@@ -1,5 +1,6 @@
 from base64 import b64encode
 from cent import Client
+from cent.exceptions import APIError
 from cent.methods import PublishMethod, BroadcastMethod, PresenceMethod
 from cent.types import StreamPosition, Disconnect
 
@@ -124,3 +125,15 @@ def test_batch(sync_client: Client) -> None:
             ),
         ]
     )
+
+
+def test_error_publish(sync_client: Client) -> None:
+    try:
+        sync_client.publish(
+            "undefined_channel:123",
+            {"data": "data"},
+        )
+    except APIError:
+        assert True
+    else:
+        raise AssertionError

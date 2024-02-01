@@ -1,6 +1,7 @@
 from base64 import b64encode
 
 from cent import AsyncClient
+from cent.exceptions import APIError
 from cent.methods import PublishMethod, BroadcastMethod, PresenceMethod
 from cent.types import StreamPosition, Disconnect
 
@@ -125,3 +126,15 @@ async def test_batch(async_client: AsyncClient) -> None:
             ),
         ]
     )
+
+
+async def test_error_publish(async_client: AsyncClient) -> None:
+    try:
+        await async_client.publish(
+            "undefined_channel:123",
+            {"data": "data"},
+        )
+    except APIError:
+        assert True
+    else:
+        raise AssertionError

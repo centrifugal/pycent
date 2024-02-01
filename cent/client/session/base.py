@@ -2,10 +2,11 @@ import json
 from http import HTTPStatus
 from typing import Final, TYPE_CHECKING, Callable, Any, Union, Dict, List
 
-from pydantic import ValidationError, TypeAdapter
+from aiohttp.http import SERVER_SOFTWARE
+from pydantic import ValidationError, TypeAdapter, __version__
 
-from cent.exceptions import ClientDecodeError, DetailedAPIError, InvalidApiKeyError
-from cent.methods.base import CentMethod, CentType, Response, Error
+from cent.exceptions import ClientDecodeError, APIError, InvalidApiKeyError, TransportError
+from cent.methods.base import CentMethod, CentType, Response
 from cent.methods.batch import BatchMethod
 
 try:
@@ -43,6 +44,10 @@ class BaseSession:
         self._base_url = base_url
         self.json_loads = json_loads
         self._timeout = timeout
+        self._headers = {
+            "User-Agent": f"{SERVER_SOFTWARE} pycent/{__version__}",
+            "Content-Type": "application/json",
+        }
 
     @staticmethod
     def get_batch_json_data(method: BatchMethod) -> Dict[str, List[Dict[str, Any]]]:
@@ -86,12 +91,10 @@ class BaseSession:
         except Exception as err:
             raise ClientDecodeError from err
 
-        if not (HTTPStatus.OK <= status_code <= HTTPStatus.IM_USED):
-            error = Error.model_validate(json_data)
-            raise DetailedAPIError(
+        if status_code != HTTPStatus.OK:
+            raise TransportError(
                 method=method,
-                code=error.code,
-                message=error.message,
+                status_code=status_code,
             )
 
         if isinstance(method, BatchMethod):
@@ -107,7 +110,7 @@ class BaseSession:
             raise ClientDecodeError from err
 
         if response.error:
-            raise DetailedAPIError(
+            raise APIError(
                 method=method,
                 code=response.error.code,
                 message=response.error.message,

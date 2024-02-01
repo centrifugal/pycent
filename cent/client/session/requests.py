@@ -1,11 +1,8 @@
 from typing import Optional, TYPE_CHECKING, cast, Any
 
 import requests
-from aiohttp.hdrs import USER_AGENT, CONTENT_TYPE
-from aiohttp.http import SERVER_SOFTWARE
 from requests import Session
 
-from cent.__meta__ import __version__
 from cent.methods.base import CentMethod, CentType
 from cent.client.session.base_sync import BaseSyncSession
 from cent.exceptions import CentNetworkError
@@ -19,13 +16,7 @@ class RequestsSession(BaseSyncSession):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._session = Session()
-        self._session.headers.update(
-            {
-                USER_AGENT: f"{SERVER_SOFTWARE} pycent/{__version__}",
-                CONTENT_TYPE: "application/json",
-                "X-Centrifugo-Error-Mode": "transport",
-            }
-        )
+        self._session.headers.update(self._headers)
 
     def close(self) -> None:
         if self._session is not None:
