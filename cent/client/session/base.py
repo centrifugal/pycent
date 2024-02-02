@@ -1,4 +1,3 @@
-import json
 from http import HTTPStatus
 from typing import Final, TYPE_CHECKING, Callable, Any, Union, Dict, List
 
@@ -14,6 +13,8 @@ try:
 
     loads = orjson.loads
 except ImportError:
+    import json
+
     loads = json.loads
 
 if TYPE_CHECKING:
@@ -86,16 +87,16 @@ class BaseSession:
         if status_code == HTTPStatus.UNAUTHORIZED:
             raise InvalidApiKeyError
 
-        try:
-            json_data = self.json_loads(content)
-        except Exception as err:
-            raise ClientDecodeError from err
-
         if status_code != HTTPStatus.OK:
             raise TransportError(
                 method=method,
                 status_code=status_code,
             )
+
+        try:
+            json_data = self.json_loads(content)
+        except Exception as err:
+            raise ClientDecodeError from err
 
         if isinstance(method, BatchMethod):
             json_data = self.validate_batch(client, method, json_data["replies"])

@@ -10,6 +10,17 @@ from cent.centrifugal.centrifugo.api import CentrifugoApiStub
 from cent.exceptions import APIError, TransportError
 from cent.methods.base import CentMethod, CentType, Response, Error
 
+try:
+    import orjson
+
+    dumps = orjson.dumps
+except ImportError:
+    import json
+
+    def dumps(x: Any) -> bytes:
+        return json.dumps(x).encode()
+
+
 if TYPE_CHECKING:
     from cent.client.grpc_client import GrpcClient
 
