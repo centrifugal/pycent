@@ -1,5 +1,6 @@
 from typing import Optional
 
+from cent.centrifugal.centrifugo.api import UnsubscribeRequest as GrpcUnsubscribeRequest
 from cent.methods.base import CentMethod
 from cent.types.unsubscribe_result import UnsubscribeResult
 
@@ -9,6 +10,8 @@ class UnsubscribeMethod(CentMethod[UnsubscribeResult]):
 
     __returning__ = UnsubscribeResult
     __api_method__ = "unsubscribe"
+
+    __grpc_method__ = GrpcUnsubscribeRequest
 
     user: str
     """User ID to unsubscribe."""

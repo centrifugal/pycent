@@ -1,7 +1,9 @@
+from typing import Union
+
 import pytest
 
 from benchmarks.conftest import BenchmarkDecoratorType
-from cent import AsyncClient, Client
+from cent import AsyncClient, Client, GrpcClient
 
 
 def sync_requests(client: Client) -> None:
@@ -12,8 +14,9 @@ def sync_requests(client: Client) -> None:
         )
 
 
-async def async_requests(client: AsyncClient) -> None:
+async def async_requests(client: Union[GrpcClient, AsyncClient]) -> None:
     for j in range(1000):
+        print(j)
         await client.publish(
             channel=f"personal:{j}",
             data={"message": "Hello world!"},

@@ -1,12 +1,14 @@
 from typing import Optional
 
-from pydantic import BaseModel
+from cent.centrifugal.centrifugo.api import SubscribeOptionOverride as GrpcChannelOptionOverride
+from cent.methods.base import NestedModel
+from cent.methods.bool_value import BoolValue
 
-from cent.types.bool_value import BoolValue
 
-
-class ChannelOptionsOverride(BaseModel):
+class ChannelOptionsOverride(NestedModel):
     """Override object."""
+
+    __grpc_method__ = GrpcChannelOptionOverride
 
     presence: Optional[BoolValue] = None
     """Override presence."""

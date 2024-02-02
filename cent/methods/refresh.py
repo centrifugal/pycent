@@ -1,5 +1,6 @@
 from typing import Optional
 
+from cent.centrifugal.centrifugo.api import RefreshRequest as GrpcRefreshRequest
 from cent.methods import CentMethod
 from cent.types.refresh_result import RefreshResult
 
@@ -9,6 +10,8 @@ class RefreshMethod(CentMethod[RefreshResult]):
 
     __returning__ = RefreshResult
     __api_method__ = "refresh"
+
+    __grpc_method__ = GrpcRefreshRequest
 
     user: str
     """User ID to refresh."""

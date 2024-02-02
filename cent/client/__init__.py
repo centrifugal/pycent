@@ -7,6 +7,7 @@ from .session import (
 )
 from .sync_client import Client
 from .async_client import AsyncClient
+from .grpc_client import GrpcClient
 
 __all__ = (
     "BaseSession",
@@ -16,4 +17,5 @@ __all__ = (
     "RequestsSession",
     "Client",
     "AsyncClient",
+    "GrpcClient",
 )

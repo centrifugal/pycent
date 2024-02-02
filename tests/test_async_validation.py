@@ -1,9 +1,12 @@
 from base64 import b64encode
 
+import pytest
+
 from cent import AsyncClient
 from cent.exceptions import APIError
 from cent.methods import PublishMethod, BroadcastMethod, PresenceMethod
 from cent.types import StreamPosition, Disconnect
+from tests.conftest import UNKNOWN_CHANNEL_ERROR_CODE
 
 
 async def test_publish(async_client: AsyncClient) -> None:
@@ -129,12 +132,9 @@ async def test_batch(async_client: AsyncClient) -> None:
 
 
 async def test_error_publish(async_client: AsyncClient) -> None:
-    try:
+    with pytest.raises(APIError, match="unknown channel") as exc_info:
         await async_client.publish(
             "undefined_channel:123",
             {"data": "data"},
         )
-    except APIError:
-        assert True
-    else:
-        raise AssertionError
+        assert exc_info.value.code == UNKNOWN_CHANNEL_ERROR_CODE

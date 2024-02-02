@@ -1,11 +1,11 @@
 from .base import CentResult
-from .bool_value import BoolValue
+from cent.methods.bool_value import BoolValue
 from .broadcast_result import BroadcastResult
 from .channel_info_result import ChannelInfoResult
-from .channel_options_override import ChannelOptionsOverride
+from cent.methods.channel_options_override import ChannelOptionsOverride
 from .channels_result import ChannelsResult
 from .client_info_result import ClientInfoResult
-from .disconnect import Disconnect
+from cent.methods.disconnect_data import Disconnect
 from .disconnect_result import DisconnectResult
 from .history_remove_result import HistoryRemoveResult
 from .history_result import HistoryResult
@@ -18,7 +18,7 @@ from .process_result import ProcessResult
 from .publication_result import PublicationResult
 from .publish_result import PublishResult
 from .refresh_result import RefreshResult
-from .stream_position import StreamPosition
+from cent.methods.stream_position import StreamPosition
 from .subscribe_result import SubscribeResult
 from .unsubscribe_result import UnsubscribeResult
 

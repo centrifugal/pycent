@@ -1,5 +1,6 @@
 from typing import Optional
 
+from cent.centrifugal.centrifugo.api import HistoryRequest as GrpcHistoryRequest
 from cent.methods import CentMethod
 from cent.types import StreamPosition
 from cent.types.history_result import HistoryResult
@@ -10,6 +11,8 @@ class HistoryMethod(CentMethod[HistoryResult]):
 
     __returning__ = HistoryResult
     __api_method__ = "history"
+
+    __grpc_method__ = GrpcHistoryRequest
 
     channel: str
     """Name of channel to call history from."""

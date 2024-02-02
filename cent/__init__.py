@@ -4,6 +4,7 @@ import asyncio as _asyncio
 from .client import (
     Client,
     AsyncClient,
+    GrpcClient,
     BaseSession,
     BaseAsyncSession,
     BaseSyncSession,
@@ -22,6 +23,7 @@ __all__ = (
     "__version__",
     "types",
     "methods",
+    "exceptions",
     "Client",
     "AsyncClient",
     "BaseSession",
@@ -29,4 +31,5 @@ __all__ = (
     "BaseSyncSession",
     "RequestsSession",
     "AiohttpSession",
+    "GrpcClient",
 )

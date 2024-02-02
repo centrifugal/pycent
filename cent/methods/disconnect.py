@@ -1,5 +1,6 @@
 from typing import Optional, List
 
+from cent.centrifugal.centrifugo.api import DisconnectRequest as GrpcDisconnectRequest
 from cent.methods import CentMethod
 from cent.types import Disconnect
 from cent.types.disconnect_result import DisconnectResult
@@ -10,6 +11,8 @@ class DisconnectMethod(CentMethod[DisconnectResult]):
 
     __returning__ = DisconnectResult
     __api_method__ = "disconnect"
+
+    __grpc_method__ = GrpcDisconnectRequest
 
     user: str
     """User ID to disconnect."""

@@ -18,7 +18,12 @@ class Response(BaseModel, Generic[CentType]):
     result: Optional[CentType] = None
 
 
-class CentMethod(ClientContextController, BaseModel, Generic[CentType], ABC):
+class CentMethod(
+    ClientContextController,
+    BaseModel,
+    Generic[CentType],
+    ABC,
+):
     model_config = ConfigDict(
         extra="allow",
         populate_by_name=True,
@@ -28,6 +33,8 @@ class CentMethod(ClientContextController, BaseModel, Generic[CentType], ABC):
     if TYPE_CHECKING:
         __returning__: ClassVar[type]
         __api_method__: ClassVar[str]
+
+        __grpc_method__: ClassVar[type]
     else:
 
         @property
@@ -38,4 +45,25 @@ class CentMethod(ClientContextController, BaseModel, Generic[CentType], ABC):
         @property
         @abstractmethod
         def __api_method__(self) -> str:
+            pass
+
+        @property
+        @abstractmethod
+        def __grpc_method__(self) -> type:
+            pass
+
+
+class NestedModel(ClientContextController, BaseModel, ABC):
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+    )
+    if TYPE_CHECKING:
+        __grpc_method__: ClassVar[type]
+    else:
+
+        @property
+        @abstractmethod
+        def __grpc_method__(self) -> type:
             pass

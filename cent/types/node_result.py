@@ -1,5 +1,7 @@
 from typing import Optional
 
+from pydantic import Field
+
 from cent.types.base import CentResult
 from cent.types.metrics_result import MetricsResult
 from cent.types.process_result import ProcessResult
@@ -14,17 +16,17 @@ class NodeResult(CentResult):
     """Node name."""
     version: str
     """Node version."""
-    num_clients: int
+    num_clients: int = Field(default=0)
     """Total number of connections."""
-    num_users: int
+    num_subs: int = Field(default=0)
+    """Total number of subscriptions."""
+    num_users: int = Field(default=0)
     """Total number of users."""
-    num_channels: int
+    num_channels: int = Field(default=0)
     """Total number of channels."""
-    uptime: int
+    uptime: int = Field(default=0)
     """Node uptime."""
     metrics: Optional[MetricsResult] = None
     """Node metrics."""
     process: Optional[ProcessResult] = None
     """Node process."""
-    num_subs: int
-    """Total number of subscriptions."""

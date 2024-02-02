@@ -1,15 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Final, TYPE_CHECKING, Callable, Any, Optional, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 
-from cent.methods.base import CentMethod, CentType
 from cent.client.session.base import BaseSession
+from cent.methods.base import CentMethod, CentType
 
 if TYPE_CHECKING:
     from cent.client.async_client import AsyncClient
-
-DEFAULT_TIMEOUT: Final[float] = 60.0
-_JsonLoads = Callable[..., Any]
-_JsonDumps = Callable[..., str]
 
 
 class BaseAsyncSession(BaseSession, ABC):
@@ -35,7 +31,6 @@ class BaseAsyncSession(BaseSession, ABC):
         :param method: Centrifuge method.
         :param timeout: Request timeout.
         """
-        ...
 
     async def __call__(
         self,
