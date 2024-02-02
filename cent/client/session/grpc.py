@@ -2,11 +2,12 @@ from dataclasses import dataclass, asdict
 from typing import TYPE_CHECKING, cast, Type, Dict, Any, List, Tuple
 
 import betterproto
+from grpclib import GRPCError
 from grpclib.client import Channel
 from pydantic import TypeAdapter, BaseModel
 
 from cent.centrifugal.centrifugo.api import CentrifugoApiStub
-from cent.exceptions import APIError
+from cent.exceptions import APIError, TransportError
 from cent.methods.base import CentMethod, CentType, Response, Error
 
 if TYPE_CHECKING:
@@ -67,7 +68,10 @@ class GrpcSession:
         method: CentMethod[CentType],
     ) -> None:
         api_method = getattr(self._stub, method.__api_method__)
-        response = await api_method(self.convert_to_grpc(method))
+        try:
+            response = await api_method(self.convert_to_grpc(method))
+        except GRPCError as error:
+            raise TransportError(method=method, status_code=error.status.value) from None
 
         self.check_response(client, method, response)
 
