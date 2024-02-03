@@ -2,10 +2,8 @@ from abc import ABC
 
 from pydantic import BaseModel, ConfigDict
 
-from cent.context_controller import ClientContextController
 
-
-class CentResult(ClientContextController, BaseModel, ABC):
+class CentResult(BaseModel, ABC):
     model_config = ConfigDict(
         use_enum_values=True,
         extra="allow",

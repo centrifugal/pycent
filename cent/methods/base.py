@@ -3,8 +3,6 @@ from typing import TypeVar, Any, Generic, TYPE_CHECKING, ClassVar, Optional
 
 from pydantic import BaseModel, ConfigDict
 
-from cent.context_controller import ClientContextController
-
 try:
     import orjson as _orjson  # type: ignore[import-not-found]
 
@@ -31,12 +29,7 @@ class Response(BaseModel, Generic[CentType]):
     result: Optional[CentType] = None
 
 
-class CentRequest(
-    ClientContextController,
-    BaseModel,
-    Generic[CentType],
-    ABC,
-):
+class CentRequest(BaseModel, Generic[CentType], ABC):
     model_config = ConfigDict(
         extra="allow",
         populate_by_name=True,
@@ -66,7 +59,7 @@ class CentRequest(
             pass
 
 
-class NestedModel(ClientContextController, BaseModel, ABC):
+class NestedModel(BaseModel, ABC):
     model_config = ConfigDict(
         extra="allow",
         populate_by_name=True,
