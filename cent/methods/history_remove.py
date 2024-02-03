@@ -1,9 +1,9 @@
-from cent.centrifugal.centrifugo.api import HistoryRemoveRequest as GrpcHistoryRemoveRequest
-from cent.methods import CentMethod
+from cent.protos.centrifugal.centrifugo.api import HistoryRemoveRequest as GrpcHistoryRemoveRequest
+from cent.methods import CentRequest
 from cent.types.history_remove_result import HistoryRemoveResult
 
 
-class HistoryRemoveMethod(CentMethod[HistoryRemoveResult]):
+class HistoryRemoveRequest(CentRequest[HistoryRemoveResult]):
     """History remove request."""
 
     __returning__ = HistoryRemoveResult

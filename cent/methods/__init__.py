@@ -1,29 +1,29 @@
-from .base import CentMethod
-from .broadcast import BroadcastMethod
-from .publish import PublishMethod
-from .subscribe import SubscribeMethod
-from .unsubscribe import UnsubscribeMethod
-from .presence import PresenceMethod
-from .presence_stats import PresenceStatsMethod
-from .history import HistoryMethod
-from .history_remove import HistoryRemoveMethod
-from .refresh import RefreshMethod
-from .channels import ChannelsMethod
-from .disconnect import DisconnectMethod
-from .info import InfoMethod
+from .base import CentRequest
+from .broadcast import BroadcastRequest
+from .publish import PublishRequest
+from .subscribe import SubscribeRequest
+from .unsubscribe import UnsubscribeRequest
+from .presence import PresenceRequest
+from .presence_stats import PresenceStatsRequest
+from .history import HistoryRequest
+from .history_remove import HistoryRemoveRequest
+from .refresh import RefreshRequest
+from .channels import ChannelsRequest
+from .disconnect import DisconnectRequest
+from .info import InfoRequest
 
 __all__ = (
-    "CentMethod",
-    "BroadcastMethod",
-    "PublishMethod",
-    "SubscribeMethod",
-    "UnsubscribeMethod",
-    "PresenceMethod",
-    "PresenceStatsMethod",
-    "HistoryMethod",
-    "HistoryRemoveMethod",
-    "RefreshMethod",
-    "ChannelsMethod",
-    "DisconnectMethod",
-    "InfoMethod",
+    "CentRequest",
+    "BroadcastRequest",
+    "PublishRequest",
+    "SubscribeRequest",
+    "UnsubscribeRequest",
+    "PresenceRequest",
+    "PresenceStatsRequest",
+    "HistoryRequest",
+    "HistoryRemoveRequest",
+    "RefreshRequest",
+    "ChannelsRequest",
+    "DisconnectRequest",
+    "InfoRequest",
 )

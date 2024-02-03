@@ -1,15 +1,14 @@
-import json
 from typing import Dict, Optional, List, Any
 
 from pydantic import field_serializer, Field
 from pydantic_core.core_schema import SerializationInfo
 
-from cent.centrifugal.centrifugo.api import BroadcastRequest as GrpcBroadcastRequest
-from cent.methods.base import CentMethod
+from cent.protos.centrifugal.centrifugo.api import BroadcastRequest as GrpcBroadcastRequest
+from cent.methods.base import CentRequest, json_dumps
 from cent.types.broadcast_result import BroadcastResult
 
 
-class BroadcastMethod(CentMethod[BroadcastResult]):
+class BroadcastRequest(CentRequest[BroadcastResult]):
     """Broadcast request."""
 
     __returning__ = BroadcastResult
@@ -33,5 +32,5 @@ class BroadcastMethod(CentMethod[BroadcastResult]):
     @field_serializer("data")
     def grpc_serialize_data(self, data: Any, _info: SerializationInfo) -> Any:
         if _info.mode == "grpc":
-            return json.dumps(data).encode()
+            return json_dumps(data)
         return data

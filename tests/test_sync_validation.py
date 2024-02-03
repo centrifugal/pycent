@@ -3,8 +3,8 @@ from base64 import b64encode
 import pytest
 
 from cent import Client
-from cent.exceptions import APIError
-from cent.methods import PublishMethod, BroadcastMethod, PresenceMethod
+from cent.exceptions import CentAPIError
+from cent.methods import PublishRequest, BroadcastRequest, PresenceRequest
 from cent.types import StreamPosition, Disconnect
 from tests.conftest import UNKNOWN_CHANNEL_ERROR_CODE
 
@@ -112,19 +112,19 @@ def test_refresh(sync_client: Client) -> None:
 def test_batch(sync_client: Client) -> None:
     sync_client.batch(
         commands=[
-            PublishMethod(
+            PublishRequest(
                 channel="personal:1",
                 data={"data": "Second data"},
             ),
-            PublishMethod(
+            PublishRequest(
                 channel="personal:2",
                 data={"data": "First data"},
             ),
-            BroadcastMethod(
+            BroadcastRequest(
                 channels=["personal:1", "personal:2"],
                 data={"data": "Third data"},
             ),
-            PresenceMethod(
+            PresenceRequest(
                 channel="personal:1",
             ),
         ]
@@ -132,7 +132,7 @@ def test_batch(sync_client: Client) -> None:
 
 
 def test_error_publish(sync_client: Client) -> None:
-    with pytest.raises(APIError, match="unknown channel") as exc_info:
+    with pytest.raises(CentAPIError, match="unknown channel") as exc_info:
         sync_client.publish(
             "undefined_channel:123",
             {"data": "data"},

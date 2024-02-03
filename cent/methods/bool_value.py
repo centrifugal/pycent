@@ -1,4 +1,4 @@
-from cent.centrifugal.centrifugo.api import BoolValue as GrpcBoolValue
+from cent.protos.centrifugal.centrifugo.api import BoolValue as GrpcBoolValue
 from cent.methods.base import NestedModel
 
 

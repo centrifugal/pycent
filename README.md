@@ -8,7 +8,9 @@ To install run:
 ```bash
 pip install cent
 ```
+
 ---
+
 ### Centrifugo compatibility
 
 **Cent v5 and higher works only with Centrifugo v5**.
@@ -16,6 +18,7 @@ pip install cent
 If you need to work with Centrifugo v3 then use Cent v4
 If you need to work with Centrifugo v2 then use Cent v3
 ---
+
 ### High-level library API
 
 First
@@ -47,8 +50,10 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+
 ---
-### CentClient init arguments
+
+### Client init arguments
 
 Required:
 
@@ -69,5 +74,28 @@ Required:
 
 Optional:
 
-* json_loads — function to load JSON from response body
-* timeout - timeout for requests
+* json_loads — function to load JSON from response body (default is json, but you can use
+  orjson, ujson etc.)
+* timeout - timeout for requests (default is 10.0)
+
+## For contributors
+
+### Tests and benchmarks
+
+To start tests, you can use pytest with any additional options, for example:
+
+```bash
+pytest -vv tests
+```
+
+To start benchmarks, you can use pytest too, for example:
+
+```bash
+pytest benchmarks --benchmark-verbose
+```
+
+### Generate code from proto file, if needed
+
+```bash
+poetry run python -m grpc_tools.protoc -I . --python_betterproto_out=./cent/protos cent/protos/apiproto.proto
+```

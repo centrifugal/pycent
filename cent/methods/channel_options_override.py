@@ -1,6 +1,8 @@
 from typing import Optional
 
-from cent.centrifugal.centrifugo.api import SubscribeOptionOverride as GrpcChannelOptionOverride
+from cent.protos.centrifugal.centrifugo.api import (
+    SubscribeOptionOverride as GrpcChannelOptionOverride,
+)
 from cent.methods.base import NestedModel
 from cent.methods.bool_value import BoolValue
 

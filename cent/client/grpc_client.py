@@ -2,19 +2,19 @@ from typing import Any, Optional, Dict, TypeVar, List
 
 from cent.client.session.grpc import GrpcSession
 from cent.methods import (
-    CentMethod,
-    BroadcastMethod,
-    PublishMethod,
-    SubscribeMethod,
-    UnsubscribeMethod,
-    PresenceMethod,
-    PresenceStatsMethod,
-    HistoryMethod,
-    HistoryRemoveMethod,
-    RefreshMethod,
-    ChannelsMethod,
-    DisconnectMethod,
-    InfoMethod,
+    CentRequest,
+    BroadcastRequest,
+    PublishRequest,
+    SubscribeRequest,
+    UnsubscribeRequest,
+    PresenceRequest,
+    PresenceStatsRequest,
+    HistoryRequest,
+    HistoryRemoveRequest,
+    RefreshRequest,
+    ChannelsRequest,
+    DisconnectRequest,
+    InfoRequest,
 )
 from cent.types import (
     PublishResult,
@@ -50,7 +50,7 @@ class GrpcClient:
         b64data: Optional[str] = None,
         idempotency_key: Optional[str] = None,
     ) -> PublishResult:
-        call = PublishMethod(
+        call = PublishRequest(
             channel=channel,
             data=data,
             skip_history=skip_history,
@@ -69,7 +69,7 @@ class GrpcClient:
         b64data: Optional[str] = None,
         idempotency_key: Optional[str] = None,
     ) -> BroadcastResult:
-        call = BroadcastMethod(
+        call = BroadcastRequest(
             channels=channels,
             data=data,
             skip_history=skip_history,
@@ -92,7 +92,7 @@ class GrpcClient:
         recover_since: Optional[StreamPosition] = None,
         override: Optional[ChannelOptionsOverride] = None,
     ) -> SubscribeResult:
-        call = SubscribeMethod(
+        call = SubscribeRequest(
             user=user,
             channel=channel,
             info=info,
@@ -113,7 +113,7 @@ class GrpcClient:
         client: Optional[str] = None,
         session: Optional[str] = None,
     ) -> UnsubscribeResult:
-        call = UnsubscribeMethod(
+        call = UnsubscribeRequest(
             user=user,
             channel=channel,
             client=client,
@@ -125,7 +125,7 @@ class GrpcClient:
         self,
         channel: str,
     ) -> PresenceResult:
-        call = PresenceMethod(
+        call = PresenceRequest(
             channel=channel,
         )
         return await self(call)
@@ -134,7 +134,7 @@ class GrpcClient:
         self,
         channel: str,
     ) -> PresenceStatsResult:
-        call = PresenceStatsMethod(
+        call = PresenceStatsRequest(
             channel=channel,
         )
         return await self(call)
@@ -146,7 +146,7 @@ class GrpcClient:
         since: Optional[StreamPosition] = None,
         reverse: Optional[bool] = None,
     ) -> HistoryResult:
-        call = HistoryMethod(
+        call = HistoryRequest(
             channel=channel,
             limit=limit,
             since=since,
@@ -158,7 +158,7 @@ class GrpcClient:
         self,
         channel: str,
     ) -> HistoryRemoveResult:
-        call = HistoryRemoveMethod(
+        call = HistoryRemoveRequest(
             channel=channel,
         )
         return await self(call)
@@ -171,7 +171,7 @@ class GrpcClient:
         expire_at: Optional[int] = None,
         expired: Optional[bool] = None,
     ) -> RefreshResult:
-        call = RefreshMethod(
+        call = RefreshRequest(
             user=user,
             client=client,
             session=session,
@@ -184,7 +184,7 @@ class GrpcClient:
         self,
         pattern: Optional[str] = None,
     ) -> ChannelsResult:
-        call = ChannelsMethod(
+        call = ChannelsRequest(
             pattern=pattern,
         )
         return await self(call)
@@ -197,7 +197,7 @@ class GrpcClient:
         whitelist: Optional[List[str]] = None,
         disconnect: Optional[Disconnect] = None,
     ) -> DisconnectResult:
-        call = DisconnectMethod(
+        call = DisconnectRequest(
             user=user,
             client=client,
             session=session,
@@ -209,10 +209,10 @@ class GrpcClient:
     async def info(
         self,
     ) -> InfoResult:
-        call = InfoMethod()
+        call = InfoRequest()
         return await self(call)
 
-    async def __call__(self, method: CentMethod[T]) -> T:
+    async def __call__(self, method: CentRequest[T]) -> T:
         """
         Call API method
 

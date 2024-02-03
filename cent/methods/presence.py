@@ -1,12 +1,12 @@
-from cent.centrifugal.centrifugo.api import (
+from cent.protos.centrifugal.centrifugo.api import (
     PresenceRequest as GrpcPresenceRequest,
     PresenceResult as GrpcPresenceResult,
 )
-from cent.methods import CentMethod
+from cent.methods import CentRequest
 from cent.types.presence_result import PresenceResult
 
 
-class PresenceMethod(CentMethod[PresenceResult]):
+class PresenceRequest(CentRequest[PresenceResult]):
     """Presence request."""
 
     __returning__ = PresenceResult

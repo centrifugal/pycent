@@ -1,11 +1,11 @@
 from typing import List, Any
 
-from cent.centrifugal.centrifugo.api import BatchRequest as GrpcBatchRequest
-from cent.methods import CentMethod
+from cent.protos.centrifugal.centrifugo.api import BatchRequest as GrpcBatchRequest
+from cent.methods import CentRequest
 from cent.types.batch_result import BatchResult
 
 
-class BatchMethod(CentMethod[BatchResult]):
+class BatchRequest(CentRequest[BatchResult]):
     """Batch request."""
 
     __returning__ = BatchResult
@@ -13,5 +13,5 @@ class BatchMethod(CentMethod[BatchResult]):
 
     __grpc_method__ = GrpcBatchRequest
 
-    commands: List[CentMethod[Any]]
+    commands: List[CentRequest[Any]]
     """List of commands to execute in batch."""

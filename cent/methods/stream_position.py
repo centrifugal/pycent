@@ -1,4 +1,4 @@
-from cent.centrifugal.centrifugo.api import StreamPosition as GrpcStreamPosition
+from cent.protos.centrifugal.centrifugo.api import StreamPosition as GrpcStreamPosition
 from cent.methods.base import NestedModel
 
 

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cent"
-version = "5.0.0b1"
+version = "5.0.0"
 description = "Python library to communicate with Centrifugo v3 HTTP API"
 authors = ["Alexandr Emelin", "Katant Savelev"]
 license = "MIT"
@@ -41,7 +41,7 @@ pytest = "^8"
 anyio = "^4.2.0"
 pytest-benchmark = "^4.0.0"
 betterproto = { extras = ["compiler"], version = "^2.0.0b6", allow-prereleases = true }
-grpcio-tools = "^1.60.1"
+grpcio-tools = "^1.60.0"
 
 [tool.ruff]
 line-length = 99
@@ -82,7 +82,7 @@ ignore = [
 "cent/types/*" = ["E501"]
 "cent/methods/*" = ["E501"]
 "tests/*" = ["S101", "PT012"]
-"cent/centrifugal/*" = ["RUF009", "ARG002", "E501"]
+"cent/protos/centrifugal/*" = ["RUF009", "ARG002", "E501"]
 
 [tool.mypy]
 strict = true
@@ -119,7 +119,7 @@ module = [
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["cent.centrifugal.*"]
+module = ["cent.protos.centrifugal.*"]
 ignore_errors = true
 
 

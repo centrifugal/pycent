@@ -1,11 +1,11 @@
 from typing import Optional
 
-from cent.centrifugal.centrifugo.api import RefreshRequest as GrpcRefreshRequest
-from cent.methods import CentMethod
+from cent.protos.centrifugal.centrifugo.api import RefreshRequest as GrpcRefreshRequest
+from cent.methods import CentRequest
 from cent.types.refresh_result import RefreshResult
 
 
-class RefreshMethod(CentMethod[RefreshResult]):
+class RefreshRequest(CentRequest[RefreshResult]):
     """Refresh request."""
 
     __returning__ = RefreshResult

@@ -1,4 +1,4 @@
-from cent.centrifugal.centrifugo.api import Disconnect as GrpcDisconnect
+from cent.protos.centrifugal.centrifugo.api import Disconnect as GrpcDisconnect
 
 from cent.methods.base import NestedModel
 

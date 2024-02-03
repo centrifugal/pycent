@@ -1,11 +1,11 @@
 from typing import Optional
 
-from cent.centrifugal.centrifugo.api import ChannelsRequest as GrpcChannelsRequest
-from cent.methods import CentMethod
+from cent.protos.centrifugal.centrifugo.api import ChannelsRequest as GrpcChannelsRequest
+from cent.methods import CentRequest
 from cent.types.channels_result import ChannelsResult
 
 
-class ChannelsMethod(CentMethod[ChannelsResult]):
+class ChannelsRequest(CentRequest[ChannelsResult]):
     """Channels request."""
 
     __returning__ = ChannelsResult

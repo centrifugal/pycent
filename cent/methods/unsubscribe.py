@@ -1,11 +1,11 @@
 from typing import Optional
 
-from cent.centrifugal.centrifugo.api import UnsubscribeRequest as GrpcUnsubscribeRequest
-from cent.methods.base import CentMethod
+from cent.protos.centrifugal.centrifugo.api import UnsubscribeRequest as GrpcUnsubscribeRequest
+from cent.methods.base import CentRequest
 from cent.types.unsubscribe_result import UnsubscribeResult
 
 
-class UnsubscribeMethod(CentMethod[UnsubscribeResult]):
+class UnsubscribeRequest(CentRequest[UnsubscribeResult]):
     """Unsubscribe request."""
 
     __returning__ = UnsubscribeResult

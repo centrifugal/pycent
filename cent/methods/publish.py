@@ -1,14 +1,13 @@
-import json
 from typing import Any, Dict, Optional
 
-from cent.centrifugal.centrifugo.api import PublishRequest as GrpcPublishRequest
+from cent.protos.centrifugal.centrifugo.api import PublishRequest as GrpcPublishRequest
 from pydantic import Field, field_serializer, SerializationInfo
 
-from cent.methods.base import CentMethod
+from cent.methods.base import CentRequest, json_dumps
 from cent.types.publish_result import PublishResult
 
 
-class PublishMethod(CentMethod[PublishResult]):
+class PublishRequest(CentRequest[PublishResult]):
     """Publish request."""
 
     __returning__ = PublishResult
@@ -32,5 +31,5 @@ class PublishMethod(CentMethod[PublishResult]):
     @field_serializer("data")
     def grpc_serialize_data(self, data: Any, _info: SerializationInfo) -> Any:
         if _info.mode == "grpc":
-            return json.dumps(data).encode()
+            return json_dumps(data)
         return data

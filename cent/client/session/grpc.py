@@ -6,20 +6,9 @@ from grpclib import GRPCError
 from grpclib.client import Channel
 from pydantic import TypeAdapter, BaseModel
 
-from cent.centrifugal.centrifugo.api import CentrifugoApiStub
-from cent.exceptions import APIError, TransportError
-from cent.methods.base import CentMethod, CentType, Response, Error
-
-try:
-    import orjson
-
-    dumps = orjson.dumps
-except ImportError:
-    import json
-
-    def dumps(x: Any) -> bytes:
-        return json.dumps(x).encode()
-
+from cent.protos.centrifugal.centrifugo.api import CentrifugoApiStub
+from cent.exceptions import CentAPIError, CentTransportError
+from cent.methods.base import CentRequest, CentType, Response, Error
 
 if TYPE_CHECKING:
     from cent.client.grpc_client import GrpcClient
@@ -50,7 +39,7 @@ class GrpcSession:
     @staticmethod
     def check_response(
         client: "GrpcClient",
-        method: CentMethod[CentType],
+        method: CentRequest[CentType],
         content: BaseResponse,
     ) -> None:
         """Validate response."""
@@ -59,13 +48,13 @@ class GrpcSession:
             asdict(content, dict_factory=dict_factory), context={"client": client}
         )
         if response.error:
-            raise APIError(
+            raise CentAPIError(
                 method=method,
                 code=response.error.code,
                 message=response.error.message,
             )
 
-    def convert_to_grpc(self, method: CentMethod[CentType]) -> Any:
+    def convert_to_grpc(self, method: CentRequest[CentType]) -> Any:
         request = method.model_dump(by_alias=True, exclude_none=True, mode="grpc")
         for key, value in method.model_fields.items():
             attr = getattr(method, key)
@@ -76,20 +65,20 @@ class GrpcSession:
     async def make_request(
         self,
         client: "GrpcClient",
-        method: CentMethod[CentType],
+        method: CentRequest[CentType],
     ) -> None:
         api_method = getattr(self._stub, method.__api_method__)
         try:
             response = await api_method(self.convert_to_grpc(method))
         except GRPCError as error:
-            raise TransportError(method=method, status_code=error.status.value) from None
+            raise CentTransportError(method=method, status_code=error.status.value) from error
 
         self.check_response(client, method, response)
 
     async def __call__(
         self,
         client: "GrpcClient",
-        method: CentMethod[CentType],
+        method: CentRequest[CentType],
     ) -> CentType:
         return cast(CentType, await self.make_request(client, method))
 

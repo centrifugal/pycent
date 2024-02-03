@@ -2,7 +2,7 @@ from abc import abstractmethod, ABC
 from typing import TYPE_CHECKING, Optional
 
 from cent.client.session.base import BaseSession
-from cent.methods.base import CentMethod, CentType
+from cent.methods.base import CentRequest, CentType
 
 if TYPE_CHECKING:
     from cent.client.sync_client import Client
@@ -21,7 +21,7 @@ class BaseSyncSession(BaseSession, ABC):
     def make_request(
         self,
         client: "Client",
-        method: CentMethod[CentType],
+        method: CentRequest[CentType],
         timeout: Optional[float] = None,
     ) -> CentType:
         """
@@ -35,7 +35,7 @@ class BaseSyncSession(BaseSession, ABC):
     def __call__(
         self,
         client: "Client",
-        method: CentMethod[CentType],
+        method: CentRequest[CentType],
         timeout: Optional[float] = None,
     ) -> CentType:
         return self.make_request(client, method, timeout)

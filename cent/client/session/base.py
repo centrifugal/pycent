@@ -4,18 +4,19 @@ from typing import Final, TYPE_CHECKING, Callable, Any, Union, Dict, List
 from aiohttp.http import SERVER_SOFTWARE
 from pydantic import ValidationError, TypeAdapter, __version__
 
-from cent.exceptions import ClientDecodeError, APIError, InvalidApiKeyError, TransportError
-from cent.methods.base import CentMethod, CentType, Response
-from cent.methods.batch import BatchMethod
-
-try:
-    import orjson
-
-    loads = orjson.loads
-except ImportError:
-    import json
-
-    loads = json.loads
+from cent.exceptions import (
+    CentClientDecodeError,
+    CentAPIError,
+    CentUnauthorizedError,
+    CentTransportError,
+)
+from cent.methods.base import (
+    json_loads as _json_loads,
+    CentRequest,
+    CentType,
+    Response,
+)
+from cent.methods.batch import BatchRequest
 
 if TYPE_CHECKING:
     from cent.client.sync_client import Client
@@ -32,7 +33,7 @@ class BaseSession:
     def __init__(
         self,
         base_url: str,
-        json_loads: _JsonLoads = loads,
+        json_loads: _JsonLoads = _json_loads,
         timeout: float = DEFAULT_TIMEOUT,
     ) -> None:
         """
@@ -51,7 +52,7 @@ class BaseSession:
         }
 
     @staticmethod
-    def get_batch_json_data(method: BatchMethod) -> Dict[str, List[Dict[str, Any]]]:
+    def get_batch_json_data(method: BatchRequest) -> Dict[str, List[Dict[str, Any]]]:
         commands = [
             {command.__api_method__: command.model_dump(exclude_none=True)}
             for command in method.commands
@@ -61,13 +62,13 @@ class BaseSession:
     @staticmethod
     def validate_batch(
         client: Union["Client", "AsyncClient"],
-        method: BatchMethod,
+        method: BatchRequest,
         json_replies: List[Dict[str, Any]],
     ) -> Dict[str, Dict[str, List[Any]]]:
         """Validate batch method."""
-        replies: List[CentMethod[Any]] = []
+        replies: List[CentRequest[Any]] = []
         for command_method, json_data in zip(method.commands, json_replies):
-            validated_method: CentMethod[Any] = TypeAdapter(
+            validated_method: CentRequest[Any] = TypeAdapter(
                 command_method.__returning__
             ).validate_python(
                 json_data[command_method.__api_method__],
@@ -79,16 +80,16 @@ class BaseSession:
     def check_response(
         self,
         client: Union["Client", "AsyncClient"],
-        method: CentMethod[CentType],
+        method: CentRequest[CentType],
         status_code: int,
         content: str,
     ) -> Response[CentType]:
         """Validate response."""
         if status_code == HTTPStatus.UNAUTHORIZED:
-            raise InvalidApiKeyError
+            raise CentUnauthorizedError
 
         if status_code != HTTPStatus.OK:
-            raise TransportError(
+            raise CentTransportError(
                 method=method,
                 status_code=status_code,
             )
@@ -96,9 +97,9 @@ class BaseSession:
         try:
             json_data = self.json_loads(content)
         except Exception as err:
-            raise ClientDecodeError from err
+            raise CentClientDecodeError from err
 
-        if isinstance(method, BatchMethod):
+        if isinstance(method, BatchRequest):
             json_data = self.validate_batch(client, method, json_data["replies"])
 
         try:
@@ -108,10 +109,10 @@ class BaseSession:
                 context={"client": client},
             )
         except ValidationError as err:
-            raise ClientDecodeError from err
+            raise CentClientDecodeError from err
 
         if response.error:
-            raise APIError(
+            raise CentAPIError(
                 method=method,
                 code=response.error.code,
                 message=response.error.message,

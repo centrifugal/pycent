@@ -5,6 +5,19 @@ from pydantic import BaseModel, ConfigDict
 
 from cent.context_controller import ClientContextController
 
+try:
+    import orjson as _orjson  # type: ignore[import-not-found]
+
+    json_dumps = _orjson.dumps
+    json_loads = _orjson.loads
+except ImportError:
+    import json
+
+    def json_dumps(x: Any) -> bytes:
+        return json.dumps(x).encode()
+
+    json_loads = json.loads
+
 CentType = TypeVar("CentType", bound=Any)
 
 
@@ -18,7 +31,7 @@ class Response(BaseModel, Generic[CentType]):
     result: Optional[CentType] = None
 
 
-class CentMethod(
+class CentRequest(
     ClientContextController,
     BaseModel,
     Generic[CentType],

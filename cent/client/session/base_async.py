@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Optional, cast
 
 from cent.client.session.base import BaseSession
-from cent.methods.base import CentMethod, CentType
+from cent.methods.base import CentRequest, CentType
 
 if TYPE_CHECKING:
     from cent.client.async_client import AsyncClient
@@ -21,7 +21,7 @@ class BaseAsyncSession(BaseSession, ABC):
     async def make_request(
         self,
         client: "AsyncClient",
-        method: CentMethod[CentType],
+        method: CentRequest[CentType],
         timeout: Optional[float] = None,
     ) -> CentType:
         """
@@ -35,7 +35,7 @@ class BaseAsyncSession(BaseSession, ABC):
     async def __call__(
         self,
         client: "AsyncClient",
-        method: CentMethod[CentType],
+        method: CentRequest[CentType],
         timeout: Optional[float] = None,
     ) -> CentType:
         return cast(CentType, await self.make_request(client, method, timeout))

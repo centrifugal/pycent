@@ -4,9 +4,9 @@ from typing import Optional, TYPE_CHECKING, cast, Any
 from aiohttp import ClientSession, ClientError
 
 from cent.client.session.base_async import BaseAsyncSession
-from cent.methods.base import CentMethod, CentType
+from cent.methods.base import CentRequest, CentType
 from cent.exceptions import CentNetworkError
-from cent.methods.batch import BatchMethod
+from cent.methods.batch import BatchRequest
 
 if TYPE_CHECKING:
     from cent.client.async_client import AsyncClient
@@ -33,13 +33,13 @@ class AiohttpSession(BaseAsyncSession):
     async def make_request(
         self,
         client: "AsyncClient",
-        method: CentMethod[CentType],
+        method: CentRequest[CentType],
         timeout: Optional[float] = None,
     ) -> CentType:
         session = await self._create_session()
         session.headers["X-API-Key"] = client.api_key
 
-        if isinstance(method, BatchMethod):
+        if isinstance(method, BatchRequest):
             json_data = self.get_batch_json_data(method)
         else:
             json_data = method.model_dump(exclude_none=True)
@@ -53,10 +53,16 @@ class AiohttpSession(BaseAsyncSession):
                 timeout=timeout or self._timeout,
             ) as resp:
                 raw_result = await resp.text()
-        except asyncio.TimeoutError:
-            raise CentNetworkError(method=method, message="Request timeout") from None
-        except ClientError as e:
-            raise CentNetworkError(method=method, message=f"{type(e).__name__}: {e}") from None
+        except asyncio.TimeoutError as error:
+            raise CentNetworkError(
+                method=method,
+                message="Request timeout",
+            ) from error
+        except ClientError as error:
+            raise CentNetworkError(
+                method=method,
+                message=f"{type(error).__name__}: {error}",
+            ) from error
         response = self.check_response(
             client=client,
             method=method,

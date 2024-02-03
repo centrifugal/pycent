@@ -1,12 +1,12 @@
 from typing import Optional, List
 
-from cent.centrifugal.centrifugo.api import DisconnectRequest as GrpcDisconnectRequest
-from cent.methods import CentMethod
+from cent.protos.centrifugal.centrifugo.api import DisconnectRequest as GrpcDisconnectRequest
+from cent.methods import CentRequest
 from cent.types import Disconnect
 from cent.types.disconnect_result import DisconnectResult
 
 
-class DisconnectMethod(CentMethod[DisconnectResult]):
+class DisconnectRequest(CentRequest[DisconnectResult]):
     """Disconnect request."""
 
     __returning__ = DisconnectResult

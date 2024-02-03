@@ -3,10 +3,10 @@ from typing import Optional, TYPE_CHECKING, cast, Any
 import requests
 from requests import Session
 
-from cent.methods.base import CentMethod, CentType
+from cent.methods.base import CentRequest, CentType
 from cent.client.session.base_sync import BaseSyncSession
 from cent.exceptions import CentNetworkError
-from cent.methods.batch import BatchMethod
+from cent.methods.batch import BatchRequest
 
 if TYPE_CHECKING:
     from cent.client.sync_client import Client
@@ -25,11 +25,11 @@ class RequestsSession(BaseSyncSession):
     def make_request(
         self,
         client: "Client",
-        method: CentMethod[CentType],
+        method: CentRequest[CentType],
         timeout: Optional[float] = None,
     ) -> CentType:
         self._session.headers["X-API-Key"] = client.api_key
-        if isinstance(method, BatchMethod):
+        if isinstance(method, BatchRequest):
             json_data = self.get_batch_json_data(method)
         else:
             json_data = method.model_dump(exclude_none=True)
@@ -42,10 +42,16 @@ class RequestsSession(BaseSyncSession):
                 json=json_data,
                 timeout=timeout or self._timeout,
             )
-        except requests.exceptions.Timeout:
-            raise CentNetworkError(method=method, message="Request timeout") from None
-        except requests.exceptions.ConnectionError as e:
-            raise CentNetworkError(method=method, message=f"{type(e).__name__}: {e}") from None
+        except requests.exceptions.Timeout as error:
+            raise CentNetworkError(
+                method=method,
+                message="Request timeout",
+            ) from error
+        except requests.exceptions.ConnectionError as error:
+            raise CentNetworkError(
+                method=method,
+                message=f"{type(error).__name__}: {error}",
+            ) from error
         response = self.check_response(
             client=client,
             method=method,

@@ -16,6 +16,7 @@ import grpclib
 from betterproto.grpc.grpclib_server import ServiceBase
 import grpclib.server
 
+
 if TYPE_CHECKING:
     from betterproto.grpc.grpclib_client import MetadataLike
     from grpclib.metadata import Deadline

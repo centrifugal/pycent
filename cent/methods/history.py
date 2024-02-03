@@ -1,12 +1,12 @@
 from typing import Optional
 
-from cent.centrifugal.centrifugo.api import HistoryRequest as GrpcHistoryRequest
-from cent.methods import CentMethod
+from cent.protos.centrifugal.centrifugo.api import HistoryRequest as GrpcHistoryRequest
+from cent.methods import CentRequest
 from cent.types import StreamPosition
 from cent.types.history_result import HistoryResult
 
 
-class HistoryMethod(CentMethod[HistoryResult]):
+class HistoryRequest(CentRequest[HistoryResult]):
     """History request."""
 
     __returning__ = HistoryResult

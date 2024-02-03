@@ -2,21 +2,21 @@ from typing import List, Optional, Any, Dict, TypeVar
 
 from cent.client.session import BaseSyncSession, RequestsSession
 from cent.methods import (
-    CentMethod,
-    BroadcastMethod,
-    PublishMethod,
-    SubscribeMethod,
-    UnsubscribeMethod,
-    PresenceMethod,
-    PresenceStatsMethod,
-    HistoryMethod,
-    HistoryRemoveMethod,
-    RefreshMethod,
-    ChannelsMethod,
-    DisconnectMethod,
-    InfoMethod,
+    CentRequest,
+    BroadcastRequest,
+    PublishRequest,
+    SubscribeRequest,
+    UnsubscribeRequest,
+    PresenceRequest,
+    PresenceStatsRequest,
+    HistoryRequest,
+    HistoryRemoveRequest,
+    RefreshRequest,
+    ChannelsRequest,
+    DisconnectRequest,
+    InfoRequest,
 )
-from cent.methods.batch import BatchMethod
+from cent.methods.batch import BatchRequest
 from cent.types import (
     PublishResult,
     BroadcastResult,
@@ -66,7 +66,7 @@ class Client:
         idempotency_key: Optional[str] = None,
         request_timeout: Optional[float] = None,
     ) -> PublishResult:
-        call = PublishMethod(
+        call = PublishRequest(
             channel=channel,
             data=data,
             skip_history=skip_history,
@@ -86,7 +86,7 @@ class Client:
         idempotency_key: Optional[str] = None,
         request_timeout: Optional[float] = None,
     ) -> BroadcastResult:
-        call = BroadcastMethod(
+        call = BroadcastRequest(
             channels=channels,
             data=data,
             skip_history=skip_history,
@@ -110,7 +110,7 @@ class Client:
         override: Optional[ChannelOptionsOverride] = None,
         request_timeout: Optional[float] = None,
     ) -> SubscribeResult:
-        call = SubscribeMethod(
+        call = SubscribeRequest(
             user=user,
             channel=channel,
             info=info,
@@ -132,7 +132,7 @@ class Client:
         session: Optional[str] = None,
         request_timeout: Optional[float] = None,
     ) -> UnsubscribeResult:
-        call = UnsubscribeMethod(
+        call = UnsubscribeRequest(
             user=user,
             channel=channel,
             client=client,
@@ -145,7 +145,7 @@ class Client:
         channel: str,
         request_timeout: Optional[float] = None,
     ) -> PresenceResult:
-        call = PresenceMethod(
+        call = PresenceRequest(
             channel=channel,
         )
         return self(call, request_timeout=request_timeout)
@@ -155,7 +155,7 @@ class Client:
         channel: str,
         request_timeout: Optional[float] = None,
     ) -> PresenceStatsResult:
-        call = PresenceStatsMethod(
+        call = PresenceStatsRequest(
             channel=channel,
         )
         return self(call, request_timeout=request_timeout)
@@ -168,7 +168,7 @@ class Client:
         reverse: Optional[bool] = None,
         request_timeout: Optional[float] = None,
     ) -> HistoryResult:
-        call = HistoryMethod(
+        call = HistoryRequest(
             channel=channel,
             limit=limit,
             since=since,
@@ -181,7 +181,7 @@ class Client:
         channel: str,
         request_timeout: Optional[float] = None,
     ) -> HistoryRemoveResult:
-        call = HistoryRemoveMethod(
+        call = HistoryRemoveRequest(
             channel=channel,
         )
         return self(call, request_timeout=request_timeout)
@@ -195,7 +195,7 @@ class Client:
         expire_at: Optional[int] = None,
         request_timeout: Optional[float] = None,
     ) -> RefreshResult:
-        call = RefreshMethod(
+        call = RefreshRequest(
             user=user,
             client=client,
             session=session,
@@ -209,7 +209,7 @@ class Client:
         pattern: Optional[str] = None,
         request_timeout: Optional[float] = None,
     ) -> ChannelsResult:
-        call = ChannelsMethod(
+        call = ChannelsRequest(
             pattern=pattern,
         )
         return self(call, request_timeout=request_timeout)
@@ -223,7 +223,7 @@ class Client:
         disconnect: Optional[Disconnect] = None,
         request_timeout: Optional[float] = None,
     ) -> DisconnectResult:
-        call = DisconnectMethod(
+        call = DisconnectRequest(
             user=user,
             client=client,
             session=session,
@@ -236,18 +236,18 @@ class Client:
         self,
         request_timeout: Optional[float] = None,
     ) -> InfoResult:
-        call = InfoMethod()
+        call = InfoRequest()
         return self(call, request_timeout=request_timeout)
 
     def batch(
         self,
-        commands: List[CentMethod[Any]],
+        commands: List[CentRequest[Any]],
         request_timeout: Optional[float] = None,
     ) -> BatchResult:
-        call = BatchMethod.model_construct(commands=commands)
+        call = BatchRequest.model_construct(commands=commands)
         return self(call, request_timeout=request_timeout)
 
-    def __call__(self, method: CentMethod[T], request_timeout: Optional[float] = None) -> T:
+    def __call__(self, method: CentRequest[T], request_timeout: Optional[float] = None) -> T:
         """
         Call API method
 

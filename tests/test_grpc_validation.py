@@ -3,7 +3,7 @@ from base64 import b64encode
 import pytest
 
 from cent.client.grpc_client import GrpcClient
-from cent.exceptions import APIError
+from cent.exceptions import CentAPIError
 from cent.methods.disconnect_data import Disconnect
 from cent.types import StreamPosition, ChannelOptionsOverride, BoolValue
 from tests.conftest import UNKNOWN_CHANNEL_ERROR_CODE
@@ -115,7 +115,7 @@ async def test_refresh(grpc_client: GrpcClient) -> None:
 
 
 async def test_error_publish(grpc_client: GrpcClient) -> None:
-    with pytest.raises(APIError, match="unknown channel") as exc_info:
+    with pytest.raises(CentAPIError, match="unknown channel") as exc_info:
         await grpc_client.publish(
             "undefined_channel:123",
             {"data": "data"},

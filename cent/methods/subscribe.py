@@ -1,11 +1,10 @@
-import json
 from typing import Optional, Any
 
 from pydantic import Field, field_serializer
 from pydantic_core.core_schema import SerializationInfo
 
-from cent.centrifugal.centrifugo.api import SubscribeRequest as GrpcSubscribeRequest
-from cent.methods.base import CentMethod
+from cent.protos.centrifugal.centrifugo.api import SubscribeRequest as GrpcSubscribeRequest
+from cent.methods.base import CentRequest, json_dumps
 from cent.types import (
     StreamPosition,
     SubscribeResult,
@@ -13,7 +12,7 @@ from cent.types import (
 )
 
 
-class SubscribeMethod(CentMethod[SubscribeResult]):
+class SubscribeRequest(CentRequest[SubscribeResult]):
     """Subscribe request."""
 
     __returning__ = SubscribeResult
@@ -45,11 +44,11 @@ class SubscribeMethod(CentMethod[SubscribeResult]):
     @field_serializer("data", when_used="unless-none")
     def grpc_serialize_data(self, data: Any, _info: SerializationInfo) -> Any:
         if _info.mode == "grpc":
-            return json.dumps(data).encode()
+            return json_dumps(data)
         return data
 
     @field_serializer("info", when_used="unless-none")
     def grpc_serialize_info(self, info: Any, _info: SerializationInfo) -> Any:
         if _info.mode == "grpc":
-            return json.dumps(info).encode()
+            return json_dumps(info)
         return info

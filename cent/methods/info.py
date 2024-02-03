@@ -1,9 +1,9 @@
-from cent.centrifugal.centrifugo.api import InfoRequest as GrpcInfoRequest
-from cent.methods import CentMethod
+from cent.protos.centrifugal.centrifugo.api import InfoRequest as GrpcInfoRequest
+from cent.methods import CentRequest
 from cent.types.info_result import InfoResult
 
 
-class InfoMethod(CentMethod[InfoResult]):
+class InfoRequest(CentRequest[InfoResult]):
     """Info request."""
 
     __returning__ = InfoResult
