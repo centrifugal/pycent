@@ -1,4 +1,4 @@
-.PHONY: proto test lint lint-fix lint-ci
+.PHONY: proto test lint lint-fix lint-ci bench
 
 dev:
 	pip install poetry
@@ -18,3 +18,6 @@ lint-fix:
 
 lint-ci:
 	poetry run ruff . --output-format=github
+
+bench:
+	poetry run pytest benchmarks --benchmark-verbose

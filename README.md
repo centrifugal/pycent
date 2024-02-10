@@ -78,13 +78,13 @@ Optional:
 To start tests, you can use pytest with any additional options, for example:
 
 ```bash
-pytest -vv tests
+make test
 ```
 
 To start benchmarks, you can use pytest too, for example:
 
 ```bash
-pytest benchmarks --benchmark-verbose
+make bench
 ```
 
 ### Generate code from proto file, if needed

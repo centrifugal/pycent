@@ -1,3 +1,5 @@
+import asyncio
+import threading
 import contextlib
 from typing import (
     Any,
@@ -35,9 +37,6 @@ def anyio_backend() -> Tuple[str, Dict[str, bool]]:
 
 @pytest.fixture()
 def aio_benchmark(benchmark: BenchmarkFixture) -> BenchmarkDecoratorType:
-    import asyncio
-    import threading
-
     class Sync2Async:
         def __init__(self, coro: BenchmarkCoroType) -> None:
             self.coro = coro

@@ -1,26 +1,24 @@
-from typing import Union
-
+import random
 import pytest
 
 from benchmarks.conftest import BenchmarkDecoratorType
-from cent import AsyncClient, Client, GrpcClient
+from cent import AsyncClient, Client
 
 
 def sync_requests(client: Client) -> None:
-    for j in range(1000):
-        client.publish(
-            channel=f"personal:{j}",
-            data={"message": "Hello world!"},
-        )
+    channel_number = random.randint(0, 1000)  # noqa: S311
+    client.publish(
+        channel=f"personal_{channel_number}",
+        data={"message": "Hello world!"},
+    )
 
 
-async def async_requests(client: Union[GrpcClient, AsyncClient]) -> None:
-    for j in range(1000):
-        print(j)
-        await client.publish(
-            channel=f"personal:{j}",
-            data={"message": "Hello world!"},
-        )
+async def async_requests(client: AsyncClient) -> None:
+    channel_number = random.randint(0, 1000)  # noqa: S311
+    await client.publish(
+        channel=f"personal_{channel_number}",
+        data={"message": "Hello world!"},
+    )
 
 
 def test_sync(
