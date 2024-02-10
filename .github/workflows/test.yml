@@ -32,7 +32,7 @@ jobs:
         uses: crazy-max/ghaction-setup-docker@v3
 
       - name: Start Centrifugo
-        run: docker run -d -p 8000:8000 -e CENTRIFUGO_API_KEY=api_key -e CENTRIFUGO_HISTORY_TTL=300s -e CENTRIFUGO_HISTORY_SIZE=100 -e CENTRIFUGO_PRESENCE=true -e CENTRIFUGO_GRPC_API=true centrifugo/centrifugo:v5 centrifugo
+        run: docker run -d -p 8000:8000 -p 10000:10000 -e CENTRIFUGO_API_KEY=api_key -e CENTRIFUGO_HISTORY_TTL=300s -e CENTRIFUGO_HISTORY_SIZE=100 -e CENTRIFUGO_PRESENCE=true -e CENTRIFUGO_GRPC_API=true centrifugo/centrifugo:v5 centrifugo
 
       - name: Install dependencies
         run: |
