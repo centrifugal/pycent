@@ -1,0 +1,33 @@
+name: Release to PyPI
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: check GITHUB_REF matches package version
+      uses: samuelcolvin/check-python-version@v4.1
+      with:
+        version_file_path: centrifuge/__meta__.py
+
+    - name: Install build dependencies
+      run: pip install build
+
+    - name: Build distribution
+      run: python -m build
+
+    - name: Publish package to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        password: ${{ secrets.PYPI_PASSWORD }}
