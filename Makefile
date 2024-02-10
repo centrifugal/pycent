@@ -11,10 +11,10 @@ test:
 	poetry run pytest -vv tests
 
 lint:
-	ruff .
+	poetry run ruff .
 
 lint-fix:
-	ruff . --fix
+	poetry run ruff . --fix
 
 lint-ci:
-	ruff . --output-format=github
+	poetry run ruff . --output-format=github

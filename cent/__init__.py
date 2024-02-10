@@ -116,4 +116,10 @@ __all__ = (
     "Node",
     "Publication",
     "ClientInfo",
+    "CentError",
+    "CentNetworkError",
+    "CentClientDecodeError",
+    "CentUnauthorizedError",
+    "CentAPIError",
+    "CentTransportError",
 )
