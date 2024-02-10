@@ -1,0 +1,879 @@
+syntax = "proto3";
+
+package centrifugal.centrifugo.api;
+
+option go_package = "./;apiproto";
+
+service CentrifugoApi {
+    rpc Batch (BatchRequest) returns (BatchResponse) {}
+    rpc Publish (PublishRequest) returns (PublishResponse) {}
+    rpc Broadcast (BroadcastRequest) returns (BroadcastResponse) {}
+    rpc Subscribe (SubscribeRequest) returns (SubscribeResponse) {}
+    rpc Unsubscribe (UnsubscribeRequest) returns (UnsubscribeResponse) {}
+    rpc Disconnect (DisconnectRequest) returns (DisconnectResponse) {}
+    rpc Presence (PresenceRequest) returns (PresenceResponse) {}
+    rpc PresenceStats (PresenceStatsRequest) returns (PresenceStatsResponse) {}
+    rpc History (HistoryRequest) returns (HistoryResponse) {}
+    rpc HistoryRemove (HistoryRemoveRequest) returns (HistoryRemoveResponse) {}
+    rpc Info (InfoRequest) returns (InfoResponse) {}
+    rpc RPC (RPCRequest) returns (RPCResponse) {}
+    rpc Refresh (RefreshRequest) returns (RefreshResponse) {}
+    rpc Channels (ChannelsRequest) returns (ChannelsResponse) {}
+    rpc Connections (ConnectionsRequest) returns (ConnectionsResponse) {}
+    rpc UpdateUserStatus (UpdateUserStatusRequest) returns (UpdateUserStatusResponse) {}
+    rpc GetUserStatus (GetUserStatusRequest) returns (GetUserStatusResponse) {}
+    rpc DeleteUserStatus (DeleteUserStatusRequest) returns (DeleteUserStatusResponse) {}
+    rpc BlockUser (BlockUserRequest) returns (BlockUserResponse) {}
+    rpc UnblockUser (UnblockUserRequest) returns (UnblockUserResponse) {}
+    rpc RevokeToken (RevokeTokenRequest) returns (RevokeTokenResponse) {}
+    rpc InvalidateUserTokens (InvalidateUserTokensRequest) returns (InvalidateUserTokensResponse) {}
+    rpc DeviceRegister (DeviceRegisterRequest) returns (DeviceRegisterResponse) {}
+    rpc DeviceUpdate (DeviceUpdateRequest) returns (DeviceUpdateResponse) {}
+    rpc DeviceRemove (DeviceRemoveRequest) returns (DeviceRemoveResponse) {}
+    rpc DeviceList (DeviceListRequest) returns (DeviceListResponse) {}
+    rpc DeviceTopicList (DeviceTopicListRequest) returns (DeviceTopicListResponse) {}
+    rpc DeviceTopicUpdate (DeviceTopicUpdateRequest) returns (DeviceTopicUpdateResponse) {}
+    rpc UserTopicList (UserTopicListRequest) returns (UserTopicListResponse) {}
+    rpc UserTopicUpdate (UserTopicUpdateRequest) returns (UserTopicUpdateResponse) {}
+    rpc SendPushNotification (SendPushNotificationRequest) returns (SendPushNotificationResponse) {}
+    rpc UpdatePushStatus (UpdatePushStatusRequest) returns (UpdatePushStatusResponse) {}
+    rpc CancelPush (CancelPushRequest) returns (CancelPushResponse) {}
+    rpc RateLimit (RateLimitRequest) returns (RateLimitResponse) {}
+}
+
+message Command {
+    enum MethodType {
+        PUBLISH = 0;
+        BROADCAST = 1;
+        UNSUBSCRIBE = 2;
+        DISCONNECT = 3;
+        PRESENCE = 4;
+        PRESENCE_STATS = 5;
+        HISTORY = 6;
+        HISTORY_REMOVE = 7;
+        CHANNELS = 8;
+        INFO = 9;
+        RPC = 10;
+        SUBSCRIBE = 11;
+        REFRESH = 12;
+        CONNECTIONS = 14;
+        UPDATE_USER_STATUS = 15;
+        GET_USER_STATUS = 16;
+        DELETE_USER_STATUS = 17;
+        BLOCK_USER = 18;
+        UNBLOCK_USER = 19;
+        REVOKE_TOKEN = 20;
+        INVALIDATE_USER_TOKENS = 21;
+        DEVICE_REGISTER = 22;
+        DEVICE_UPDATE = 23;
+        DEVICE_REMOVE = 24;
+        DEVICE_LIST = 25;
+        DEVICE_TOPIC_LIST = 26;
+        DEVICE_TOPIC_UPDATE = 27;
+        USER_TOPIC_LIST = 28;
+        USER_TOPIC_UPDATE = 29;
+        SEND_PUSH_NOTIFICATION = 30;
+        UPDATE_PUSH_STATUS = 31;
+        CANCEL_PUSH = 32;
+        RATE_LIMIT = 47;
+    }
+    uint32 id = 1;
+    MethodType method = 2;
+    bytes params = 3;
+
+    PublishRequest publish = 4;
+    BroadcastRequest broadcast = 5;
+    SubscribeRequest subscribe = 6;
+    UnsubscribeRequest unsubscribe = 7;
+    DisconnectRequest disconnect = 8;
+    PresenceRequest presence = 9;
+    PresenceStatsRequest presence_stats = 10;
+    HistoryRequest history = 11;
+    HistoryRemoveRequest history_remove = 12;
+    InfoRequest info = 13;
+    RPCRequest rpc = 14;
+    RefreshRequest refresh = 15;
+    ChannelsRequest channels = 16;
+    ConnectionsRequest connections = 17;
+    UpdateUserStatusRequest update_user_status = 18;
+    GetUserStatusRequest get_user_status = 19;
+    DeleteUserStatusRequest delete_user_status = 20;
+    BlockUserRequest block_user = 21;
+    UnblockUserRequest unblock_user = 22;
+    RevokeTokenRequest revoke_token = 23;
+    InvalidateUserTokensRequest invalidate_user_tokens = 24;
+    DeviceRegisterRequest device_register = 25;
+    DeviceUpdateRequest device_update = 26;
+    DeviceRemoveRequest device_remove = 27;
+    DeviceListRequest device_list = 28;
+    DeviceTopicListRequest device_topic_list = 29;
+    DeviceTopicUpdateRequest device_topic_update = 30;
+    UserTopicListRequest user_topic_list = 31;
+    UserTopicUpdateRequest user_topic_update = 32;
+    SendPushNotificationRequest send_push_notification = 33;
+    UpdatePushStatusRequest update_push_status = 34;
+    CancelPushRequest cancel_push = 35;
+    RateLimitRequest rate_limit = 50;
+}
+
+message Error {
+    uint32 code = 1;
+    string message = 2;
+}
+
+message Reply {
+    uint32 id = 1;
+    Error error = 2;
+    bytes result = 3;
+
+    PublishResult publish = 4;
+    BroadcastResult broadcast = 5;
+    SubscribeResult subscribe = 6;
+    UnsubscribeResult unsubscribe = 7;
+    DisconnectResult disconnect = 8;
+    PresenceResult presence = 9;
+    PresenceStatsResult presence_stats = 10;
+    HistoryResult history = 11;
+    HistoryRemoveResult history_remove = 12;
+    InfoResult info = 13;
+    RPCResult rpc = 14;
+    RefreshResult refresh = 15;
+    ChannelsResult channels = 16;
+    ConnectionsResult connections = 17;
+    UpdateUserStatusResult update_user_status = 18;
+    GetUserStatusResult get_user_status = 19;
+    DeleteUserStatusResult delete_user_status = 20;
+    BlockUserResult block_user = 21;
+    UnblockUserResult unblock_user = 22;
+    RevokeTokenResult revoke_token = 23;
+    InvalidateUserTokensResult invalidate_user_tokens = 24;
+    DeviceRegisterResult device_register = 25;
+    DeviceUpdateResult device_update = 26;
+    DeviceRemoveResult device_remove = 27;
+    DeviceListResult device_list = 28;
+    DeviceTopicListResult device_topic_list = 29;
+    DeviceTopicUpdateResult device_topic_update = 30;
+    UserTopicListResult user_topic_list = 31;
+    UserTopicUpdateResult user_topic_update = 32;
+    SendPushNotificationResult send_push_notification = 33;
+    UpdatePushStatusResult update_push_status = 34;
+    CancelPushResult cancel_push = 35;
+    RateLimitResult rate_limit = 50;
+}
+
+message BoolValue {
+    bool value = 1;
+}
+
+message Int32Value {
+    int32 value = 1;
+}
+
+message SubscribeOptionOverride {
+    BoolValue presence = 1;
+    BoolValue join_leave = 2;
+    BoolValue force_recovery = 3;
+    BoolValue force_positioning = 4;
+    BoolValue force_push_join_leave = 5;
+}
+
+message BatchRequest {
+    repeated Command commands = 1;
+    bool parallel = 2;
+}
+
+message BatchResponse {
+    repeated Reply replies = 1;
+}
+
+message PublishRequest {
+    string channel = 1;
+    bytes data = 2;
+    string b64data = 3;
+    bool skip_history = 4;
+    map<string, string> tags = 5;
+    string idempotency_key = 6;
+}
+
+message PublishResponse {
+    Error error = 1;
+    PublishResult result = 2;
+}
+
+message PublishResult {
+    uint64 offset = 1;
+    string epoch = 2;
+}
+
+message BroadcastRequest {
+    repeated string channels = 1;
+    bytes data = 2;
+    string b64data = 3;
+    bool skip_history = 4;
+    map<string, string> tags = 5;
+    string idempotency_key = 6;
+}
+
+message BroadcastResponse {
+    Error error = 1;
+    BroadcastResult result = 2;
+}
+
+message BroadcastResult {
+    repeated PublishResponse responses = 1;
+}
+
+message SubscribeRequest {
+    string channel = 1;
+    string user = 2;
+    int64 expire_at = 3;
+    bytes info = 4;
+    string b64info = 5;
+    string client = 6;
+    bytes data = 7;
+    string b64data = 8;
+    StreamPosition recover_since = 9;
+    SubscribeOptionOverride override = 10;
+    string session = 11;
+}
+
+message SubscribeResponse {
+    Error error = 1;
+    SubscribeResult result = 2;
+}
+
+message SubscribeResult {}
+
+message UnsubscribeRequest {
+    string channel = 1;
+    string user = 2;
+    string client = 3;
+    string session = 4;
+}
+
+message UnsubscribeResponse {
+    Error error = 1;
+    UnsubscribeResult result = 2;
+}
+
+message UnsubscribeResult {}
+
+message Disconnect {
+    reserved 3;
+    uint32 code = 1;
+    string reason = 2;
+}
+
+message DisconnectRequest {
+    string user = 1;
+    Disconnect disconnect = 2;
+    string client = 3;
+    repeated string whitelist = 4;
+    string session = 5;
+}
+
+message DisconnectResponse {
+    Error error = 1;
+    DisconnectResult result = 2;
+}
+
+message DisconnectResult {}
+
+message PresenceRequest {
+    string channel = 1;
+}
+
+message PresenceResponse {
+    Error error = 1;
+    PresenceResult result = 2;
+}
+
+message ClientInfo {
+    string user = 1;
+    string client = 2;
+    bytes conn_info = 3;
+    bytes chan_info = 4;
+}
+
+message PresenceResult {
+    map<string, ClientInfo> presence = 1;
+}
+
+message PresenceStatsRequest {
+    string channel = 1;
+}
+
+message PresenceStatsResponse {
+    Error error = 1;
+    PresenceStatsResult result = 2;
+}
+
+message PresenceStatsResult {
+    uint32 num_clients = 1;
+    uint32 num_users = 2;
+}
+
+message StreamPosition {
+    uint64 offset = 1;
+    string epoch = 2;
+}
+
+message HistoryRequest {
+    string channel = 1;
+    int32 limit = 2;
+    StreamPosition since = 3;
+    bool reverse = 4;
+}
+
+message HistoryResponse {
+    Error error = 1;
+    HistoryResult result = 2;
+}
+
+message Publication {
+    // Removed: string uid = 1;
+    bytes data = 2;
+    ClientInfo info = 3;
+    uint64 offset = 4;
+    map<string, string> tags = 5;
+}
+
+message HistoryResult {
+    repeated Publication publications = 1;
+    string epoch = 2;
+    uint64 offset = 3;
+}
+
+message HistoryRemoveRequest {
+    string channel = 1;
+}
+
+message HistoryRemoveResponse {
+    Error error = 1;
+    HistoryRemoveResult result = 2;
+}
+
+message HistoryRemoveResult {}
+
+message InfoRequest {}
+
+message InfoResponse {
+    Error error = 1;
+    InfoResult result = 2;
+}
+
+message InfoResult {
+    repeated NodeResult nodes = 1;
+}
+
+message RPCRequest {
+    string method = 1;
+    bytes params = 2;
+}
+
+message RPCResponse {
+    Error error = 1;
+    RPCResult result = 2;
+}
+
+message RPCResult {
+    bytes data = 1;
+}
+
+message RefreshRequest {
+    string user = 1;
+    string client = 2;
+    bool expired = 3;
+    int64 expire_at = 4;
+    bytes info = 5;
+    string session = 6;
+}
+
+message RefreshResponse {
+    Error error = 1;
+    RefreshResult result = 2;
+}
+
+message RefreshResult {}
+
+message NodeResult {
+    string uid = 1;
+    string name = 2;
+    string version = 3;
+    uint32 num_clients = 4;
+    uint32 num_users = 5;
+    uint32 num_channels = 6;
+    uint32 uptime = 7;
+    Metrics metrics = 8;
+    Process process = 9;
+    uint32 num_subs = 10;
+}
+
+message Metrics {
+    double interval = 1;
+    map<string, double> items = 2;
+}
+
+message Process {
+    double cpu = 1;
+    int64 rss = 2;
+}
+
+message ChannelsRequest {
+    string pattern = 1;
+}
+
+message ChannelsResponse {
+    Error error = 1;
+    ChannelsResult result = 2;
+}
+
+message ChannelsResult {
+    map<string, ChannelInfo> channels = 1;
+}
+
+message ChannelInfo {
+    uint32 num_clients = 1;
+}
+
+message ConnectionsRequest {
+    string user = 1;
+    string expression = 2;
+}
+
+message ConnectionsResponse {
+    Error error = 1;
+    ConnectionsResult result = 2;
+}
+
+message ConnectionsResult {
+    map<string, ConnectionInfo> connections = 1;
+}
+
+message ConnectionInfo {
+    string app_name = 1;
+    string app_version = 2;
+    string transport = 3;
+    string protocol = 4;
+    // 5-7 dropped for backwards compatibility.
+    string user = 8;
+    ConnectionState state = 9;
+}
+
+message ConnectionState {
+    map<string, ChannelContext> channels = 1;
+    ConnectionTokenInfo connection_token = 2;
+    map<string, SubscriptionTokenInfo> subscription_tokens = 3;
+    bytes meta = 4;
+}
+
+message ChannelContext {
+    uint32 source = 1;
+}
+
+message ConnectionTokenInfo {
+    string uid = 1;
+    int64 issued_at = 2;
+}
+
+message SubscriptionTokenInfo {
+    string uid = 1;
+    int64 issued_at = 2;
+}
+
+message UpdateUserStatusRequest {
+    repeated string users = 1;
+    string state = 2;
+}
+
+message UpdateUserStatusResponse {
+    Error error = 1;
+    UpdateUserStatusResult result = 2;
+}
+
+message UpdateUserStatusResult {}
+
+message GetUserStatusRequest {
+    repeated string users = 1;
+}
+
+message GetUserStatusResponse {
+    Error error = 1;
+    GetUserStatusResult result = 2;
+}
+
+message GetUserStatusResult {
+    repeated UserStatus statuses = 1;
+}
+
+message UserStatus {
+    string user = 1;
+    int64 active = 2;
+    int64 online = 3;
+    string state = 4;
+}
+
+message DeleteUserStatusRequest {
+    repeated string users = 1;
+}
+
+message DeleteUserStatusResponse {
+    Error error = 1;
+    DeleteUserStatusResult result = 2;
+}
+
+message DeleteUserStatusResult {
+}
+
+message BlockUserRequest {
+    int64 expire_at = 1;
+    string user = 2;
+}
+
+message BlockUserResult {}
+
+message BlockUserResponse {
+    Error error = 1;
+    BlockUserResult result = 2;
+}
+
+message UnblockUserRequest {
+    string user = 1;
+}
+
+message UnblockUserResult {}
+
+message UnblockUserResponse {
+    Error error = 1;
+    UnblockUserResult result = 2;
+}
+
+message RevokeTokenRequest {
+    int64 expire_at = 1;
+    string uid = 2;
+}
+
+message RevokeTokenResult {}
+
+message RevokeTokenResponse {
+    Error error = 1;
+    RevokeTokenResult result = 2;
+}
+
+message InvalidateUserTokensRequest {
+    int64 expire_at = 1;
+    string user = 2;
+    int64 issued_before = 3;
+    string channel = 4;
+}
+
+message InvalidateUserTokensResult {}
+
+message InvalidateUserTokensResponse {
+    Error error = 1;
+    InvalidateUserTokensResult result = 2;
+}
+
+message DeviceRegisterRequest {
+    string id = 1;
+    string provider = 2;
+    string token = 3;
+    string platform = 4;
+    string user = 5;
+    map<string, string> meta = 6;
+    repeated string topics = 7;
+    //map<string, string> labels = 8;
+    //map<string, int64> scores = 9;
+}
+
+message DeviceUpdateRequest {
+    repeated string ids = 1;
+    repeated string users = 2;
+
+    DeviceUserUpdate user_update = 4;
+    DeviceMetaUpdate meta_update = 5;
+    DeviceTopicsUpdate topics_update = 6;
+    //DeviceLabelsUpdate labels_update = 7;
+    //DeviceScoresUpdate scores_update = 8;
+}
+
+message DeviceRemoveRequest {
+    repeated string ids = 1;
+    repeated string users = 2;
+}
+
+message DeviceUserUpdate {
+    string user = 1;
+}
+
+message DeviceMetaUpdate {
+    map<string, string> meta = 1;
+}
+
+message DeviceTopicsUpdate {
+    string op = 1; // add | remove | set
+    repeated string topics = 2;
+}
+
+message DeviceFilter {
+    repeated string ids = 1;
+    repeated string users = 2;
+    repeated string topics = 3;
+    repeated string providers = 4;
+    repeated string platforms = 5;
+}
+
+message DeviceListRequest {
+    DeviceFilter filter = 1;
+
+    bool include_total_count = 2;
+    bool include_meta = 3;
+    bool include_topics = 4;
+    //bool include_labels = 5;
+    //bool include_scores = 6;
+
+    string cursor = 10;
+    int32 limit = 11;
+}
+
+message DeviceTopicFilter {
+    repeated string device_ids = 1;
+    repeated string device_providers = 2;
+    repeated string device_platforms = 3;
+    repeated string device_users = 4;
+    repeated string topics = 5;
+    string topic_prefix = 6;
+}
+
+message DeviceTopicListRequest {
+    DeviceTopicFilter filter = 1;
+
+    bool include_total_count = 2;
+    bool include_device = 3;
+
+    string cursor = 10;
+    int32 limit = 11;
+}
+
+message UserTopicFilter {
+    repeated string users = 1;
+    repeated string topics = 2;
+    string topic_prefix = 3;
+}
+
+message UserTopicListRequest {
+    UserTopicFilter filter = 1;
+
+    bool include_total_count = 2;
+
+    string cursor = 10;
+    int32 limit = 11;
+}
+
+message DeviceTopicUpdateRequest {
+    string device_id = 1;
+    string op = 2; // add | remove | set
+    repeated string topics = 3;
+}
+
+message UserTopicUpdateRequest {
+    string user = 1;
+    string op = 2; // add | remove | set
+    repeated string topics = 3;
+}
+
+message DeviceRegisterResponse {
+    Error error = 1;
+    DeviceRegisterResult result = 2;
+}
+
+message DeviceUpdateResponse {
+    Error error = 1;
+    DeviceUpdateResult result = 2;
+}
+
+message DeviceRemoveResponse {
+    Error error = 1;
+    DeviceRemoveResult result = 2;
+}
+
+message DeviceListResponse {
+    Error error = 1;
+    DeviceListResult result = 2;
+}
+
+message DeviceTopicListResponse {
+    Error error = 1;
+    DeviceTopicListResult result = 2;
+}
+
+message UserTopicListResponse {
+    Error error = 1;
+    UserTopicListResult result = 2;
+}
+
+message DeviceTopicUpdateResponse {
+    Error error = 1;
+    DeviceTopicUpdateResult result = 2;
+}
+
+message UserTopicUpdateResponse {
+    Error error = 1;
+    UserTopicUpdateResult result = 2;
+}
+
+message DeviceRegisterResult {
+    string id = 1;
+}
+
+message DeviceUpdateResult {
+}
+
+message DeviceRemoveResult {
+}
+
+message DeviceListResult {
+    repeated Device items = 1;
+    string next_cursor = 2;
+    int64 total_count = 3;
+}
+
+message Device {
+    string id = 1;
+    string platform = 2;
+    string provider = 3;
+    string token = 4;
+    string user = 5;
+    int64 created_at = 6;
+    int64 updated_at = 7;
+
+    map<string, string> meta = 10;
+    repeated string topics = 11;
+    //map<string, string> labels = 12;
+    //map<string, int64> scores = 13;
+}
+
+message DeviceTopicListResult {
+    repeated DeviceTopic items = 1;
+    string next_cursor = 2;
+    int64 total_count = 3;
+}
+
+message DeviceTopic {
+    string id = 1;
+    string topic = 2;
+    Device device = 3;
+}
+
+message UserTopicListResult {
+    repeated UserTopic items = 1;
+    string next_cursor = 2;
+    int64 total_count = 3;
+}
+
+message DeviceTopicUpdateResult {
+}
+
+message UserTopicUpdateResult {
+}
+
+message UserTopic {
+    string id = 1;
+    string user = 2;
+    string topic = 3;
+}
+
+message PushRecipient {
+    DeviceFilter filter = 1;
+
+    repeated string fcm_tokens = 2;
+    string fcm_topic = 3;
+    string fcm_condition = 4;
+
+    repeated string hms_tokens = 5;
+    string hms_topic = 6;
+    string hms_condition = 7;
+
+    repeated string apns_tokens = 8;
+}
+
+message PushNotification {
+    FcmPushNotification fcm = 1;
+    HmsPushNotification hms = 2;
+    ApnsPushNotification apns = 3;
+
+    int64 expire_at = 5; // timestamp in the future when Centrifugo should stop trying to send push notification.
+}
+
+message FcmPushNotification {
+    bytes message = 1;
+}
+
+message HmsPushNotification {
+    bytes message = 1;
+}
+
+message ApnsPushNotification {
+    map<string, string> headers = 1;
+    bytes payload = 2;
+}
+
+message SendPushNotificationRequest {
+    PushRecipient recipient = 1;
+    PushNotification notification = 2;
+    string uid = 3; // unique identifier for push notification, used for matching in Centrifugo analytics.
+    int64 send_at = 4;
+}
+
+message SendPushNotificationResponse {
+    Error error = 1;
+    SendPushNotificationResult result = 2;
+}
+
+message SendPushNotificationResult {
+    string uid = 1;  // Unique identifier of notification send request (it's not a FCM message id).
+}
+
+message UpdatePushStatusRequest {
+    string uid = 1;        // uid of push notification (matches SendPushNotificationResult.uid)
+    string status = 2;     // failed | sent | delivered | interacted
+    string device_id = 3;  // Centrifugo device id.
+    string msg_id = 4;     // Provider issued message id.
+}
+
+message UpdatePushStatusResponse {
+    Error error = 1;
+    UpdatePushStatusResult result = 2;
+}
+
+message UpdatePushStatusResult {}
+
+message CancelPushRequest {
+    string uid = 1;
+}
+
+message CancelPushResponse {
+    Error error = 1;
+    CancelPushResult result = 2;
+}
+
+message CancelPushResult {}
+
+message RateLimitRequest {
+    //    string key = 1;
+    //    int64 rate = 2;
+    //    int64 interval = 3;
+    //    int64 score = 4;
+}
+
+message RateLimitResponse {
+    Error error = 1;
+    RateLimitResult result = 2;
+}
+
+message RateLimitResult {
+    //    bool allowed = 1;
+    //    int64 tokens_left = 2;
+    //    int64 allowed_in = 3;
+    //    int64 server_time = 4;
+}

@@ -1,7 +1,7 @@
 CENT
 ====
 
-Python tools to communicate with Centrifugo HTTP API. Python >= 3.3 supported.
+Python tools to communicate with Centrifugo v5 HTTP API. Python >= 3.9 supported.
 
 To install run:
 
@@ -9,113 +9,93 @@ To install run:
 pip install cent
 ```
 
+---
+
+### Centrifugo compatibility
+
+**Cent v5 and higher works only with Centrifugo v5**.
+
+If you need to work with Centrifugo v3 then use Cent v4
+If you need to work with Centrifugo v2 then use Cent v3
+---
+
 ### High-level library API
 
-First see [available API methods in documentation](https://centrifugal.dev/docs/server/server_api#http-api).
+First
+see [available API methods in documentation](https://centrifugal.dev/docs/server/server_api#api-methods).
 
-This library contains `Client` class to send messages to Centrifugo from your python-powered backend:
+This library contains `Client` and `AsyncClient` class to send messages to
+Centrifugo from your python-powered backend:
 
 ```python
-from cent import Client
+import asyncio
+from cent import AsyncClient, Client
 
 url = "http://localhost:8000/api"
 api_key = "XXX"
 
-# initialize client instance.
-client = Client(url, api_key=api_key, timeout=1)
+# Initialize a client (you can use sync or async version)
+async_client = AsyncClient(url, api_key=api_key)
+sync_client = Client(url, api_key=api_key)
 
-# publish data into channel
-channel = "public:chat"
-data = {"input": "test"}
-client.publish(channel, data)
+response = sync_client.publish("example:channel", {"input": "Hello world!"})
+print(response)
 
-# other available methods
-client.unsubscribe("user_id", "channel")
-client.disconnect("user_id")
-history = client.history("public:chat")
-presence = client.presence("public:chat")
-channels = client.channels()
-info = client.info()
-client.history_remove("public:chat")
+
+async def main():
+    response = await async_client.publish("example:channel", {"input": "Hello world!"})
+    print(response)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
-`publish`, `disconnect`, `unsubscribe`, `history_remove` return `None` in case of success. Each of this commands can raise an instance of `CentException`.
+---
 
-I.e.:
-
-```python
-from cent import Client, CentException
-
-client = Client("http://localhost:8000/api", api_key="XXX", timeout=1)
-try:
-    client.publish("public:chat", {"input": "test"})
-except CentException:
-    # handle exception
-```
-
-Depending on problem occurred exceptions can be:
-
-* RequestException – HTTP request to Centrifugo failed
-* ResponseError - Centrifugo returned some error on request
-
-Both exceptions inherited from `CentException`.
-
-### Low-level library API:
-
-To send lots of commands in one request:
-
-```python
-from cent import Client, CentException
-
-client = Client("http://localhost:8000/api", api_key="XXX", timeout=1)
-
-params = {
-    "channel": "python",
-    "data": "hello world"
-}
-
-client.add("publish", params)
-
-try:
-    result = client.send()
-except CentException:
-    # handle exception
-else:
-    print(result)
-```
-
-You can use `add` method to add several messages which will be sent.
-
-You'll get something like this in response:
-
-```bash
-[{}]
-```
-
-I.e. list of single response to each command sent. So you need to inspect response on errors (if any) yourself.
-
-### Client initialization arguments
+### Client init arguments
 
 Required:
 
-* address - Centrifugo HTTP API endpoint address
+* base_url - Centrifugo HTTP API endpoint address
+* api_key - Centrifugo HTTP API key
 
 Optional:
 
-* `api_key` - HTTP API key of Centrifugo 
-* `timeout` (default: `1`) - timeout for HTTP requests to Centrifugo
-* `json_encoder` (default: `None`) - set custom JSON encoder
-* `send_func` (default: `None`) - set custom send function
-* `verify` (default: `True`) - when set to `False` no certificate check will be done during requests.
+* session (`BaseSession`) - session to use
 
-## For maintainer
+You can use `AiohttpSession` or create custom from `BaseSession` class.
 
-To release:
+Arguments for default session:
 
-1. Bump version in `setup.py`
-1. Changelog, push and create new tag
-1. `pip install twine`
-1. `pip install wheel`
-1. `python setup.py sdist bdist_wheel`
-1. `twine check dist/*`
-1. `twine upload dist/*`
+Required:
+
+* base_url - Centrifugo HTTP API endpoint address
+
+Optional:
+
+* json_loads — function to load JSON from response body (default is json, but you can use
+  orjson, ujson etc.)
+* timeout - timeout for requests (default is 10.0)
+
+## For contributors
+
+### Tests and benchmarks
+
+To start tests, you can use pytest with any additional options, for example:
+
+```bash
+pytest -vv tests
+```
+
+To start benchmarks, you can use pytest too, for example:
+
+```bash
+pytest benchmarks --benchmark-verbose
+```
+
+### Generate code from proto file, if needed
+
+```bash
+poetry run python -m grpc_tools.protoc -I . --python_betterproto_out=./cent/protos cent/protos/apiproto.proto
+```
