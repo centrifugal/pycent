@@ -8,7 +8,7 @@ proto:
 	poetry run python -m grpc_tools.protoc -I . --python_betterproto_out=./cent/proto cent/proto/apiproto.proto
 
 test:
-	pytest -vv tests
+	poetry run pytest -vv tests
 
 lint:
 	ruff .
