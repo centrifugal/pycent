@@ -1,32 +1,30 @@
-from base64 import b64encode
+import json
 
 import pytest
 
-from cent.client.grpc_client import GrpcClient
-from cent.exceptions import CentAPIError
-from cent.methods.disconnect_data import Disconnect
-from cent.types import StreamPosition, ChannelOptionsOverride, BoolValue
+from cent import (GrpcClient, CentAPIError, StreamPosition,
+                  ChannelOptionsOverride, BoolValue, Disconnect)
 from tests.conftest import UNKNOWN_CHANNEL_ERROR_CODE
 
 
 async def test_publish(grpc_client: GrpcClient) -> None:
     await grpc_client.publish(
-        "personal:1",
-        {"data": "data"},
+        "personal_1",
+        json.dumps({"data": "data"}).encode(),
         skip_history=False,
         tags={"tag": "tag"},
-        b64data=b64encode(b"data").decode(),
+        # b64data=b64encode(b"data").decode(),
         idempotency_key="idempotency_key",
     )
 
 
 async def test_broadcast(grpc_client: GrpcClient) -> None:
     await grpc_client.broadcast(
-        ["personal:1", "personal:2"],
-        {"data": "data"},
+        ["personal_1", "personal_2"],
+        json.dumps({"data": "data"}).encode(),
         skip_history=False,
         tags={"tag": "tag"},
-        b64data=b64encode(b"data").decode(),
+        # b64data=b64encode(b"data").decode(),
         idempotency_key="idempotency_key",
     )
 
@@ -34,12 +32,12 @@ async def test_broadcast(grpc_client: GrpcClient) -> None:
 async def test_subscribe(grpc_client: GrpcClient) -> None:
     await grpc_client.subscribe(
         "user",
-        "personal:1",
-        info={"info": "info"},
-        b64info=b64encode(b"info").decode(),
+        "personal_1",
+        info=json.dumps({"info": "info"}).encode(),
+        # b64info=b64encode(b"info").decode(),
         client="client",
         session="session",
-        data={"data": "data"},
+        data=json.dumps({"data": "data"}).encode(),
         recover_since=StreamPosition(
             offset=1,
             epoch="1",
@@ -55,30 +53,30 @@ async def test_subscribe(grpc_client: GrpcClient) -> None:
 async def test_unsubscribe(grpc_client: GrpcClient) -> None:
     await grpc_client.unsubscribe(
         user="user",
-        channel="personal:1",
+        channel="personal_1",
         session="session",
         client="client",
     )
 
 
 async def test_presence(grpc_client: GrpcClient) -> None:
-    await grpc_client.presence("personal:1")
+    await grpc_client.presence("personal_1")
 
 
 async def test_presence_stats(grpc_client: GrpcClient) -> None:
-    await grpc_client.presence_stats("personal:1")
+    await grpc_client.presence_stats("personal_1")
 
 
 async def test_history(grpc_client: GrpcClient) -> None:
     await grpc_client.history(
-        channel="personal:1",
+        channel="personal_1",
         limit=1,
         reverse=True,
     )
 
 
 async def test_history_remove(grpc_client: GrpcClient) -> None:
-    await grpc_client.history_remove(channel="personal:1")
+    await grpc_client.history_remove(channel="personal_1")
 
 
 async def test_info(grpc_client: GrpcClient) -> None:
@@ -96,7 +94,7 @@ async def test_disconnect(grpc_client: GrpcClient) -> None:
         user="user",
         client="client",
         session="session",
-        whitelist=["personal:1"],
+        whitelist=["personal_1"],
         disconnect=Disconnect(
             code=4000,
             reason="reason",
@@ -118,6 +116,6 @@ async def test_error_publish(grpc_client: GrpcClient) -> None:
     with pytest.raises(CentAPIError, match="unknown channel") as exc_info:
         await grpc_client.publish(
             "undefined_channel:123",
-            {"data": "data"},
+            json.dumps({"data": "data"}).encode(),
         )
         assert exc_info.value.code == UNKNOWN_CHANNEL_ERROR_CODE

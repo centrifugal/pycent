@@ -2,7 +2,8 @@ from abc import abstractmethod, ABC
 from typing import TYPE_CHECKING, Optional
 
 from cent.client.session.base import BaseSession
-from cent.methods.base import CentRequest, CentType
+from cent.requests import CentRequest
+from cent.base import CentType
 
 if TYPE_CHECKING:
     from cent.client.sync_client import Client

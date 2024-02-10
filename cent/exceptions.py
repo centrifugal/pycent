@@ -1,4 +1,4 @@
-from cent.methods.base import CentRequest, CentType
+from cent.base import CentType, CentRequest
 
 
 class CentError(Exception):

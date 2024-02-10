@@ -10,13 +10,13 @@ from cent.exceptions import (
     CentUnauthorizedError,
     CentTransportError,
 )
-from cent.methods.base import (
+from cent.base import (
     json_loads as _json_loads,
     CentRequest,
     CentType,
     Response,
 )
-from cent.methods.batch import BatchRequest
+from cent.requests import BatchRequest
 
 if TYPE_CHECKING:
     from cent.client.sync_client import Client

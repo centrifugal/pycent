@@ -6,9 +6,10 @@ from grpclib import GRPCError
 from grpclib.client import Channel
 from pydantic import TypeAdapter, BaseModel
 
-from cent.protos.centrifugal.centrifugo.api import CentrifugoApiStub
+from cent.proto.centrifugal.centrifugo.api import CentrifugoApiStub
 from cent.exceptions import CentAPIError, CentTransportError
-from cent.methods.base import CentRequest, CentType, Response, Error
+from cent.requests import CentRequest
+from cent.base import CentType, Response, Error
 
 if TYPE_CHECKING:
     from cent.client.grpc_client import GrpcClient

@@ -3,10 +3,11 @@ from typing import Optional, TYPE_CHECKING, cast, Any
 import requests
 from requests import Session
 
-from cent.methods.base import CentRequest, CentType
+from cent.requests import CentRequest
+from cent.base import CentType
 from cent.client.session.base_sync import BaseSyncSession
 from cent.exceptions import CentNetworkError
-from cent.methods.batch import BatchRequest
+from cent.requests import BatchRequest
 
 if TYPE_CHECKING:
     from cent.client.sync_client import Client

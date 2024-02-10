@@ -75,14 +75,12 @@ select = [
 ignore = [
     "PLR0913", # too-many-arguments
     "PGH003", # use specific rule code when ignore
-    "T201"
+    "T201",
 ]
 
 [tool.ruff.per-file-ignores]
-"cent/types/*" = ["E501"]
-"cent/methods/*" = ["E501"]
 "tests/*" = ["S101", "PT012"]
-"cent/protos/centrifugal/*" = ["RUF009", "ARG002", "E501"]
+"cent/proto/centrifugal/*" = ["RUF009", "ARG002", "E501"]
 
 [tool.mypy]
 strict = true

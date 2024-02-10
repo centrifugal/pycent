@@ -9,23 +9,18 @@ To install run:
 pip install cent
 ```
 
----
-
-### Centrifugo compatibility
+## Centrifugo compatibility
 
 **Cent v5 and higher works only with Centrifugo v5**.
 
-If you need to work with Centrifugo v3 then use Cent v4
-If you need to work with Centrifugo v2 then use Cent v3
----
+* If you need to work with Centrifugo v3 then use Cent v4
+* If you need to work with Centrifugo v2 then use Cent v3
 
-### High-level library API
+## High-level library API
 
-First
-see [available API methods in documentation](https://centrifugal.dev/docs/server/server_api#api-methods).
+First see [available API methods in documentation](https://centrifugal.dev/docs/server/server_api#api-methods).
 
-This library contains `Client` and `AsyncClient` class to send messages to
-Centrifugo from your python-powered backend:
+This library contains `Client` and `AsyncClient` class to send messages to Centrifugo from your python-powered backend:
 
 ```python
 import asyncio
@@ -50,8 +45,6 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 ```
-
----
 
 ### Client init arguments
 
@@ -97,5 +90,5 @@ pytest benchmarks --benchmark-verbose
 ### Generate code from proto file, if needed
 
 ```bash
-poetry run python -m grpc_tools.protoc -I . --python_betterproto_out=./cent/protos cent/protos/apiproto.proto
+poetry run python -m grpc_tools.protoc -I . --python_betterproto_out=./cent/proto cent/proto/apiproto.proto
 ```

@@ -4,12 +4,12 @@ from typing import Optional, TYPE_CHECKING, cast, Any
 from aiohttp import ClientSession, ClientError
 
 from cent.client.session.base_async import BaseAsyncSession
-from cent.methods.base import CentRequest, CentType
+from cent.base import CentType
+from cent.requests import CentRequest, BatchRequest
 from cent.exceptions import CentNetworkError
-from cent.methods.batch import BatchRequest
 
 if TYPE_CHECKING:
-    from cent.client.async_client import AsyncClient
+    from cent.client import AsyncClient
 
 
 class AiohttpSession(BaseAsyncSession):

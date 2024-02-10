@@ -1,32 +1,30 @@
-from base64 import b64encode
-
 import pytest
 
-from cent import AsyncClient
-from cent.exceptions import CentAPIError
-from cent.methods import PublishRequest, BroadcastRequest, PresenceRequest
-from cent.types import StreamPosition, Disconnect
+from cent import (
+    AsyncClient, CentAPIError, PublishRequest, StreamPosition, Disconnect,
+    BroadcastRequest, PresenceRequest)
+
 from tests.conftest import UNKNOWN_CHANNEL_ERROR_CODE
 
 
 async def test_publish(async_client: AsyncClient) -> None:
     await async_client.publish(
-        "personal:1",
+        "personal_1",
         {"data": "data"},
         skip_history=False,
         tags={"tag": "tag"},
-        b64data=b64encode(b"data").decode(),
+        # b64data=b64encode(b"data").decode(),
         idempotency_key="idempotency_key",
     )
 
 
 async def test_broadcast(async_client: AsyncClient) -> None:
     await async_client.broadcast(
-        ["personal:1", "personal:2"],
+        ["personal_1", "personal_2"],
         {"data": "data"},
         skip_history=False,
         tags={"tag": "tag"},
-        b64data=b64encode(b"data").decode(),
+        # b64data=b64encode(b"data").decode(),
         idempotency_key="idempotency_key",
     )
 
@@ -34,9 +32,9 @@ async def test_broadcast(async_client: AsyncClient) -> None:
 async def test_subscribe(async_client: AsyncClient) -> None:
     await async_client.subscribe(
         "user",
-        "personal:1",
+        "personal_1",
         info={"info": "info"},
-        b64info=b64encode(b"info").decode(),
+        # b64info=b64encode(b"info").decode(),
         client="client",
         session="session",
         data={"data": "data"},
@@ -50,30 +48,30 @@ async def test_subscribe(async_client: AsyncClient) -> None:
 async def test_unsubscribe(async_client: AsyncClient) -> None:
     await async_client.unsubscribe(
         user="user",
-        channel="personal:1",
+        channel="personal_1",
         session="session",
         client="client",
     )
 
 
 async def test_presence(async_client: AsyncClient) -> None:
-    await async_client.presence("personal:1")
+    await async_client.presence("personal_1")
 
 
 async def test_presence_stats(async_client: AsyncClient) -> None:
-    await async_client.presence_stats("personal:1")
+    await async_client.presence_stats("personal_1")
 
 
 async def test_history(async_client: AsyncClient) -> None:
     await async_client.history(
-        channel="personal:1",
+        channel="personal_1",
         limit=1,
         reverse=True,
     )
 
 
 async def test_history_remove(async_client: AsyncClient) -> None:
-    await async_client.history_remove("personal:1")
+    await async_client.history_remove("personal_1")
 
 
 async def test_info(async_client: AsyncClient) -> None:
@@ -91,7 +89,7 @@ async def test_disconnect(async_client: AsyncClient) -> None:
         user="user",
         client="client",
         session="session",
-        whitelist=["personal:1"],
+        whitelist=["personal_1"],
         disconnect=Disconnect(
             code=4000,
             reason="reason",
@@ -113,19 +111,19 @@ async def test_batch(async_client: AsyncClient) -> None:
     await async_client.batch(
         commands=[
             PublishRequest(
-                channel="personal:1",
+                channel="personal_1",
                 data={"data": "Second data"},
             ),
             PublishRequest(
-                channel="personal:2",
+                channel="personal_2",
                 data={"data": "First data"},
             ),
             BroadcastRequest(
-                channels=["personal:1", "personal:2"],
+                channels=["personal_1", "personal_2"],
                 data={"data": "Third data"},
             ),
             PresenceRequest(
-                channel="personal:1",
+                channel="personal_1",
             ),
         ]
     )

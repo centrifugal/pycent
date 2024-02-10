@@ -1,7 +1,7 @@
 from typing import List, Optional, Any, Dict, TypeVar
 
 from cent.client.session import BaseAsyncSession, AiohttpSession
-from cent.methods import (
+from cent.requests import (
     CentRequest,
     BroadcastRequest,
     PublishRequest,
@@ -15,9 +15,9 @@ from cent.methods import (
     ChannelsRequest,
     DisconnectRequest,
     InfoRequest,
+    BatchRequest,
 )
-from cent.methods.batch import BatchRequest
-from cent.types import (
+from cent.results import (
     PublishResult,
     BroadcastResult,
     SubscribeResult,
@@ -30,11 +30,14 @@ from cent.types import (
     ChannelsResult,
     DisconnectResult,
     InfoResult,
+)
+from cent.types import (
     StreamPosition,
     ChannelOptionsOverride,
     Disconnect,
 )
-from cent.types.batch_result import BatchResult
+from cent.results import BatchResult
+
 
 T = TypeVar("T")
 

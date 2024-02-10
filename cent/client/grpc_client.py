@@ -1,7 +1,7 @@
 from typing import Any, Optional, Dict, TypeVar, List
 
 from cent.client.session.grpc import GrpcSession
-from cent.methods import (
+from cent.requests import (
     CentRequest,
     BroadcastRequest,
     PublishRequest,
@@ -16,7 +16,7 @@ from cent.methods import (
     DisconnectRequest,
     InfoRequest,
 )
-from cent.types import (
+from cent.results import (
     PublishResult,
     BroadcastResult,
     SubscribeResult,
@@ -29,6 +29,8 @@ from cent.types import (
     ChannelsResult,
     DisconnectResult,
     InfoResult,
+)
+from cent.types import (
     StreamPosition,
     ChannelOptionsOverride,
     Disconnect,
