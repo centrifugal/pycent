@@ -269,3 +269,9 @@ class Client:
         :return: Centrifugo response
         """
         return self._session(self._api_key, request, timeout=request_timeout)
+
+    def __enter__(self) -> "Client":
+        return self
+
+    def __exit__(self, *kwargs: Any) -> None:
+        self.close()

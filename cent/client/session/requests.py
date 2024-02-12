@@ -40,7 +40,8 @@ class RequestsSession(BaseHttpSyncSession):
         request: CentRequest[CentType],
         timeout: Optional[float] = None,
     ) -> CentType:
-        self._session.headers["X-API-Key"] = api_key
+        if api_key:
+            self._session.headers["X-API-Key"] = api_key
         if isinstance(request, BatchRequest):
             json_data = self.get_batch_json_data(request)
         else:

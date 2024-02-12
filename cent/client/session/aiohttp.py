@@ -45,7 +45,8 @@ class AiohttpSession(BaseHttpAsyncSession):
         timeout: Optional[float] = None,
     ) -> CentType:
         session = self._session
-        session.headers["X-API-Key"] = api_key
+        if api_key:
+            session.headers["X-API-Key"] = api_key
 
         if isinstance(request, BatchRequest):
             json_data = self.get_batch_json_data(request)

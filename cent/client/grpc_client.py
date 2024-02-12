@@ -1,4 +1,4 @@
-from typing import Optional, Dict, TypeVar, List
+from typing import Optional, Dict, TypeVar, List, Any
 
 from cent.client.session import GrpcSession
 from cent.base import CentRequest
@@ -244,3 +244,9 @@ class GrpcClient:
         :return: Centrifugo response
         """
         return await self._session(request, request_timeout)
+
+    async def __aenter__(self) -> "GrpcClient":
+        return self
+
+    async def __aexit__(self, *kwargs: Any) -> None:
+        await self.close()

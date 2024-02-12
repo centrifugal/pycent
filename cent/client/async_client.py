@@ -269,3 +269,9 @@ class AsyncClient:
         :return: Centrifugo response
         """
         return await self._session(self._api_key, request, timeout=request_timeout)
+
+    async def __aenter__(self) -> "AsyncClient":
+        return self
+
+    async def __aexit__(self, *kwargs: Any) -> None:
+        await self.close()
