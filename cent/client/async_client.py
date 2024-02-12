@@ -1,8 +1,8 @@
 from typing import List, Optional, Any, Dict, TypeVar
 
-from cent.client.session import BaseAsyncSession, AiohttpSession
+from cent.client.session import AiohttpSession
+from cent.base import CentRequest
 from cent.requests import (
-    CentRequest,
     BroadcastRequest,
     PublishRequest,
     SubscribeRequest,
@@ -18,6 +18,7 @@ from cent.requests import (
     BatchRequest,
 )
 from cent.results import (
+    BatchResult,
     PublishResult,
     BroadcastResult,
     SubscribeResult,
@@ -36,7 +37,6 @@ from cent.types import (
     ChannelOptionsOverride,
     Disconnect,
 )
-from cent.results import BatchResult
 
 
 T = TypeVar("T")
@@ -45,19 +45,21 @@ T = TypeVar("T")
 class AsyncClient:
     def __init__(
         self,
-        base_url: str,
+        api_url: str,
         api_key: str,
-        session: Optional[BaseAsyncSession] = None,
+        request_timeout: Optional[float] = 10.0,
     ) -> None:
         """
-        :param base_url: Centrifuge base_url
-        :param api_key: Centrifuge API key
-        :param session: Custom Session instance
+        :param api_url: Centrifugo API URL
+        :param api_key: Centrifugo API key
+        :param request_timeout: base timeout for all requests.
         """
-
-        self._base_url = base_url
-        self.api_key = api_key
-        self.session = session or AiohttpSession(base_url=base_url)
+        self._base_url = api_url
+        self._api_key = api_key
+        self._session = AiohttpSession(
+            base_url=api_url,
+            timeout=request_timeout,
+        )
 
     async def publish(
         self,
@@ -250,11 +252,16 @@ class AsyncClient:
         call = BatchRequest.model_construct(commands=commands)
         return await self(call, request_timeout=request_timeout)
 
-    async def __call__(self, method: CentRequest[T], request_timeout: Optional[float] = None) -> T:
+    async def close(self) -> None:
+        await self._session.close()
+
+    async def __call__(
+        self, request: CentRequest[T], request_timeout: Optional[float] = None
+    ) -> T:
         """
         Call API method
 
-        :param method: Centrifugo method
+        :param request: Centrifugo request
         :return: Centrifugo response
         """
-        return await self.session(self, method, timeout=request_timeout)
+        return await self._session(self._api_key, request, timeout=request_timeout)

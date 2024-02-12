@@ -5,14 +5,9 @@ from .client import (
     Client,
     AsyncClient,
     GrpcClient,
-    BaseSession,
-    BaseAsyncSession,
-    BaseSyncSession,
-    RequestsSession,
-    AiohttpSession,
 )
+from cent.base import CentRequest
 from cent.requests import (
-    CentRequest,
     BroadcastRequest,
     PublishRequest,
     SubscribeRequest,
@@ -55,10 +50,10 @@ from cent.types import (
 from cent.exceptions import (
     CentError,
     CentNetworkError,
-    CentClientDecodeError,
-    CentUnauthorizedError,
-    CentAPIError,
     CentTransportError,
+    CentUnauthorizedError,
+    CentDecodeError,
+    CentAPIError,
 )
 
 with contextlib.suppress(ImportError):
@@ -67,18 +62,14 @@ with contextlib.suppress(ImportError):
     _asyncio.set_event_loop_policy(_uvloop.EventLoopPolicy())
 
 __all__ = (
-    "AiohttpSession",
     "AsyncClient",
-    "BaseAsyncSession",
-    "BaseSession",
-    "BaseSyncSession",
     "BatchRequest",
     "BatchResult",
     "BoolValue",
     "BroadcastRequest",
     "BroadcastResult",
     "CentAPIError",
-    "CentClientDecodeError",
+    "CentDecodeError",
     "CentError",
     "CentNetworkError",
     "CentRequest",
@@ -110,13 +101,9 @@ __all__ = (
     "PublishResult",
     "RefreshRequest",
     "RefreshResult",
-    "RequestsSession",
     "StreamPosition",
     "SubscribeRequest",
     "SubscribeResult",
     "UnsubscribeRequest",
     "UnsubscribeResult",
-    "exceptions",
-    "requests",
-    "types",
 )

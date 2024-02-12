@@ -16,20 +16,6 @@ class BaseResult(BaseModel, ABC):
     )
 
 
-try:
-    import orjson as _orjson  # type: ignore[import-not-found]
-
-    json_dumps = _orjson.dumps
-    json_loads = _orjson.loads
-except ImportError:
-    import json
-
-    def json_dumps(x: Any) -> bytes:
-        return json.dumps(x).encode()
-
-    json_loads = json.loads
-
-
 CentType = TypeVar("CentType", bound=Any)
 
 
@@ -55,6 +41,7 @@ class CentRequest(BaseModel, Generic[CentType], ABC):
         __api_method__: ClassVar[str]
         __grpc_method__: ClassVar[type]
     else:
+
         @property
         @abstractmethod
         def __returning__(self) -> type:
@@ -80,6 +67,7 @@ class NestedModel(BaseModel, ABC):
     if TYPE_CHECKING:
         __grpc_method__: ClassVar[type]
     else:
+
         @property
         @abstractmethod
         def __grpc_method__(self) -> type:

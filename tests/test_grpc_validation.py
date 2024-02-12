@@ -1,21 +1,27 @@
+import uuid
 import json
-
 import pytest
 
-from cent import (GrpcClient, CentAPIError, StreamPosition,
-                  ChannelOptionsOverride, BoolValue, Disconnect)
+from cent import (
+    GrpcClient,
+    CentAPIError,
+    StreamPosition,
+    ChannelOptionsOverride,
+    BoolValue,
+    Disconnect,
+)
 from tests.conftest import UNKNOWN_CHANNEL_ERROR_CODE
 
 
 async def test_publish(grpc_client: GrpcClient) -> None:
-    await grpc_client.publish(
+    result = await grpc_client.publish(
         "personal_1",
         json.dumps({"data": "data"}).encode(),
         skip_history=False,
         tags={"tag": "tag"},
-        # b64data=b64encode(b"data").decode(),
         idempotency_key="idempotency_key",
     )
+    assert result.offset
 
 
 async def test_broadcast(grpc_client: GrpcClient) -> None:
@@ -24,7 +30,6 @@ async def test_broadcast(grpc_client: GrpcClient) -> None:
         json.dumps({"data": "data"}).encode(),
         skip_history=False,
         tags={"tag": "tag"},
-        # b64data=b64encode(b"data").decode(),
         idempotency_key="idempotency_key",
     )
 
@@ -34,7 +39,6 @@ async def test_subscribe(grpc_client: GrpcClient) -> None:
         "user",
         "personal_1",
         info=json.dumps({"info": "info"}).encode(),
-        # b64info=b64encode(b"info").decode(),
         client="client",
         session="session",
         data=json.dumps({"data": "data"}).encode(),
@@ -68,11 +72,21 @@ async def test_presence_stats(grpc_client: GrpcClient) -> None:
 
 
 async def test_history(grpc_client: GrpcClient) -> None:
-    await grpc_client.history(
-        channel="personal_1",
+    channel = "personal_" + uuid.uuid4().hex
+    for i in range(10):
+        await grpc_client.publish(
+            channel,
+            json.dumps({"data": f"data {i}"}).encode(),
+        )
+    result = await grpc_client.history(
+        channel=channel,
         limit=1,
         reverse=True,
     )
+    assert isinstance(result.offset, int)
+    assert result.offset > 0
+    assert len(result.publications) == 1
+    assert result.publications[0].data == b'{"data": "data 9"}'
 
 
 async def test_history_remove(grpc_client: GrpcClient) -> None:

@@ -1,8 +1,8 @@
 from typing import List, Optional, Any, Dict, TypeVar
 
-from cent.client.session import BaseSyncSession, RequestsSession
+from cent.client.session import RequestsSession
+from cent.base import CentRequest
 from cent.requests import (
-    CentRequest,
     BroadcastRequest,
     PublishRequest,
     SubscribeRequest,
@@ -15,9 +15,10 @@ from cent.requests import (
     ChannelsRequest,
     DisconnectRequest,
     InfoRequest,
-    BatchRequest
+    BatchRequest,
 )
 from cent.results import (
+    BatchResult,
     PublishResult,
     BroadcastResult,
     SubscribeResult,
@@ -36,7 +37,6 @@ from cent.types import (
     ChannelOptionsOverride,
     Disconnect,
 )
-from cent.results import BatchResult
 
 
 T = TypeVar("T")
@@ -45,19 +45,22 @@ T = TypeVar("T")
 class Client:
     def __init__(
         self,
-        base_url: str,
+        api_url: str,
         api_key: str,
-        session: Optional[BaseSyncSession] = None,
+        request_timeout: Optional[float] = 10.0,
     ) -> None:
         """
-        :param base_url: Centrifuge base_url
-        :param api_key: Centrifuge API key
-        :param session: Custom Session instance
+        :param api_url: Centrifugo API URL
+        :param api_key: Centrifugo API key
+        :param request_timeout: Base timeout for all requests.
         """
 
-        self._base_url = base_url
-        self.api_key = api_key
-        self.session = session or RequestsSession(base_url=base_url)
+        self._api_url = api_url
+        self._api_key = api_key
+        self._session = RequestsSession(
+            base_url=api_url,
+            timeout=request_timeout,
+        )
 
     def publish(
         self,
@@ -250,11 +253,14 @@ class Client:
         call = BatchRequest.model_construct(commands=commands)
         return self(call, request_timeout=request_timeout)
 
-    def __call__(self, method: CentRequest[T], request_timeout: Optional[float] = None) -> T:
+    def close(self) -> None:
+        self._session.close()
+
+    def __call__(self, request: CentRequest[T], request_timeout: Optional[float] = None) -> T:
         """
         Call API method
 
-        :param method: Centrifugo method
+        :param request: Centrifugo request
         :return: Centrifugo response
         """
-        return self.session(self, method, timeout=request_timeout)
+        return self._session(self._api_key, request, timeout=request_timeout)

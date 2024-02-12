@@ -30,7 +30,7 @@ async def grpc_client(
 ) -> AsyncGenerator[GrpcClient, None]:
     client = GrpcClient("localhost", 10000)
     yield client
-    client.session.close()
+    client._session.close()
 
 
 @pytest.fixture()
@@ -39,4 +39,4 @@ async def async_client(
 ) -> AsyncGenerator[AsyncClient, None]:
     client = AsyncClient(BASE_URL, API_KEY)
     yield client
-    await client.session.close()
+    await client._session.close()

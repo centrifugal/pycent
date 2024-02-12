@@ -1,8 +1,8 @@
-from typing import Any, Optional, Dict, TypeVar, List
+from typing import Optional, Dict, TypeVar, List
 
-from cent.client.session.grpc import GrpcSession
+from cent.client.session import GrpcSession
+from cent.base import CentRequest
 from cent.requests import (
-    CentRequest,
     BroadcastRequest,
     PublishRequest,
     SubscribeRequest,
@@ -36,77 +36,78 @@ from cent.types import (
     Disconnect,
 )
 
+
 T = TypeVar("T")
 
 
 class GrpcClient:
-    def __init__(self, host: str, port: int) -> None:
-        self.session = GrpcSession(host=host, port=port)
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        request_timeout: Optional[float] = 10.0,
+    ) -> None:
+        self._session = GrpcSession(host=host, port=port, timeout=request_timeout)
 
     async def publish(
         self,
         channel: str,
-        data: Any,
+        data: bytes,
         skip_history: Optional[bool] = None,
         tags: Optional[Dict[str, str]] = None,
-        b64data: Optional[str] = None,
         idempotency_key: Optional[str] = None,
+        request_timeout: Optional[float] = None,
     ) -> PublishResult:
         call = PublishRequest(
             channel=channel,
             data=data,
             skip_history=skip_history,
             tags=tags,
-            b64data=b64data,
             idempotency_key=idempotency_key,
         )
-        return await self(call)
+        return await self(call, request_timeout=request_timeout)
 
     async def broadcast(
         self,
         channels: List[str],
-        data: Any,
+        data: bytes,
         skip_history: Optional[bool] = None,
         tags: Optional[Dict[str, str]] = None,
-        b64data: Optional[str] = None,
         idempotency_key: Optional[str] = None,
+        request_timeout: Optional[float] = None,
     ) -> BroadcastResult:
         call = BroadcastRequest(
             channels=channels,
             data=data,
             skip_history=skip_history,
             tags=tags,
-            b64data=b64data,
             idempotency_key=idempotency_key,
         )
-        return await self(call)
+        return await self(call, request_timeout=request_timeout)
 
     async def subscribe(
         self,
         user: str,
         channel: str,
-        info: Optional[Any] = None,
-        b64info: Optional[str] = None,
+        info: Optional[bytes] = None,
         client: Optional[str] = None,
         session: Optional[str] = None,
-        data: Optional[Any] = None,
-        b64data: Optional[str] = None,
+        data: Optional[bytes] = None,
         recover_since: Optional[StreamPosition] = None,
         override: Optional[ChannelOptionsOverride] = None,
+        request_timeout: Optional[float] = None,
     ) -> SubscribeResult:
         call = SubscribeRequest(
             user=user,
             channel=channel,
             info=info,
-            b64info=b64info,
             client=client,
             session=session,
             data=data,
-            b64data=b64data,
             recover_since=recover_since,
             override=override,
         )
-        return await self(call)
+        return await self(call, request_timeout=request_timeout)
 
     async def unsubscribe(
         self,
@@ -114,6 +115,7 @@ class GrpcClient:
         channel: str,
         client: Optional[str] = None,
         session: Optional[str] = None,
+        request_timeout: Optional[float] = None,
     ) -> UnsubscribeResult:
         call = UnsubscribeRequest(
             user=user,
@@ -121,25 +123,27 @@ class GrpcClient:
             client=client,
             session=session,
         )
-        return await self(call)
+        return await self(call, request_timeout=request_timeout)
 
     async def presence(
         self,
         channel: str,
+        request_timeout: Optional[float] = None,
     ) -> PresenceResult:
         call = PresenceRequest(
             channel=channel,
         )
-        return await self(call)
+        return await self(call, request_timeout=request_timeout)
 
     async def presence_stats(
         self,
         channel: str,
+        request_timeout: Optional[float] = None,
     ) -> PresenceStatsResult:
         call = PresenceStatsRequest(
             channel=channel,
         )
-        return await self(call)
+        return await self(call, request_timeout=request_timeout)
 
     async def history(
         self,
@@ -147,6 +151,7 @@ class GrpcClient:
         limit: Optional[int] = None,
         since: Optional[StreamPosition] = None,
         reverse: Optional[bool] = None,
+        request_timeout: Optional[float] = None,
     ) -> HistoryResult:
         call = HistoryRequest(
             channel=channel,
@@ -154,16 +159,17 @@ class GrpcClient:
             since=since,
             reverse=reverse,
         )
-        return await self(call)
+        return await self(call, request_timeout=request_timeout)
 
     async def history_remove(
         self,
         channel: str,
+        request_timeout: Optional[float] = None,
     ) -> HistoryRemoveResult:
         call = HistoryRemoveRequest(
             channel=channel,
         )
-        return await self(call)
+        return await self(call, request_timeout=request_timeout)
 
     async def refresh(
         self,
@@ -172,6 +178,7 @@ class GrpcClient:
         session: Optional[str] = None,
         expire_at: Optional[int] = None,
         expired: Optional[bool] = None,
+        request_timeout: Optional[float] = None,
     ) -> RefreshResult:
         call = RefreshRequest(
             user=user,
@@ -180,16 +187,17 @@ class GrpcClient:
             expire_at=expire_at,
             expired=expired,
         )
-        return await self(call)
+        return await self(call, request_timeout=request_timeout)
 
     async def channels(
         self,
         pattern: Optional[str] = None,
+        request_timeout: Optional[float] = None,
     ) -> ChannelsResult:
         call = ChannelsRequest(
             pattern=pattern,
         )
-        return await self(call)
+        return await self(call, request_timeout=request_timeout)
 
     async def disconnect(
         self,
@@ -198,6 +206,7 @@ class GrpcClient:
         session: Optional[str] = None,
         whitelist: Optional[List[str]] = None,
         disconnect: Optional[Disconnect] = None,
+        request_timeout: Optional[float] = None,
     ) -> DisconnectResult:
         call = DisconnectRequest(
             user=user,
@@ -206,19 +215,25 @@ class GrpcClient:
             whitelist=whitelist,
             disconnect=disconnect,
         )
-        return await self(call)
+        return await self(call, request_timeout=request_timeout)
 
     async def info(
         self,
+        request_timeout: Optional[float] = None,
     ) -> InfoResult:
         call = InfoRequest()
-        return await self(call)
+        return await self(call, request_timeout=request_timeout)
 
-    async def __call__(self, method: CentRequest[T]) -> T:
+    async def close(self) -> None:
+        self._session.close()
+
+    async def __call__(
+        self, request: CentRequest[T], request_timeout: Optional[float] = None
+    ) -> T:
         """
         Call API method
 
-        :param method: Centrifugo method
+        :param request: Centrifugo request
         :return: Centrifugo response
         """
-        return await self.session(self, method)
+        return await self._session(request, request_timeout)

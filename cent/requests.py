@@ -1,7 +1,5 @@
 from typing import Any, Optional, Dict, List
 
-from pydantic import Field
-
 from cent.proto.centrifugal.centrifugo.api import (
     ChannelsRequest as GrpcChannelsRequest,
     PublishRequest as GrpcPublishRequest,
@@ -22,10 +20,18 @@ from cent.base import CentRequest
 from cent.types import StreamPosition, ChannelOptionsOverride, Disconnect
 
 from cent.results import (
-    BatchResult, BroadcastResult, ChannelsResult,
-    DisconnectResult, HistoryResult, HistoryRemoveResult,
-    InfoResult, PresenceResult, PresenceStatsResult,
-    PublishResult, RefreshResult, SubscribeResult,
+    BatchResult,
+    BroadcastResult,
+    ChannelsResult,
+    DisconnectResult,
+    HistoryResult,
+    HistoryRemoveResult,
+    InfoResult,
+    PresenceResult,
+    PresenceStatsResult,
+    PublishResult,
+    RefreshResult,
+    SubscribeResult,
     UnsubscribeResult,
 )
 
@@ -57,7 +63,7 @@ class BroadcastRequest(CentRequest[BroadcastResult]):
     tags: Optional[Dict[str, str]] = None
     """Publication tags - map with arbitrary string keys and values which is attached to
     publication and will be delivered to clients."""
-    b64data: Optional[str] = Field(None, alias="b64_data")
+    b64data: Optional[str] = None
     """Custom binary data to publish into a channel encoded to base64 so it's possible
     to use HTTP API to send binary to clients. Centrifugo will decode it from base64 before
     publishing. In case of GRPC you can publish binary using data field."""
@@ -173,7 +179,7 @@ class PublishRequest(CentRequest[PublishResult]):
     tags: Optional[Dict[str, str]] = None
     """Publication tags - map with arbitrary string keys and values which is attached to
     publication and will be delivered to clients."""
-    b64data: Optional[str] = Field(None, alias="b64_data")
+    b64data: Optional[str] = None
     """Custom binary data to publish into a channel encoded to base64 so it's possible to use
     HTTP API to send binary to clients. Centrifugo will decode it from base64 before publishing.
     In case of GRPC you can publish binary using data field."""
@@ -215,7 +221,7 @@ class SubscribeRequest(CentRequest[SubscribeResult]):
     """Name of channel to subscribe user to."""
     info: Optional[Any] = None
     """Attach custom data to subscription (will be used in presence and join/leave messages)."""
-    b64info: Optional[str] = Field(None, alias="b64_info")
+    b64info: Optional[str] = None
     """info in base64 for binary mode (will be decoded by Centrifugo)."""
     client: Optional[str] = None
     """Specific client ID to subscribe (user still required to be set, will ignore other user
@@ -224,7 +230,7 @@ class SubscribeRequest(CentRequest[SubscribeResult]):
     """Specific client session to subscribe (user still required to be set)."""
     data: Optional[Any] = None
     """Custom subscription data (will be sent to client in Subscribe push)."""
-    b64data: Optional[str] = Field(None, alias="b64_data")
+    b64data: Optional[str] = None
     """Same as data but in base64 format (will be decoded by Centrifugo)."""
     recover_since: Optional[StreamPosition] = None
     """Stream position to recover from."""

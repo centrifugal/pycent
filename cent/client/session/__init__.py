@@ -1,13 +1,9 @@
-from .base import BaseSession
-from .base_async import BaseAsyncSession
-from .base_sync import BaseSyncSession
 from .aiohttp import AiohttpSession
 from .requests import RequestsSession
+from .grpc import GrpcSession
 
 __all__ = (
     "AiohttpSession",
-    "BaseAsyncSession",
-    "BaseSession",
-    "BaseSyncSession",
+    "GrpcSession",
     "RequestsSession",
 )

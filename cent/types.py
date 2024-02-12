@@ -11,8 +11,26 @@ from cent.proto.centrifugal.centrifugo.api import (
 )
 
 
+class Disconnect(NestedModel):
+    """Disconnect data.
+
+    Attributes:
+        code (int): Disconnect code.
+        reason (str): Disconnect reason.
+    """
+
+    __grpc_method__ = GrpcDisconnect
+
+    code: int
+    reason: str
+
+
 class BoolValue(NestedModel):
-    """Bool value."""
+    """Bool value.
+
+    Attributes:
+        value (bool): Value.
+    """
 
     __grpc_method__ = GrpcBoolValue
 
@@ -88,54 +106,54 @@ class ClientInfo(BaseResult):
 
 
 class Publication(BaseResult):
-    """Publication result."""
+    """Publication result.
+
+    Attributes:
+        offset (int): Offset of publication in history stream.
+        data (Any): Custom JSON inside publication.
+        tags (Optional[Dict[str, str]]): Tags are optional.
+    """
 
     data: Any
-    """Custom JSON inside publication."""
     offset: int = Field(default=0)
-    """Offset of publication in history stream."""
+    tags: Optional[Dict[str, str]] = None
 
 
 class Metrics(BaseResult):
-    """Metrics result."""
+    """Metrics result.
+
+    Attributes:
+        interval (float): Metrics aggregation interval.
+        items (Dict[str, float]): metric values.
+    """
 
     interval: float = Field(default=0.0)
-    """Interval."""
     items: Dict[str, float]
-    """Map where key is string and value is float."""
 
 
 class Node(BaseResult):
-    """Node result."""
+    """Node result.
+
+    Attributes:
+        uid (str): Node unique identifier.
+        name (str): Node name.
+        version (str): Node version.
+        num_clients (int): Total number of connections.
+        num_subs (int): Total number of subscriptions.
+        num_users (int): Total number of users.
+        num_channels (int): Total number of channels.
+        uptime (int): Node uptime.
+        metrics (Optional[Metrics]): Node metrics.
+        process (Optional[ProcessStats]): Node process stats.
+    """
 
     uid: str
-    """Node unique identifier."""
     name: str
-    """Node name."""
     version: str
-    """Node version."""
     num_clients: int = Field(default=0)
-    """Total number of connections."""
     num_subs: int = Field(default=0)
-    """Total number of subscriptions."""
     num_users: int = Field(default=0)
-    """Total number of users."""
     num_channels: int = Field(default=0)
-    """Total number of channels."""
     uptime: int = Field(default=0)
-    """Node uptime."""
     metrics: Optional[Metrics] = None
-    """Node metrics."""
     process: Optional[ProcessStats] = None
-    """Node process."""
-
-
-class Disconnect(NestedModel):
-    """Disconnect data."""
-
-    __grpc_method__ = GrpcDisconnect
-
-    code: int
-    """Disconnect code."""
-    reason: str
-    """Disconnect reason."""

@@ -86,4 +86,4 @@ async def async_client(
 ) -> AsyncGenerator[AsyncClient, None]:
     client = AsyncClient(BASE_URL, API_KEY)
     yield client
-    await client.session.close()
+    await client.close()

@@ -1,25 +1,24 @@
 import asyncio
-from typing import Optional, TYPE_CHECKING, cast, Any
+from typing import Optional, cast, Any
 
-from aiohttp import ClientSession, ClientError
+from aiohttp import ClientSession, ClientError, ClientTimeout
 
-from cent.client.session.base_async import BaseAsyncSession
-from cent.base import CentType
-from cent.requests import CentRequest, BatchRequest
-from cent.exceptions import CentNetworkError
-
-if TYPE_CHECKING:
-    from cent.client import AsyncClient
+from cent.client.session.base_http_async import BaseHttpAsyncSession
+from cent.base import CentType, CentRequest
+from cent.requests import BatchRequest
+from cent.exceptions import CentNetworkError, CentTimeoutError
 
 
-class AiohttpSession(BaseAsyncSession):
+class AiohttpSession(BaseHttpAsyncSession):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._session: Optional[ClientSession] = None
 
     async def _create_session(self) -> ClientSession:
         if self._session is None or self._session.closed:
-            self._session = ClientSession(headers=self._headers)
+            self._session = ClientSession(
+                headers=self._headers, timeout=ClientTimeout(total=self._timeout)
+            )
 
         return self._session
 
@@ -32,19 +31,19 @@ class AiohttpSession(BaseAsyncSession):
 
     async def make_request(
         self,
-        client: "AsyncClient",
-        method: CentRequest[CentType],
+        api_key: str,
+        request: CentRequest[CentType],
         timeout: Optional[float] = None,
     ) -> CentType:
         session = await self._create_session()
-        session.headers["X-API-Key"] = client.api_key
+        session.headers["X-API-Key"] = api_key
 
-        if isinstance(method, BatchRequest):
-            json_data = self.get_batch_json_data(method)
+        if isinstance(request, BatchRequest):
+            json_data = self.get_batch_json_data(request)
         else:
-            json_data = method.model_dump(exclude_none=True)
+            json_data = request.model_dump(exclude_none=True)
 
-        url = f"{self._base_url}/{method.__api_method__}"
+        url = f"{self._base_url}/{request.__api_method__}"
 
         try:
             async with session.post(
@@ -54,18 +53,17 @@ class AiohttpSession(BaseAsyncSession):
             ) as resp:
                 raw_result = await resp.text()
         except asyncio.TimeoutError as error:
-            raise CentNetworkError(
-                method=method,
+            raise CentTimeoutError(
+                request=request,
                 message="Request timeout",
             ) from error
         except ClientError as error:
             raise CentNetworkError(
-                method=method,
+                request=request,
                 message=f"{type(error).__name__}: {error}",
             ) from error
         response = self.check_response(
-            client=client,
-            method=method,
+            request=request,
             status_code=resp.status,
             content=raw_result,
         )

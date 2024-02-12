@@ -16,18 +16,10 @@ jobs:
       with:
         python-version: '3.12'
 
-    - name: check GITHUB_REF matches package version
-      uses: samuelcolvin/check-python-version@v4.1
-      with:
-        version_file_path: centrifuge/__meta__.py
+    - name: Install poetry
+      run: pip install poetry
 
-    - name: Install build dependencies
-      run: pip install build
+    - run: poetry config pypi-token.pypi "${{ secrets.PYPI_PASSWORD }}"
 
-    - name: Build distribution
-      run: python -m build
-
-    - name: Publish package to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        password: ${{ secrets.PYPI_PASSWORD }}
+    - name: Publish package
+      run: poetry publish --build

@@ -1,21 +1,28 @@
-
+import uuid
 import pytest
 
-from cent import (Client, CentAPIError, PublishRequest, BroadcastRequest, PresenceRequest,
-                  StreamPosition, Disconnect)
+from cent import (
+    Client,
+    CentAPIError,
+    PublishRequest,
+    BroadcastRequest,
+    PresenceRequest,
+    StreamPosition,
+    Disconnect,
+)
 
 from tests.conftest import UNKNOWN_CHANNEL_ERROR_CODE
 
 
 def test_publish(sync_client: Client) -> None:
-    sync_client.publish(
+    result = sync_client.publish(
         "personal_1",
         {"data": "data"},
         skip_history=False,
         tags={"tag": "tag"},
-        # b64data=b64encode(b"data").decode(),
         idempotency_key="idempotency_key",
     )
+    assert result.offset
 
 
 def test_broadcast(sync_client: Client) -> None:
@@ -24,7 +31,6 @@ def test_broadcast(sync_client: Client) -> None:
         {"data": "data"},
         skip_history=False,
         tags={"tag": "tag"},
-        # b64data=b64encode(b"data").decode(),
         idempotency_key="idempotency_key",
     )
 
@@ -34,7 +40,6 @@ def test_subscribe(sync_client: Client) -> None:
         "user",
         "personal_1",
         info={"info": "info"},
-        # b64info=b64encode(b"info").decode(),
         client="client",
         session="session",
         data={"data": "data"},
@@ -63,11 +68,23 @@ def test_presence_stats(sync_client: Client) -> None:
 
 
 def test_history(sync_client: Client) -> None:
-    sync_client.history(
-        channel="personal_1",
-        limit=1,
-        reverse=True,
+    num_pubs = 10
+    channel = "personal_" + uuid.uuid4().hex
+    for i in range(num_pubs):
+        sync_client.publish(
+            channel,
+            {"data": f"data {i}"},
+        )
+
+    result = sync_client.history(
+        channel=channel,
+        limit=num_pubs,
+        reverse=False,
     )
+    assert isinstance(result.offset, int)
+    assert result.offset > 0
+    assert len(result.publications) == num_pubs
+    assert result.publications[0].data == {"data": "data 0"}
 
 
 def test_history_remove(sync_client: Client) -> None:

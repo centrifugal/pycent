@@ -1,19 +1,15 @@
-from typing import Optional, TYPE_CHECKING, cast, Any
+from typing import Optional, cast, Any
 
 import requests
 from requests import Session
 
-from cent.requests import CentRequest
-from cent.base import CentType
-from cent.client.session.base_sync import BaseSyncSession
-from cent.exceptions import CentNetworkError
+from cent.base import CentType, CentRequest
+from cent.client.session.base_http_sync import BaseHttpSyncSession
+from cent.exceptions import CentNetworkError, CentTimeoutError
 from cent.requests import BatchRequest
 
-if TYPE_CHECKING:
-    from cent.client.sync_client import Client
 
-
-class RequestsSession(BaseSyncSession):
+class RequestsSession(BaseHttpSyncSession):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._session = Session()
@@ -25,17 +21,17 @@ class RequestsSession(BaseSyncSession):
 
     def make_request(
         self,
-        client: "Client",
-        method: CentRequest[CentType],
+        api_key: str,
+        request: CentRequest[CentType],
         timeout: Optional[float] = None,
     ) -> CentType:
-        self._session.headers["X-API-Key"] = client.api_key
-        if isinstance(method, BatchRequest):
-            json_data = self.get_batch_json_data(method)
+        self._session.headers["X-API-Key"] = api_key
+        if isinstance(request, BatchRequest):
+            json_data = self.get_batch_json_data(request)
         else:
-            json_data = method.model_dump(exclude_none=True)
+            json_data = request.model_dump(exclude_none=True)
 
-        url = f"{self._base_url}/{method.__api_method__}"
+        url = f"{self._base_url}/{request.__api_method__}"
 
         try:
             raw_result = self._session.post(
@@ -44,18 +40,17 @@ class RequestsSession(BaseSyncSession):
                 timeout=timeout or self._timeout,
             )
         except requests.exceptions.Timeout as error:
-            raise CentNetworkError(
-                method=method,
+            raise CentTimeoutError(
+                request=request,
                 message="Request timeout",
             ) from error
         except requests.exceptions.ConnectionError as error:
             raise CentNetworkError(
-                method=method,
+                request=request,
                 message=f"{type(error).__name__}: {error}",
             ) from error
         response = self.check_response(
-            client=client,
-            method=method,
+            request=request,
             status_code=raw_result.status_code,
             content=raw_result.text,
         )

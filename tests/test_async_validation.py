@@ -1,21 +1,28 @@
+import uuid
 import pytest
 
 from cent import (
-    AsyncClient, CentAPIError, PublishRequest, StreamPosition, Disconnect,
-    BroadcastRequest, PresenceRequest)
+    AsyncClient,
+    CentAPIError,
+    PublishRequest,
+    StreamPosition,
+    Disconnect,
+    BroadcastRequest,
+    PresenceRequest,
+)
 
 from tests.conftest import UNKNOWN_CHANNEL_ERROR_CODE
 
 
 async def test_publish(async_client: AsyncClient) -> None:
-    await async_client.publish(
+    result = await async_client.publish(
         "personal_1",
         {"data": "data"},
         skip_history=False,
         tags={"tag": "tag"},
-        # b64data=b64encode(b"data").decode(),
         idempotency_key="idempotency_key",
     )
+    assert result.offset
 
 
 async def test_broadcast(async_client: AsyncClient) -> None:
@@ -24,7 +31,6 @@ async def test_broadcast(async_client: AsyncClient) -> None:
         {"data": "data"},
         skip_history=False,
         tags={"tag": "tag"},
-        # b64data=b64encode(b"data").decode(),
         idempotency_key="idempotency_key",
     )
 
@@ -34,7 +40,6 @@ async def test_subscribe(async_client: AsyncClient) -> None:
         "user",
         "personal_1",
         info={"info": "info"},
-        # b64info=b64encode(b"info").decode(),
         client="client",
         session="session",
         data={"data": "data"},
@@ -63,11 +68,22 @@ async def test_presence_stats(async_client: AsyncClient) -> None:
 
 
 async def test_history(async_client: AsyncClient) -> None:
-    await async_client.history(
-        channel="personal_1",
-        limit=1,
+    num_pubs = 10
+    channel = "personal_" + uuid.uuid4().hex
+    for i in range(num_pubs):
+        await async_client.publish(
+            channel,
+            {"data": f"data {i}"},
+        )
+    result = await async_client.history(
+        channel=channel,
+        limit=num_pubs,
         reverse=True,
     )
+    assert isinstance(result.offset, int)
+    assert result.offset > 0
+    assert len(result.publications) == num_pubs
+    assert result.publications[0].data == {"data": "data 9"}
 
 
 async def test_history_remove(async_client: AsyncClient) -> None:

@@ -26,5 +26,3 @@ repos:
         name: Validate types with MyPy
         language: system
         types: [ python ]
-        args:
-          - "cent"
