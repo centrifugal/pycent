@@ -1,5 +1,7 @@
 from typing import List, Optional, Any, Dict, TypeVar
 
+from aiohttp import ClientSession
+
 from cent.client.session import AiohttpSession
 from cent.base import CentRequest
 from cent.requests import (
@@ -48,17 +50,19 @@ class AsyncClient:
         api_url: str,
         api_key: str,
         request_timeout: Optional[float] = 10.0,
+        session: Optional[ClientSession] = None,
     ) -> None:
         """
         :param api_url: Centrifugo API URL
         :param api_key: Centrifugo API key
-        :param request_timeout: base timeout for all requests.
+        :param request_timeout: Base timeout for all requests
+        :param session: Custom `aiohttp` session
         """
-        self._base_url = api_url
         self._api_key = api_key
         self._session = AiohttpSession(
-            base_url=api_url,
+            api_url,
             timeout=request_timeout,
+            session=session,
         )
 
     async def publish(

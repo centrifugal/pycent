@@ -1,7 +1,4 @@
-CENT
-====
-
-Python tools to communicate with Centrifugo v5 HTTP API. Python >= 3.9 supported.
+Python SDK to communicate with Centrifugo v5 HTTP API. Python >= 3.9 supported.
 
 To install run:
 
@@ -18,29 +15,29 @@ pip install cent
 
 ## Usage
 
-First see [available API methods in documentation](https://centrifugal.dev/docs/server/server_api#api-methods).
+See the description of Centrifugo [server API](https://centrifugal.dev/docs/server/server_api) in documentation.
 
-This library contains `Client`, `AsyncClient` and `GrpcClient` classes to work with Centrifugo HTTP API.
+This library contains `Client`, `AsyncClient` and `GrpcClient` classes to work with Centrifugo HTTP and GRPC server API.
 
 ```python
 import asyncio
-from cent import AsyncClient, Client
+from cent import Client, AsyncClient
 
-url = "http://localhost:8000/api"
-api_key = "XXX"
+api_url = "http://localhost:8000/api"
+api_key = "<CENTRIFUGO_API_KEY>"
 
 # Initialize a client (you can use sync or async version)
-sync_client = Client(url, api_key=api_key)
-async_client = AsyncClient(url, api_key=api_key)
+sync_client = Client(api_url, api_key)
+async_client = AsyncClient(api_url, api_key)
 
 # Now you can use sync client to call API methods.
-result = sync_client.publish("example:channel", {"input": "Hello world!"})
+result = sync_client.publish("channel", {"input": "Hello world!"})
 print(result)
 
 
 async def main():
     # And async client to call API methods too.
-    result = await async_client.publish("example:channel", {"input": "Hello world!"})
+    result = await async_client.publish("channel", {"input": "Hello world!"})
     print(result)
 
 
@@ -48,19 +45,35 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-### Handling errors
+For GRPC the usage is slightly different:
 
-This library may raise exceptions if sth goes wrong. All exceptions are subclasses of `cent.CentError`.
+```python
+import asyncio
+import json
+from cent import GrpcClient
 
-* CentError - base class for all exceptions
-* CentNetworkError - raised in case of network related errors (connection refused)
-* CentTransportError - raised in case of transport related errors (HTTP status code is not 2xx)
-* CentTimeoutError - raised in case of timeout
-* CentUnauthorizedError - raised in case of unauthorized access
-* CentDecodeError - raised in case of server response decoding error
-* CentAPIError - raised in case of API error (error returned by Centrifugo itself)
+host = "localhost"
+port = 10000
 
-### HTTP client init arguments
+grpc_client = GrpcClient(host, port)
+
+async def main():
+    result = await grpc_client.publish(
+        "example:channel", json.dumps({"input": "Hello world!"}).encode())
+    print(result)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+Note that in GRPC case you must pass payload as `bytes`, see below more details about payloads in HTTP vs GRPC cases.
+
+## Sync HTTP client init arguments
+
+```python
+from cent import Client
+```
 
 Required:
 
@@ -70,8 +83,29 @@ Required:
 Optional:
 
 * `request_timeout` (float) - base timeout for all requests in seconds, default is 10 seconds.
+* `session` (requests.Session) - custom `requests` session to use.
 
-### GRPC client init arguments
+## Async HTTP client init arguments
+
+```python
+from cent import AsyncClient
+```
+
+Required:
+
+* `api_url` (str) - Centrifugo HTTP API URL address
+* `api_key` (str) - Centrifugo HTTP API key
+
+Optional:
+
+* `request_timeout` (float) - base timeout for all requests in seconds, default is 10 seconds.
+* `session` (aiohttp.ClientSession) - custom `aiohttp` session to use.
+
+## GRPC client init arguments
+
+```python
+from cent import GrpcClient
+```
 
 Required:
 
@@ -82,7 +116,7 @@ Optional:
 
 * `request_timeout` (float) - base timeout for all requests in seconds, default is 10 seconds.
 
-## HTTP vs GRPC for payloads
+## Payloads in HTTP vs GRPC cases
 
 When using HTTP-based clients (`Client` and `AsyncClient`):
 
@@ -94,17 +128,42 @@ When using GRPC-based client (`GrpcClient`):
 * you must pass payloads as `bytes`
 * in results, you will receive `bytes` for payloads
 
+## Handling errors
+
+This library raises exceptions if sth goes wrong. All exceptions are subclasses of `cent.CentError`.
+
+* `CentError` - base class for all exceptions
+* `CentNetworkError` - raised in case of network related errors (connection refused)
+* `CentTransportError` - raised in case of transport related errors (HTTP status code is not 2xx)
+* `CentTimeoutError` - raised in case of timeout
+* `CentUnauthorizedError` - raised in case of unauthorized access
+* `CentDecodeError` - raised in case of server response decoding error
+* `CentAPIError` - raised in case of API error (error returned by Centrifugo itself)
+
 ## For contributors
 
 ### Tests and benchmarks
 
-To start tests, you can use pytest with any additional options, for example:
+Prerequisites – start Centrifugo server locally:
+
+```bash
+CENTRIFUGO_API_KEY=api_key CENTRIFUGO_HISTORY_TTL=300s CENTRIFUGO_HISTORY_SIZE=100 \
+CENTRIFUGO_PRESENCE=true CENTRIFUGO_GRPC_API=true ./centrifugo
+```
+
+And install dependencies:
+
+```bash
+make dev
+```
+
+To start tests, run:
 
 ```bash
 make test
 ```
 
-To start benchmarks, you can use pytest too, for example:
+To start benchmarks, run:
 
 ```bash
 make bench

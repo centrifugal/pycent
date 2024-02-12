@@ -1,5 +1,5 @@
 import asyncio
-from typing import Optional, cast, Any
+from typing import Optional, cast
 
 from aiohttp import ClientSession, ClientError, ClientTimeout
 
@@ -10,17 +10,26 @@ from cent.exceptions import CentNetworkError, CentTimeoutError
 
 
 class AiohttpSession(BaseHttpAsyncSession):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        self._session: Optional[ClientSession] = None
-
-    async def _create_session(self) -> ClientSession:
-        if self._session is None or self._session.closed:
+    def __init__(
+        self,
+        base_url: str,
+        timeout: Optional[float] = 10.0,
+        session: Optional[ClientSession] = None,
+    ) -> None:
+        super().__init__()
+        self._base_url = base_url
+        self._timeout = timeout
+        self._session: ClientSession
+        if session:
+            self._session = session
+        else:
             self._session = ClientSession(
-                headers=self._headers, timeout=ClientTimeout(total=self._timeout)
+                headers={
+                    "User-Agent": "centrifugal/pycent",
+                    "Content-Type": "application/json",
+                },
+                timeout=ClientTimeout(total=self._timeout),
             )
-
-        return self._session
 
     async def close(self) -> None:
         if self._session is not None and not self._session.closed:
@@ -35,7 +44,7 @@ class AiohttpSession(BaseHttpAsyncSession):
         request: CentRequest[CentType],
         timeout: Optional[float] = None,
     ) -> CentType:
-        session = await self._create_session()
+        session = self._session
         session.headers["X-API-Key"] = api_key
 
         if isinstance(request, BatchRequest):

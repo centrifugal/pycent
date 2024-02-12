@@ -1,5 +1,7 @@
 from typing import List, Optional, Any, Dict, TypeVar
 
+from requests import Session
+
 from cent.client.session import RequestsSession
 from cent.base import CentRequest
 from cent.requests import (
@@ -48,18 +50,21 @@ class Client:
         api_url: str,
         api_key: str,
         request_timeout: Optional[float] = 10.0,
+        session: Optional[Session] = None,
     ) -> None:
         """
         :param api_url: Centrifugo API URL
         :param api_key: Centrifugo API key
         :param request_timeout: Base timeout for all requests.
+        :param session: Custom `requests` session.
         """
 
         self._api_url = api_url
         self._api_key = api_key
         self._session = RequestsSession(
-            base_url=api_url,
+            api_url,
             timeout=request_timeout,
+            session=session,
         )
 
     def publish(

@@ -19,19 +19,7 @@ from cent.requests import BatchRequest
 
 
 class BaseHttpSession:
-    """Base class for all sessions."""
-
-    def __init__(
-        self,
-        base_url: str,
-        timeout: float = 10.0,
-    ) -> None:
-        self._base_url = base_url
-        self._timeout = timeout
-        self._headers = {
-            "User-Agent": "centrifugal/pycent",
-            "Content-Type": "application/json",
-        }
+    """Base class for all HTTP sessions."""
 
     @staticmethod
     def get_batch_json_data(request: BatchRequest) -> Dict[str, List[Dict[str, Any]]]:

@@ -47,7 +47,14 @@ class GrpcClient:
         port: int,
         request_timeout: Optional[float] = 10.0,
     ) -> None:
-        self._session = GrpcSession(host=host, port=port, timeout=request_timeout)
+        """
+        Initialize GRPC client.
+
+        :param host: Centrifugo host.
+        :param port: Centrifugo port.
+        :param request_timeout: Request timeout.
+        """
+        self._session = GrpcSession(host, port, timeout=request_timeout)
 
     async def publish(
         self,

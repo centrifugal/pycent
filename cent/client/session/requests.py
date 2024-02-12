@@ -1,4 +1,4 @@
-from typing import Optional, cast, Any
+from typing import Optional, cast
 
 import requests
 from requests import Session
@@ -10,10 +10,25 @@ from cent.requests import BatchRequest
 
 
 class RequestsSession(BaseHttpSyncSession):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        self._session = Session()
-        self._session.headers.update(self._headers)
+    def __init__(
+        self,
+        base_url: str,
+        timeout: Optional[float] = 10.0,
+        session: Optional[Session] = None,
+    ) -> None:
+        super().__init__()
+        self._base_url = base_url
+        self._timeout = timeout
+        self._headers = {
+            "User-Agent": "centrifugal/pycent",
+            "Content-Type": "application/json",
+        }
+        self._session: Session
+        if session:
+            self._session = session
+        else:
+            self._session = Session()
+            self._session.headers.update(self._headers)
 
     def close(self) -> None:
         if self._session is not None:
