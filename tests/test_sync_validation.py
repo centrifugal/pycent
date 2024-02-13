@@ -125,7 +125,7 @@ def test_refresh(sync_client: Client) -> None:
 
 
 def test_batch(sync_client: Client) -> None:
-    sync_client.batch(
+    result = sync_client.batch(
         commands=[
             PublishRequest(
                 channel="personal_1",
@@ -144,6 +144,14 @@ def test_batch(sync_client: Client) -> None:
             ),
         ]
     )
+
+    num_expected_replies = 4
+    assert len(result.replies) == num_expected_replies
+    assert result.replies[0].offset
+    assert result.replies[1].offset
+    assert result.replies[2].responses[0].result.offset
+    assert result.replies[2].responses[1].result.offset
+    assert result.replies[3].presence == {}
 
 
 def test_error_publish(sync_client: Client) -> None:

@@ -253,9 +253,10 @@ class Client:
     def batch(
         self,
         commands: List[CentRequest[Any]],
+        parallel: Optional[bool] = False,
         request_timeout: Optional[float] = None,
     ) -> BatchResult:
-        call = BatchRequest.model_construct(commands=commands)
+        call = BatchRequest.model_construct(commands=commands, parallel=parallel)
         return self(call, request_timeout=request_timeout)
 
     def close(self) -> None:

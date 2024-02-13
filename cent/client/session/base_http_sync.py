@@ -1,4 +1,4 @@
-from abc import abstractmethod, ABC
+from abc import ABC, abstractmethod
 from typing import Optional
 
 from cent.client.session.base_http import BaseHttpSession
@@ -6,8 +6,6 @@ from cent.base import CentType, CentRequest
 
 
 class BaseHttpSyncSession(BaseHttpSession, ABC):
-    """Base class for all sessions."""
-
     @abstractmethod
     def close(self) -> None:
         """

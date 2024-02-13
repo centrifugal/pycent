@@ -1,12 +1,7 @@
-import contextlib
-import asyncio as _asyncio
-
 from .client import (
     Client,
     AsyncClient,
-    GrpcClient,
 )
-from cent.base import CentRequest
 from cent.requests import (
     BroadcastRequest,
     PublishRequest,
@@ -56,11 +51,6 @@ from cent.exceptions import (
     CentAPIError,
 )
 
-with contextlib.suppress(ImportError):
-    import uvloop as _uvloop
-
-    _asyncio.set_event_loop_policy(_uvloop.EventLoopPolicy())
-
 __all__ = (
     "AsyncClient",
     "BatchRequest",
@@ -72,7 +62,6 @@ __all__ = (
     "CentDecodeError",
     "CentError",
     "CentNetworkError",
-    "CentRequest",
     "CentTransportError",
     "CentUnauthorizedError",
     "ChannelOptionsOverride",
@@ -83,7 +72,6 @@ __all__ = (
     "Disconnect",
     "DisconnectRequest",
     "DisconnectResult",
-    "GrpcClient",
     "HistoryRemoveRequest",
     "HistoryRemoveResult",
     "HistoryRequest",

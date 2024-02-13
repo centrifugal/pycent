@@ -1,6 +1,6 @@
 import json
 from http import HTTPStatus
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
 
 from pydantic import ValidationError, TypeAdapter
 
@@ -19,7 +19,7 @@ from cent.requests import BatchRequest
 
 
 class BaseHttpSession:
-    """Base class for all HTTP sessions."""
+    """Base class for HTTP sessions."""
 
     @staticmethod
     def get_batch_json_data(request: BatchRequest) -> Dict[str, List[Dict[str, Any]]]:
@@ -49,7 +49,7 @@ class BaseHttpSession:
         request: CentRequest[CentType],
         status_code: int,
         content: str,
-    ) -> Response[CentType]:
+    ) -> CentType:
         if status_code == HTTPStatus.UNAUTHORIZED:
             raise CentUnauthorizedError
 
@@ -82,4 +82,4 @@ class BaseHttpSession:
                 message=response.error.message,
             )
 
-        return response
+        return cast(CentType, response.result)

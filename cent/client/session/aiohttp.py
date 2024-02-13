@@ -1,5 +1,5 @@
 import asyncio
-from typing import Optional, cast
+from typing import Optional
 
 from aiohttp import ClientSession, ClientError, ClientTimeout
 
@@ -72,12 +72,11 @@ class AiohttpSession(BaseHttpAsyncSession):
                 request=request,
                 message=f"{type(error).__name__}: {error}",
             ) from error
-        response = self.check_response(
+        return self.check_response(
             request=request,
             status_code=resp.status,
             content=raw_result,
         )
-        return cast(CentType, response.result)
 
     def __del__(self) -> None:
         if self._session and not self._session.closed:

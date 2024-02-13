@@ -1,21 +1,5 @@
 from typing import Any, Optional, Dict, List
 
-from cent.proto.centrifugal.centrifugo.api import (
-    ChannelsRequest as GrpcChannelsRequest,
-    PublishRequest as GrpcPublishRequest,
-    PresenceStatsRequest as GrpcPresenceStatsRequest,
-    InfoRequest as GrpcInfoRequest,
-    BroadcastRequest as GrpcBroadcastRequest,
-    BatchRequest as GrpcBatchRequest,
-    RefreshRequest as GrpcRefreshRequest,
-    UnsubscribeRequest as GrpcUnsubscribeRequest,
-    SubscribeRequest as GrpcSubscribeRequest,
-    HistoryRequest as GrpcHistoryRequest,
-    HistoryRemoveRequest as GrpcHistoryRemoveRequest,
-    PresenceRequest as GrpcPresenceRequest,
-    DisconnectRequest as GrpcDisconnectRequest,
-)
-
 from cent.base import CentRequest
 from cent.types import StreamPosition, ChannelOptionsOverride, Disconnect
 
@@ -45,10 +29,9 @@ class BatchRequest(CentRequest[BatchResult]):
 
     __returning__ = BatchResult
     __api_method__ = "batch"
-    __grpc_method__ = GrpcBatchRequest
 
     commands: List[CentRequest[Any]]
-    """List of commands to execute in batch."""
+    parallel: Optional[bool] = None
 
 
 class BroadcastRequest(CentRequest[BroadcastResult]):
@@ -70,7 +53,6 @@ class BroadcastRequest(CentRequest[BroadcastResult]):
 
     __returning__ = BroadcastResult
     __api_method__ = "broadcast"
-    __grpc_method__ = GrpcBroadcastRequest
 
     channels: List[str]
     data: Any
@@ -90,7 +72,6 @@ class ChannelsRequest(CentRequest[ChannelsResult]):
 
     __returning__ = ChannelsResult
     __api_method__ = "channels"
-    __grpc_method__ = GrpcChannelsRequest
 
     pattern: Optional[str] = None
 
@@ -108,7 +89,6 @@ class DisconnectRequest(CentRequest[DisconnectResult]):
 
     __returning__ = DisconnectResult
     __api_method__ = "disconnect"
-    __grpc_method__ = GrpcDisconnectRequest
 
     user: str
     client: Optional[str] = None
@@ -130,7 +110,6 @@ class HistoryRequest(CentRequest[HistoryResult]):
 
     __returning__ = HistoryResult
     __api_method__ = "history"
-    __grpc_method__ = GrpcHistoryRequest
 
     channel: str
     limit: Optional[int] = None
@@ -147,7 +126,6 @@ class HistoryRemoveRequest(CentRequest[HistoryRemoveResult]):
 
     __returning__ = HistoryRemoveResult
     __api_method__ = "history_remove"
-    __grpc_method__ = GrpcHistoryRemoveRequest
 
     channel: str
 
@@ -157,7 +135,6 @@ class InfoRequest(CentRequest[InfoResult]):
 
     __returning__ = InfoResult
     __api_method__ = "info"
-    __grpc_method__ = GrpcInfoRequest
 
 
 class PresenceRequest(CentRequest[PresenceResult]):
@@ -169,20 +146,21 @@ class PresenceRequest(CentRequest[PresenceResult]):
 
     __returning__ = PresenceResult
     __api_method__ = "presence"
-    __grpc_method__ = GrpcPresenceRequest
 
     channel: str
 
 
 class PresenceStatsRequest(CentRequest[PresenceStatsResult]):
-    """Presence request."""
+    """Presence request.
+
+    Attributes:
+        channel: Name of channel to call presence from.
+    """
 
     __returning__ = PresenceStatsResult
     __api_method__ = "presence_stats"
-    __grpc_method__ = GrpcPresenceStatsRequest
 
     channel: str
-    """Name of channel to call presence from."""
 
 
 class PublishRequest(CentRequest[PublishResult]):
@@ -204,7 +182,6 @@ class PublishRequest(CentRequest[PublishResult]):
 
     __returning__ = PublishResult
     __api_method__ = "publish"
-    __grpc_method__ = GrpcPublishRequest
 
     channel: str
     data: Any
@@ -227,7 +204,6 @@ class RefreshRequest(CentRequest[RefreshResult]):
 
     __returning__ = RefreshResult
     __api_method__ = "refresh"
-    __grpc_method__ = GrpcRefreshRequest
 
     user: str
     client: Optional[str] = None
@@ -257,7 +233,6 @@ class SubscribeRequest(CentRequest[SubscribeResult]):
 
     __returning__ = SubscribeResult
     __api_method__ = "subscribe"
-    __grpc_method__ = GrpcSubscribeRequest
 
     user: str
     channel: str
@@ -283,7 +258,6 @@ class UnsubscribeRequest(CentRequest[UnsubscribeResult]):
 
     __returning__ = UnsubscribeResult
     __api_method__ = "unsubscribe"
-    __grpc_method__ = GrpcUnsubscribeRequest
 
     user: str
     channel: str

@@ -7,7 +7,7 @@ from typing import (
 
 import pytest
 
-from cent import Client, AsyncClient, GrpcClient
+from cent import Client, AsyncClient
 
 BASE_URL = "http://localhost:8000/api"
 API_KEY = "api_key"
@@ -22,15 +22,6 @@ def anyio_backend() -> Tuple[str, Dict[str, bool]]:
 @pytest.fixture()
 def sync_client() -> Client:
     return Client(BASE_URL, API_KEY)
-
-
-@pytest.fixture()
-async def grpc_client(
-    anyio_backend: Any,  # noqa: ARG001
-) -> AsyncGenerator[GrpcClient, None]:
-    client = GrpcClient("localhost", 10000)
-    yield client
-    client._session.close()
 
 
 @pytest.fixture()

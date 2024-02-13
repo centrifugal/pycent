@@ -2,13 +2,7 @@ from typing import Optional, Any, Dict
 
 from pydantic import Field
 
-from cent.base import BaseResult, NestedModel
-from cent.proto.centrifugal.centrifugo.api import (
-    SubscribeOptionOverride as GrpcChannelOptionOverride,
-    BoolValue as GrpcBoolValue,
-    StreamPosition as GrpcStreamPosition,
-    Disconnect as GrpcDisconnect,
-)
+from cent.base import CentResult, NestedModel
 
 
 class Disconnect(NestedModel):
@@ -18,8 +12,6 @@ class Disconnect(NestedModel):
         code (int): Disconnect code.
         reason (str): Disconnect reason.
     """
-
-    __grpc_method__ = GrpcDisconnect
 
     code: int
     reason: str
@@ -32,8 +24,6 @@ class BoolValue(NestedModel):
         value (bool): Value.
     """
 
-    __grpc_method__ = GrpcBoolValue
-
     value: bool
 
 
@@ -45,8 +35,6 @@ class StreamPosition(NestedModel):
         offset (int): Offset of publication in history stream.
         epoch (str): Epoch of current stream.
     """
-
-    __grpc_method__ = GrpcStreamPosition
 
     offset: int
     epoch: str
@@ -64,8 +52,6 @@ class ChannelOptionsOverride(NestedModel):
         force_recovery (Optional[BoolValue]): Override for force recovery.
     """
 
-    __grpc_method__ = GrpcChannelOptionOverride
-
     presence: Optional[BoolValue] = None
     join_leave: Optional[BoolValue] = None
     force_push_join_leave: Optional[BoolValue] = None
@@ -73,7 +59,7 @@ class ChannelOptionsOverride(NestedModel):
     force_recovery: Optional[BoolValue] = None
 
 
-class ProcessStats(BaseResult):
+class ProcessStats(CentResult):
     """
     Represents statistics of a process.
 
@@ -86,7 +72,7 @@ class ProcessStats(BaseResult):
     rss: int
 
 
-class ClientInfo(BaseResult):
+class ClientInfo(CentResult):
     """
     Represents the result containing client information.
 
@@ -105,7 +91,7 @@ class ClientInfo(BaseResult):
     chan_info: Optional[Any] = None
 
 
-class Publication(BaseResult):
+class Publication(CentResult):
     """Publication result.
 
     Attributes:
@@ -119,7 +105,7 @@ class Publication(BaseResult):
     tags: Optional[Dict[str, str]] = None
 
 
-class Metrics(BaseResult):
+class Metrics(CentResult):
     """Metrics result.
 
     Attributes:
@@ -131,7 +117,7 @@ class Metrics(BaseResult):
     items: Dict[str, float]
 
 
-class Node(BaseResult):
+class Node(CentResult):
     """Node result.
 
     Attributes:

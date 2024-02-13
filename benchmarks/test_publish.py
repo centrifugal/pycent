@@ -1,5 +1,4 @@
 import random
-import pytest
 
 from benchmarks.conftest import BenchmarkDecoratorType
 from cent import AsyncClient, Client
@@ -30,8 +29,7 @@ def test_sync(
         sync_requests(sync_client)
 
 
-@pytest.mark.anyio()
-async def test_async(aio_benchmark: BenchmarkDecoratorType, async_client: AsyncClient) -> None:
+def test_async(aio_benchmark: BenchmarkDecoratorType, async_client: AsyncClient) -> None:
     @aio_benchmark
     async def _() -> None:
         await async_requests(async_client)

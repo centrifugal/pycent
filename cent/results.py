@@ -2,97 +2,125 @@ from typing import List, Any, Optional, Dict
 
 from pydantic import Field
 
-from cent.base import BaseResult
+from cent.base import CentResult
 from cent.base import Response
 from cent.types import Publication, Node, ClientInfo
 
 
-class BatchResult(BaseResult):
-    """Batch response."""
+class BatchResult(CentResult):
+    """Batch response.
+
+    Attributes:
+        replies: List of results from batch request.
+    """
 
     replies: List[Any]
-    """List of results from batch request."""
 
 
-class PublishResult(BaseResult):
-    """Publish result."""
+class PublishResult(CentResult):
+    """Publish result.
+
+    Attributes:
+        offset: Offset of publication in history stream.
+        epoch: Epoch of current stream.
+    """
 
     offset: Optional[int] = None
-    """Offset of publication in history stream."""
     epoch: Optional[str] = None
-    """Epoch of current stream."""
 
 
-class BroadcastResult(BaseResult):
-    """Publish result."""
+class BroadcastResult(CentResult):
+    """Broadcast result.
+
+    Attributes:
+        responses: List of responses for each individual publish
+        (with possible error and publish result)
+    """
 
     responses: List[Response[PublishResult]] = Field(default_factory=list)
-    """Responses for each individual publish (with possible error and publish result)."""
 
 
-class ChannelInfoResult(BaseResult):
-    """Channel info result."""
+class ChannelInfoResult(CentResult):
+    """Channel info result.
+
+    Attributes:
+        num_clients: Total number of connections currently subscribed to a channel.
+    """
 
     num_clients: int = Field(default=0)
-    """Total number of connections currently subscribed to a channel."""
 
 
-class ChannelsResult(BaseResult):
-    """Channels result."""
+class ChannelsResult(CentResult):
+    """Channels result.
+
+    Attributes:
+        channels: Map where key is channel and value is ChannelInfoResult.
+    """
 
     channels: Dict[str, ChannelInfoResult]
-    """Map where key is channel and value is ChannelInfoResult."""
 
 
-class DisconnectResult(BaseResult):
+class DisconnectResult(CentResult):
     """Disconnect result."""
 
 
-class HistoryRemoveResult(BaseResult):
+class HistoryRemoveResult(CentResult):
     """History remove result."""
 
 
-class HistoryResult(BaseResult):
-    """History result."""
+class HistoryResult(CentResult):
+    """History result.
+
+    Attributes:
+        publications: List of publications in channel.
+        offset: Top offset in history stream.
+        epoch: Epoch of current stream.
+    """
 
     publications: List[Publication] = Field(default_factory=list)
-    """List of publications in channel."""
     offset: Optional[int] = None
-    """Top offset in history stream."""
     epoch: Optional[str] = None
-    """Epoch of current stream."""
 
 
-class InfoResult(BaseResult):
-    """Info result."""
+class InfoResult(CentResult):
+    """Info result.
+
+    Attributes:
+        nodes: Information about all nodes in a cluster.
+    """
 
     nodes: List[Node]
-    """Information about all nodes in a cluster."""
 
 
-class PresenceResult(BaseResult):
-    """Presence result."""
+class PresenceResult(CentResult):
+    """Presence result.
+
+    Attributes:
+        presence: Map where key is client ID and value is ClientInfo.
+    """
 
     presence: Dict[str, ClientInfo]
-    """Offset of publication in history stream."""
 
 
-class PresenceStatsResult(BaseResult):
-    """Presence stats result."""
+class PresenceStatsResult(CentResult):
+    """Presence stats result.
+
+    Attributes:
+        num_clients: Total number of clients in channel.
+        num_users: Total number of unique users in channel.
+    """
 
     num_clients: int = Field(default=0)
-    """Total number of clients in channel."""
     num_users: int = Field(default=0)
-    """Total number of unique users in channel."""
 
 
-class RefreshResult(BaseResult):
+class RefreshResult(CentResult):
     """Refresh result."""
 
 
-class SubscribeResult(BaseResult):
+class SubscribeResult(CentResult):
     """Subscribe result."""
 
 
-class UnsubscribeResult(BaseResult):
+class UnsubscribeResult(CentResult):
     """Unsubscribe result."""

@@ -124,7 +124,7 @@ async def test_refresh(async_client: AsyncClient) -> None:
 
 
 async def test_batch(async_client: AsyncClient) -> None:
-    await async_client.batch(
+    result = await async_client.batch(
         commands=[
             PublishRequest(
                 channel="personal_1",
@@ -143,6 +143,14 @@ async def test_batch(async_client: AsyncClient) -> None:
             ),
         ]
     )
+
+    num_expected_replies = 4
+    assert len(result.replies) == num_expected_replies
+    assert result.replies[0].offset
+    assert result.replies[1].offset
+    assert result.replies[2].responses[0].result.offset
+    assert result.replies[2].responses[1].result.offset
+    assert result.replies[3].presence == {}
 
 
 async def test_error_publish(async_client: AsyncClient) -> None:

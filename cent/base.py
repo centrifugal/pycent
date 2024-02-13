@@ -4,18 +4,6 @@ from typing import TypeVar, Any, Generic, TYPE_CHECKING, ClassVar, Optional
 from pydantic import BaseModel, ConfigDict
 
 
-class BaseResult(BaseModel, ABC):
-    model_config = ConfigDict(
-        use_enum_values=True,
-        extra="allow",
-        validate_assignment=True,
-        frozen=True,
-        populate_by_name=True,
-        arbitrary_types_allowed=True,
-        defer_build=True,
-    )
-
-
 CentType = TypeVar("CentType", bound=Any)
 
 
@@ -29,6 +17,18 @@ class Response(BaseModel, Generic[CentType]):
     result: Optional[CentType] = None
 
 
+class CentResult(BaseModel, ABC):
+    model_config = ConfigDict(
+        use_enum_values=True,
+        extra="allow",
+        validate_assignment=True,
+        frozen=True,
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        defer_build=True,
+    )
+
+
 class CentRequest(BaseModel, Generic[CentType], ABC):
     model_config = ConfigDict(
         extra="allow",
@@ -39,7 +39,6 @@ class CentRequest(BaseModel, Generic[CentType], ABC):
     if TYPE_CHECKING:
         __returning__: ClassVar[type]
         __api_method__: ClassVar[str]
-        __grpc_method__: ClassVar[type]
     else:
 
         @property
@@ -52,11 +51,6 @@ class CentRequest(BaseModel, Generic[CentType], ABC):
         def __api_method__(self) -> str:
             pass
 
-        @property
-        @abstractmethod
-        def __grpc_method__(self) -> type:
-            pass
-
 
 class NestedModel(BaseModel, ABC):
     model_config = ConfigDict(
@@ -64,11 +58,3 @@ class NestedModel(BaseModel, ABC):
         populate_by_name=True,
         arbitrary_types_allowed=True,
     )
-    if TYPE_CHECKING:
-        __grpc_method__: ClassVar[type]
-    else:
-
-        @property
-        @abstractmethod
-        def __grpc_method__(self) -> type:
-            pass

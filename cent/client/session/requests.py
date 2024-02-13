@@ -1,12 +1,12 @@
-from typing import Optional, cast
+from typing import Optional
 
 import requests
 from requests import Session
 
-from cent.base import CentType, CentRequest
 from cent.client.session.base_http_sync import BaseHttpSyncSession
-from cent.exceptions import CentNetworkError, CentTimeoutError
+from cent.base import CentType, CentRequest
 from cent.requests import BatchRequest
+from cent.exceptions import CentNetworkError, CentTimeoutError
 
 
 class RequestsSession(BaseHttpSyncSession):
@@ -19,16 +19,15 @@ class RequestsSession(BaseHttpSyncSession):
         super().__init__()
         self._base_url = base_url
         self._timeout = timeout
-        self._headers = {
-            "User-Agent": "centrifugal/pycent",
-            "Content-Type": "application/json",
-        }
         self._session: Session
         if session:
             self._session = session
         else:
             self._session = Session()
-            self._session.headers.update(self._headers)
+            self._session.headers.update({
+                "User-Agent": "centrifugal/pycent",
+                "Content-Type": "application/json",
+            })
 
     def close(self) -> None:
         if self._session is not None:
@@ -65,12 +64,11 @@ class RequestsSession(BaseHttpSyncSession):
                 request=request,
                 message=f"{type(error).__name__}: {error}",
             ) from error
-        response = self.check_response(
+        return self.check_response(
             request=request,
             status_code=raw_result.status_code,
             content=raw_result.text,
         )
-        return cast(CentType, response.result)
 
     def __del__(self) -> None:
         self.close()

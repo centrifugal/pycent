@@ -1,28 +1,17 @@
 import asyncio
-import threading
-import contextlib
+import pytest_asyncio
 from typing import (
-    Any,
     AsyncGenerator,
-    Tuple,
-    Dict,
     Callable,
     Awaitable,
     Optional,
-    cast,
-    TYPE_CHECKING,
 )
 
 import pytest
-from pytest_benchmark.fixture import BenchmarkFixture
 
 from cent import Client, AsyncClient
 
-if TYPE_CHECKING:
-    from asyncio import AbstractEventLoop
-    from threading import Thread
-
-BASE_URL = "http://localhost:8000/api"
+API_URL = "http://localhost:8000/api"
 API_KEY = "api_key"
 
 BenchmarkCoroType = Callable[[], Awaitable[None]]
@@ -30,60 +19,31 @@ BenchmarkType = Callable[[], Optional[Awaitable[None]]]
 BenchmarkDecoratorType = Callable[[BenchmarkType], None]
 
 
-@pytest.fixture(scope="session")
-def anyio_backend() -> Tuple[str, Dict[str, bool]]:
-    return "asyncio", {"use_uvloop": True}
-
-
-@pytest.fixture()
-def aio_benchmark(benchmark: BenchmarkFixture) -> BenchmarkDecoratorType:
-    class Sync2Async:
-        def __init__(self, coro: BenchmarkCoroType) -> None:
-            self.coro = coro
-            self.custom_loop: Optional["AbstractEventLoop"] = None
-            self.thread: Optional["Thread"] = None
-
-        def start_background_loop(self) -> None:
-            if self.custom_loop:
-                asyncio.set_event_loop(self.custom_loop)
-                self.custom_loop.run_forever()
-
-        def __call__(self) -> Any:
-            awaitable = self.coro()
-            with contextlib.suppress(RuntimeError):
-                evloop = asyncio.get_running_loop()
-            if evloop is None:
-                return asyncio.run(awaitable)
-            else:
-                if not self.custom_loop or not self.thread or not self.thread.is_alive():
-                    self.custom_loop = asyncio.new_event_loop()
-                    self.thread = threading.Thread(
-                        target=self.start_background_loop,
-                        daemon=True,
-                    )
-                    self.thread.start()
-
-                return asyncio.run_coroutine_threadsafe(awaitable, self.custom_loop).result()
-
-    def _wrapper(func: BenchmarkType) -> None:
-        if asyncio.iscoroutinefunction(func):
-            func = cast(BenchmarkCoroType, func)
-            benchmark(Sync2Async(func))
-        else:
-            benchmark(func)
-
-    return _wrapper
-
-
 @pytest.fixture()
 def sync_client() -> Client:
-    return Client(BASE_URL, API_KEY)
+    return Client(API_URL, API_KEY)
 
 
-@pytest.fixture()
+@pytest_asyncio.fixture()
 async def async_client(
-    anyio_backend: Any,  # noqa: ARG001
+    # anyio_backend: Any,
 ) -> AsyncGenerator[AsyncClient, None]:
-    client = AsyncClient(BASE_URL, API_KEY)
+    client = AsyncClient(API_URL, API_KEY)
     yield client
     await client.close()
+
+
+# async support for pytest-benchmark
+# https://github.com/ionelmc/pytest-benchmark/issues/66
+@pytest_asyncio.fixture
+def aio_benchmark(benchmark, event_loop):  # type: ignore
+    def _wrapper(func, *args, **kwargs):  # type: ignore
+        if asyncio.iscoroutinefunction(func):
+
+            @benchmark
+            def _():  # type: ignore
+                return event_loop.run_until_complete(func(*args, **kwargs))
+        else:
+            benchmark(func, *args, **kwargs)
+
+    return _wrapper
