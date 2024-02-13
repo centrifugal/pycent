@@ -1,23 +1,321 @@
-from typing import Any, Optional, Dict, List
+from abc import ABC, abstractmethod
+from typing import TypeVar, Any, Generic, TYPE_CHECKING, ClassVar, Optional, List, Dict
+from pydantic import BaseModel, ConfigDict, Field
 
-from cent.base import CentRequest
-from cent.types import StreamPosition, ChannelOptionsOverride, Disconnect
 
-from cent.results import (
-    BatchResult,
-    BroadcastResult,
-    ChannelsResult,
-    DisconnectResult,
-    HistoryResult,
-    HistoryRemoveResult,
-    InfoResult,
-    PresenceResult,
-    PresenceStatsResult,
-    PublishResult,
-    RefreshResult,
-    SubscribeResult,
-    UnsubscribeResult,
-)
+class Error(BaseModel):
+    code: int
+    message: str
+
+
+CentType = TypeVar("CentType", bound=Any)
+
+
+class Response(BaseModel, Generic[CentType]):
+    error: Optional[Error] = None
+    result: Optional[CentType] = None
+
+
+class CentRequest(BaseModel, Generic[CentType], ABC):
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+    )
+
+    if TYPE_CHECKING:
+        __returning__: ClassVar[type]
+        __api_method__: ClassVar[str]
+    else:
+
+        @property
+        @abstractmethod
+        def __returning__(self) -> type:
+            pass
+
+        @property
+        @abstractmethod
+        def __api_method__(self) -> str:
+            pass
+
+
+class CentResult(BaseModel, ABC):
+    model_config = ConfigDict(
+        use_enum_values=True,
+        extra="allow",
+        validate_assignment=True,
+        frozen=True,
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        defer_build=True,
+    )
+
+
+class NestedModel(BaseModel, ABC):
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+    )
+
+
+class Disconnect(NestedModel):
+    """Disconnect data.
+
+    Attributes:
+        code (int): Disconnect code.
+        reason (str): Disconnect reason.
+    """
+
+    code: int
+    reason: str
+
+
+class BoolValue(NestedModel):
+    """Bool value.
+
+    Attributes:
+        value (bool): Value.
+    """
+
+    value: bool
+
+
+class StreamPosition(NestedModel):
+    """
+    Stream position representation.
+
+    Attributes:
+        offset (int): Offset of publication in history stream.
+        epoch (str): Epoch of current stream.
+    """
+
+    offset: int
+    epoch: str
+
+
+class ChannelOptionsOverride(NestedModel):
+    """
+    Override object for channel options.
+
+    Attributes:
+        presence (Optional[BoolValue]): Override for presence.
+        join_leave (Optional[BoolValue]): Override for join_leave behavior.
+        force_push_join_leave (Optional[BoolValue]): Force push for join_leave events.
+        force_positioning (Optional[BoolValue]): Override for force positioning.
+        force_recovery (Optional[BoolValue]): Override for force recovery.
+    """
+
+    presence: Optional[BoolValue] = None
+    join_leave: Optional[BoolValue] = None
+    force_push_join_leave: Optional[BoolValue] = None
+    force_positioning: Optional[BoolValue] = None
+    force_recovery: Optional[BoolValue] = None
+
+
+class ProcessStats(CentResult):
+    """
+    Represents statistics of a process.
+
+    Attributes:
+        cpu (float): Process CPU usage as a percentage. Defaults to 0.0.
+        rss (int): Process Resident Set Size (RSS) in bytes.
+    """
+
+    cpu: float = Field(default=0.0)
+    rss: int
+
+
+class ClientInfo(CentResult):
+    """
+    Represents the result containing client information.
+
+    Attributes:
+        client (str): Client ID.
+        user (str): User ID.
+        conn_info (Optional[Any]): Optional connection info. This can include details
+            such as IP address, location, etc.
+        chan_info (Optional[Any]): Optional channel info. This might include specific
+            settings or preferences related to the channel.
+    """
+
+    client: str
+    user: str
+    conn_info: Optional[Any] = None
+    chan_info: Optional[Any] = None
+
+
+class Publication(CentResult):
+    """Publication result.
+
+    Attributes:
+        offset (int): Offset of publication in history stream.
+        data (Any): Custom JSON inside publication.
+        tags (Optional[Dict[str, str]]): Tags are optional.
+    """
+
+    data: Any
+    offset: int = Field(default=0)
+    tags: Optional[Dict[str, str]] = None
+
+
+class Metrics(CentResult):
+    """Metrics result.
+
+    Attributes:
+        interval (float): Metrics aggregation interval.
+        items (Dict[str, float]): metric values.
+    """
+
+    interval: float = Field(default=0.0)
+    items: Dict[str, float]
+
+
+class Node(CentResult):
+    """Node result.
+
+    Attributes:
+        uid (str): Node unique identifier.
+        name (str): Node name.
+        version (str): Node version.
+        num_clients (int): Total number of connections.
+        num_subs (int): Total number of subscriptions.
+        num_users (int): Total number of users.
+        num_channels (int): Total number of channels.
+        uptime (int): Node uptime.
+        metrics (Optional[Metrics]): Node metrics.
+        process (Optional[ProcessStats]): Node process stats.
+    """
+
+    uid: str
+    name: str
+    version: str
+    num_clients: int = Field(default=0)
+    num_subs: int = Field(default=0)
+    num_users: int = Field(default=0)
+    num_channels: int = Field(default=0)
+    uptime: int = Field(default=0)
+    metrics: Optional[Metrics] = None
+    process: Optional[ProcessStats] = None
+
+
+class BatchResult(CentResult):
+    """Batch response.
+
+    Attributes:
+        replies: List of results from batch request.
+    """
+
+    replies: List[Any]
+
+
+class PublishResult(CentResult):
+    """Publish result.
+
+    Attributes:
+        offset: Offset of publication in history stream.
+        epoch: Epoch of current stream.
+    """
+
+    offset: Optional[int] = None
+    epoch: Optional[str] = None
+
+
+class BroadcastResult(CentResult):
+    """Broadcast result.
+
+    Attributes:
+        responses: List of responses for each individual publish
+        (with possible error and publish result)
+    """
+
+    responses: List[Response[PublishResult]] = Field(default_factory=list)
+
+
+class ChannelInfoResult(CentResult):
+    """Channel info result.
+
+    Attributes:
+        num_clients: Total number of connections currently subscribed to a channel.
+    """
+
+    num_clients: int = Field(default=0)
+
+
+class ChannelsResult(CentResult):
+    """Channels result.
+
+    Attributes:
+        channels: Map where key is channel and value is ChannelInfoResult.
+    """
+
+    channels: Dict[str, ChannelInfoResult]
+
+
+class DisconnectResult(CentResult):
+    """Disconnect result."""
+
+
+class HistoryRemoveResult(CentResult):
+    """History remove result."""
+
+
+class HistoryResult(CentResult):
+    """History result.
+
+    Attributes:
+        publications: List of publications in channel.
+        offset: Top offset in history stream.
+        epoch: Epoch of current stream.
+    """
+
+    publications: List[Publication] = Field(default_factory=list)
+    offset: Optional[int] = None
+    epoch: Optional[str] = None
+
+
+class InfoResult(CentResult):
+    """Info result.
+
+    Attributes:
+        nodes: Information about all nodes in a cluster.
+    """
+
+    nodes: List[Node]
+
+
+class PresenceResult(CentResult):
+    """Presence result.
+
+    Attributes:
+        presence: Map where key is client ID and value is ClientInfo.
+    """
+
+    presence: Dict[str, ClientInfo]
+
+
+class PresenceStatsResult(CentResult):
+    """Presence stats result.
+
+    Attributes:
+        num_clients: Total number of clients in channel.
+        num_users: Total number of unique users in channel.
+    """
+
+    num_clients: int = Field(default=0)
+    num_users: int = Field(default=0)
+
+
+class RefreshResult(CentResult):
+    """Refresh result."""
+
+
+class SubscribeResult(CentResult):
+    """Subscribe result."""
+
+
+class UnsubscribeResult(CentResult):
+    """Unsubscribe result."""
 
 
 class BatchRequest(CentRequest[BatchResult]):

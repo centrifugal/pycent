@@ -27,13 +27,13 @@ from cent import Client
 
 Required init arguments:
 
-* `api_url` (str) - Centrifugo HTTP API URL address
-* `api_key` (str) - Centrifugo HTTP API key
+* `api_url` (`str`) - Centrifugo HTTP API URL address, for example, `http://localhost:8000/api`
+* `api_key` (`str`) - Centrifugo HTTP API key
 
 Optional arguments:
 
-* `request_timeout` (float) - base timeout for all requests in seconds, default is 10 seconds.
-* `session` (requests.Session) - custom `requests` session to use.
+* `timeout` (`float`) - base timeout for all requests in seconds, default is 10 seconds.
+* `session` (`requests.Session`) - custom `requests` session to use.
 
 Example:
 
@@ -56,13 +56,13 @@ from cent import AsyncClient
 
 Required init arguments:
 
-* `api_url` (str) - Centrifugo HTTP API URL address
-* `api_key` (str) - Centrifugo HTTP API key
+* `api_url` (`str`) - Centrifugo HTTP API URL address, for example, `http://localhost:8000
+* `api_key` (`str`) - Centrifugo HTTP API key
 
 Optional arguments:
 
-* `request_timeout` (float) - base timeout for all requests in seconds, default is 10 seconds.
-* `session` (aiohttp.ClientSession) - custom `aiohttp` session to use.
+* `timeout` (`float`) - base timeout for all requests in seconds, default is 10 seconds.
+* `session` (`aiohttp.ClientSession`) - custom `aiohttp` session to use.
 
 Example:
 
@@ -91,9 +91,9 @@ This library raises exceptions if sth goes wrong. All exceptions are subclasses 
 * `CentNetworkError` - raised in case of network related errors (connection refused)
 * `CentTransportError` - raised in case of transport related errors (HTTP status code is not 2xx)
 * `CentTimeoutError` - raised in case of timeout
-* `CentUnauthorizedError` - raised in case of unauthorized access
+* `CentUnauthorizedError` - raised in case of unauthorized access (signal of invalid API key)
 * `CentDecodeError` - raised in case of server response decoding error
-* `CentAPIError` - raised in case of API error (error returned by Centrifugo itself, you can inspect code and message in this case)
+* `CentResponseError` - raised in case of API response error (i.e. error returned by Centrifugo itself, you can inspect code and message returned by Centrifugo in this case)
 
 ## For contributors
 
@@ -123,3 +123,11 @@ To run benchmarks, run:
 ```bash
 make bench
 ```
+
+## Migrate to Cent v5
+
+Cent v5 contains the following notable changes compared to Cent v4:
+
+* Constructor slightly changed, refer to the examples above.
+* Base exception class is now `CentError` instead of `CentException`, exceptions SDK raises were refactored.
+* To send multiple commands in one HTTP request SDK provides `batch` method.

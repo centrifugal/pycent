@@ -4,8 +4,7 @@ import requests
 from requests import Session
 
 from cent.client.session.base_http_sync import BaseHttpSyncSession
-from cent.base import CentType, CentRequest
-from cent.requests import BatchRequest
+from cent.dto import CentType, CentRequest, BatchRequest
 from cent.exceptions import CentNetworkError, CentTimeoutError
 
 
@@ -24,10 +23,6 @@ class RequestsSession(BaseHttpSyncSession):
             self._session = session
         else:
             self._session = Session()
-            self._session.headers.update({
-                "User-Agent": "centrifugal/pycent",
-                "Content-Type": "application/json",
-            })
 
     def close(self) -> None:
         if self._session is not None:

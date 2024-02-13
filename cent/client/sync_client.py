@@ -3,8 +3,8 @@ from typing import List, Optional, Any, Dict, TypeVar
 from requests import Session
 
 from cent.client.session import RequestsSession
-from cent.base import CentRequest
-from cent.requests import (
+from cent.dto import (
+    CentRequest,
     BroadcastRequest,
     PublishRequest,
     SubscribeRequest,
@@ -18,8 +18,6 @@ from cent.requests import (
     DisconnectRequest,
     InfoRequest,
     BatchRequest,
-)
-from cent.results import (
     BatchResult,
     PublishResult,
     BroadcastResult,
@@ -33,8 +31,6 @@ from cent.results import (
     ChannelsResult,
     DisconnectResult,
     InfoResult,
-)
-from cent.types import (
     StreamPosition,
     ChannelOptionsOverride,
     Disconnect,
@@ -49,13 +45,13 @@ class Client:
         self,
         api_url: str,
         api_key: str,
-        request_timeout: Optional[float] = 10.0,
+        timeout: Optional[float] = 10.0,
         session: Optional[Session] = None,
     ) -> None:
         """
         :param api_url: Centrifugo API URL
         :param api_key: Centrifugo API key
-        :param request_timeout: Base timeout for all requests.
+        :param timeout: Base timeout for all requests.
         :param session: Custom `requests` session.
         """
 
@@ -63,7 +59,7 @@ class Client:
         self._api_key = api_key
         self._session = RequestsSession(
             api_url,
-            timeout=request_timeout,
+            timeout=timeout,
             session=session,
         )
 
@@ -75,7 +71,7 @@ class Client:
         tags: Optional[Dict[str, str]] = None,
         b64data: Optional[str] = None,
         idempotency_key: Optional[str] = None,
-        request_timeout: Optional[float] = None,
+        timeout: Optional[float] = None,
     ) -> PublishResult:
         call = PublishRequest(
             channel=channel,
@@ -85,7 +81,7 @@ class Client:
             b64data=b64data,
             idempotency_key=idempotency_key,
         )
-        return self(call, request_timeout=request_timeout)
+        return self(call, timeout=timeout)
 
     def broadcast(
         self,
@@ -95,7 +91,7 @@ class Client:
         tags: Optional[Dict[str, str]] = None,
         b64data: Optional[str] = None,
         idempotency_key: Optional[str] = None,
-        request_timeout: Optional[float] = None,
+        timeout: Optional[float] = None,
     ) -> BroadcastResult:
         call = BroadcastRequest(
             channels=channels,
@@ -105,7 +101,7 @@ class Client:
             b64data=b64data,
             idempotency_key=idempotency_key,
         )
-        return self(call, request_timeout=request_timeout)
+        return self(call, timeout=timeout)
 
     def subscribe(
         self,
@@ -119,7 +115,7 @@ class Client:
         b64data: Optional[str] = None,
         recover_since: Optional[StreamPosition] = None,
         override: Optional[ChannelOptionsOverride] = None,
-        request_timeout: Optional[float] = None,
+        timeout: Optional[float] = None,
     ) -> SubscribeResult:
         call = SubscribeRequest(
             user=user,
@@ -133,7 +129,7 @@ class Client:
             recover_since=recover_since,
             override=override,
         )
-        return self(call, request_timeout=request_timeout)
+        return self(call, timeout=timeout)
 
     def unsubscribe(
         self,
@@ -141,7 +137,7 @@ class Client:
         channel: str,
         client: Optional[str] = None,
         session: Optional[str] = None,
-        request_timeout: Optional[float] = None,
+        timeout: Optional[float] = None,
     ) -> UnsubscribeResult:
         call = UnsubscribeRequest(
             user=user,
@@ -149,27 +145,27 @@ class Client:
             client=client,
             session=session,
         )
-        return self(call, request_timeout=request_timeout)
+        return self(call, timeout=timeout)
 
     def presence(
         self,
         channel: str,
-        request_timeout: Optional[float] = None,
+        timeout: Optional[float] = None,
     ) -> PresenceResult:
         call = PresenceRequest(
             channel=channel,
         )
-        return self(call, request_timeout=request_timeout)
+        return self(call, timeout=timeout)
 
     def presence_stats(
         self,
         channel: str,
-        request_timeout: Optional[float] = None,
+        timeout: Optional[float] = None,
     ) -> PresenceStatsResult:
         call = PresenceStatsRequest(
             channel=channel,
         )
-        return self(call, request_timeout=request_timeout)
+        return self(call, timeout=timeout)
 
     def history(
         self,
@@ -177,7 +173,7 @@ class Client:
         limit: Optional[int] = None,
         since: Optional[StreamPosition] = None,
         reverse: Optional[bool] = None,
-        request_timeout: Optional[float] = None,
+        timeout: Optional[float] = None,
     ) -> HistoryResult:
         call = HistoryRequest(
             channel=channel,
@@ -185,17 +181,17 @@ class Client:
             since=since,
             reverse=reverse,
         )
-        return self(call, request_timeout=request_timeout)
+        return self(call, timeout=timeout)
 
     def history_remove(
         self,
         channel: str,
-        request_timeout: Optional[float] = None,
+        timeout: Optional[float] = None,
     ) -> HistoryRemoveResult:
         call = HistoryRemoveRequest(
             channel=channel,
         )
-        return self(call, request_timeout=request_timeout)
+        return self(call, timeout=timeout)
 
     def refresh(
         self,
@@ -204,7 +200,7 @@ class Client:
         session: Optional[str] = None,
         expired: Optional[bool] = None,
         expire_at: Optional[int] = None,
-        request_timeout: Optional[float] = None,
+        timeout: Optional[float] = None,
     ) -> RefreshResult:
         call = RefreshRequest(
             user=user,
@@ -213,17 +209,17 @@ class Client:
             expired=expired,
             expire_at=expire_at,
         )
-        return self(call, request_timeout=request_timeout)
+        return self(call, timeout=timeout)
 
     def channels(
         self,
         pattern: Optional[str] = None,
-        request_timeout: Optional[float] = None,
+        timeout: Optional[float] = None,
     ) -> ChannelsResult:
         call = ChannelsRequest(
             pattern=pattern,
         )
-        return self(call, request_timeout=request_timeout)
+        return self(call, timeout=timeout)
 
     def disconnect(
         self,
@@ -232,7 +228,7 @@ class Client:
         session: Optional[str] = None,
         whitelist: Optional[List[str]] = None,
         disconnect: Optional[Disconnect] = None,
-        request_timeout: Optional[float] = None,
+        timeout: Optional[float] = None,
     ) -> DisconnectResult:
         call = DisconnectRequest(
             user=user,
@@ -241,35 +237,35 @@ class Client:
             whitelist=whitelist,
             disconnect=disconnect,
         )
-        return self(call, request_timeout=request_timeout)
+        return self(call, timeout=timeout)
 
     def info(
         self,
-        request_timeout: Optional[float] = None,
+        timeout: Optional[float] = None,
     ) -> InfoResult:
         call = InfoRequest()
-        return self(call, request_timeout=request_timeout)
+        return self(call, timeout=timeout)
 
     def batch(
         self,
         commands: List[CentRequest[Any]],
         parallel: Optional[bool] = False,
-        request_timeout: Optional[float] = None,
+        timeout: Optional[float] = None,
     ) -> BatchResult:
         call = BatchRequest.model_construct(commands=commands, parallel=parallel)
-        return self(call, request_timeout=request_timeout)
+        return self(call, timeout=timeout)
 
     def close(self) -> None:
         self._session.close()
 
-    def __call__(self, request: CentRequest[T], request_timeout: Optional[float] = None) -> T:
+    def __call__(self, request: CentRequest[T], timeout: Optional[float] = None) -> T:
         """
         Call API method
 
         :param request: Centrifugo request
         :return: Centrifugo response
         """
-        return self._session(self._api_key, request, timeout=request_timeout)
+        return self._session(self._api_key, request, timeout=timeout)
 
     def __enter__(self) -> "Client":
         return self

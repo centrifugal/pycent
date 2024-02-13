@@ -6,16 +6,16 @@ from pydantic import ValidationError, TypeAdapter
 
 from cent.exceptions import (
     CentDecodeError,
-    CentAPIError,
+    CentResponseError,
     CentUnauthorizedError,
     CentTransportError,
 )
-from cent.base import (
+from cent.dto import (
     CentRequest,
     CentType,
     Response,
+    BatchRequest,
 )
-from cent.requests import BatchRequest
 
 
 class BaseHttpSession:
@@ -76,7 +76,7 @@ class BaseHttpSession:
             raise CentDecodeError from err
 
         if response.error:
-            raise CentAPIError(
+            raise CentResponseError(
                 request=request,
                 code=response.error.code,
                 message=response.error.message,

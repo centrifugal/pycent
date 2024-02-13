@@ -2,7 +2,7 @@ from .client import (
     Client,
     AsyncClient,
 )
-from cent.requests import (
+from cent.dto import (
     BroadcastRequest,
     PublishRequest,
     SubscribeRequest,
@@ -16,8 +16,6 @@ from cent.requests import (
     DisconnectRequest,
     InfoRequest,
     BatchRequest,
-)
-from cent.results import (
     PublishResult,
     BroadcastResult,
     SubscribeResult,
@@ -31,8 +29,6 @@ from cent.results import (
     DisconnectResult,
     InfoResult,
     BatchResult,
-)
-from cent.types import (
     StreamPosition,
     ChannelOptionsOverride,
     Disconnect,
@@ -48,7 +44,7 @@ from cent.exceptions import (
     CentTransportError,
     CentUnauthorizedError,
     CentDecodeError,
-    CentAPIError,
+    CentResponseError,
 )
 
 __all__ = (
@@ -58,10 +54,10 @@ __all__ = (
     "BoolValue",
     "BroadcastRequest",
     "BroadcastResult",
-    "CentAPIError",
     "CentDecodeError",
     "CentError",
     "CentNetworkError",
+    "CentResponseError",
     "CentTransportError",
     "CentUnauthorizedError",
     "ChannelOptionsOverride",

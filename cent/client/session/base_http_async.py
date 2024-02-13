@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 from cent.client.session.base_http import BaseHttpSession
-from cent.base import CentType, CentRequest
+from cent.dto import CentType, CentRequest
 
 
 class BaseHttpAsyncSession(BaseHttpSession, ABC):

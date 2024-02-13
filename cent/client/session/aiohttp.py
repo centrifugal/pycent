@@ -1,11 +1,10 @@
 import asyncio
 from typing import Optional
 
-from aiohttp import ClientSession, ClientError, ClientTimeout
+from aiohttp import ClientSession, ClientError
 
 from cent.client.session.base_http_async import BaseHttpAsyncSession
-from cent.base import CentType, CentRequest
-from cent.requests import BatchRequest
+from cent.dto import CentType, CentRequest, BatchRequest
 from cent.exceptions import CentNetworkError, CentTimeoutError
 
 
@@ -23,13 +22,7 @@ class AiohttpSession(BaseHttpAsyncSession):
         if session:
             self._session = session
         else:
-            self._session = ClientSession(
-                headers={
-                    "User-Agent": "centrifugal/pycent",
-                    "Content-Type": "application/json",
-                },
-                timeout=ClientTimeout(total=self._timeout),
-            )
+            self._session = ClientSession()
 
     async def close(self) -> None:
         if self._session is not None and not self._session.closed:

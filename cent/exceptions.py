@@ -1,4 +1,4 @@
-from cent.base import CentType, CentRequest
+from cent.dto import CentType, CentRequest
 
 
 class CentError(Exception):
@@ -8,7 +8,7 @@ class CentError(Exception):
 
 
 class CentNetworkError(CentError):
-    """CentNetworkError raised when Centrifugo is not available."""
+    """CentNetworkError raised when Centrifugo is unreachable or not available."""
 
     def __init__(self, request: CentRequest[CentType], message: str) -> None:
         self.request = request
@@ -22,7 +22,7 @@ class CentNetworkError(CentError):
 
 
 class CentTransportError(CentError):
-    """CentTransportError raised when returns non-200 status code."""
+    """CentTransportError raised when HTTP request results into non-200 status code."""
 
     def __init__(self, request: CentRequest[CentType], status_code: int):
         self.request = request
@@ -61,7 +61,7 @@ class CentDecodeError(CentError):
     """
 
 
-class CentAPIError(CentError):
+class CentResponseError(CentError):
     """
     CentAPIError raised when response from Centrifugo contains any error
     as a result of API command execution.
@@ -73,7 +73,7 @@ class CentAPIError(CentError):
         self.message = message
 
     def __str__(self) -> str:
-        return f"API error #{self.code}: {self.message}"
+        return f"Server API response error #{self.code}: {self.message}"
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}('{self}')"
