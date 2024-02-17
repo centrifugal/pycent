@@ -93,7 +93,7 @@ This library raises exceptions if sth goes wrong. All exceptions are subclasses 
 * `CentTimeoutError` - raised in case of timeout
 * `CentUnauthorizedError` - raised in case of unauthorized access (signal of invalid API key)
 * `CentDecodeError` - raised in case of server response decoding error
-* `CentResponseError` - raised in case of API response error (i.e. error returned by Centrifugo itself, you can inspect code and message returned by Centrifugo in this case)
+* `CentApiResponseError` - raised in case of API response error (i.e. error returned by Centrifugo itself, you can inspect code and message returned by Centrifugo in this case)
 
 ## For contributors
 
