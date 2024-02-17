@@ -61,10 +61,10 @@ class CentDecodeError(CentError):
     """
 
 
-class CentResponseError(CentError):
+class CentApiResponseError(CentError):
     """
-    CentAPIError raised when response from Centrifugo contains any error
-    as a result of API command execution.
+    CentApiResponseError raised when the response from Centrifugo server API contains
+    any error as a result of API command execution.
     """
 
     def __init__(self, request: CentRequest[CentType], code: int, message: str) -> None:

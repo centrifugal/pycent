@@ -3,7 +3,7 @@ import pytest
 
 from cent import (
     AsyncClient,
-    CentResponseError,
+    CentApiResponseError,
     PublishRequest,
     StreamPosition,
     Disconnect,
@@ -154,7 +154,7 @@ async def test_batch(async_client: AsyncClient) -> None:
 
 
 async def test_error_publish(async_client: AsyncClient) -> None:
-    with pytest.raises(CentResponseError, match="unknown channel") as exc_info:
+    with pytest.raises(CentApiResponseError, match="unknown channel") as exc_info:
         await async_client.publish(
             "undefined_channel:123",
             {"data": "data"},

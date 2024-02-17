@@ -44,7 +44,7 @@ from cent.exceptions import (
     CentTransportError,
     CentUnauthorizedError,
     CentDecodeError,
-    CentResponseError,
+    CentApiResponseError,
 )
 
 __all__ = (
@@ -54,10 +54,10 @@ __all__ = (
     "BoolValue",
     "BroadcastRequest",
     "BroadcastResult",
+    "CentApiResponseError",
     "CentDecodeError",
     "CentError",
     "CentNetworkError",
-    "CentResponseError",
     "CentTransportError",
     "CentUnauthorizedError",
     "ChannelOptionsOverride",
