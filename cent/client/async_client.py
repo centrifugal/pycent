@@ -40,7 +40,7 @@ class AsyncClient:
             payload,
             timeout=timeout,
         )
-        response = request.get_result(content)
+        response = request.parse_response(content)
         return cast(CentResultType, response.result)
 
     async def close(self) -> None:

@@ -40,7 +40,7 @@ class Client:
             request.to_json(),
             timeout=timeout,
         )
-        response = request.get_result(content)
+        response = request.parse_response(content)
         return cast(CentResultType, response.result)
 
     def close(self) -> None:

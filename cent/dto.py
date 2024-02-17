@@ -6,11 +6,6 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 from cent.exceptions import CentDecodeError, CentApiResponseError
 
 
-class Error(BaseModel):
-    code: int
-    message: str
-
-
 class CentResult(BaseModel, ABC):
     model_config = ConfigDict(
         use_enum_values=True,
@@ -24,6 +19,11 @@ class CentResult(BaseModel, ABC):
 
 
 CentResultType = TypeVar("CentResultType", bound=CentResult)
+
+
+class Error(BaseModel):
+    code: int
+    message: str
 
 
 class Response(BaseModel, Generic[CentResultType]):
@@ -59,7 +59,7 @@ class CentRequest(BaseModel, Generic[CentResultType], ABC):
     def get_method(self) -> str:
         return self.__api_method__
 
-    def get_result(
+    def parse_response(
         self,
         content: str,
     ) -> Response[CentResult]:
