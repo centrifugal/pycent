@@ -15,7 +15,7 @@ pip install cent
 
 ## Usage
 
-See the description of Centrifugo [server API](https://centrifugal.dev/docs/server/server_api) in the documentation.
+First of all, see the description of Centrifugo [server API](https://centrifugal.dev/docs/server/server_api) in the documentation.
 
 This library contains `Client` and `AsyncClient` to work with Centrifugo HTTP server API. Both clients have the same methods to work with Centrifugo API and raise the same top-level exceptions.
 
@@ -28,7 +28,7 @@ from cent import Client
 Required init arguments:
 
 * `api_url` (`str`) - Centrifugo HTTP API URL address, for example, `http://localhost:8000/api`
-* `api_key` (`str`) - Centrifugo HTTP API key
+* `api_key` (`str`) - Centrifugo HTTP API key for auth
 
 Optional arguments:
 
@@ -56,8 +56,8 @@ from cent import AsyncClient
 
 Required init arguments:
 
-* `api_url` (`str`) - Centrifugo HTTP API URL address, for example, `http://localhost:8000
-* `api_key` (`str`) - Centrifugo HTTP API key
+* `api_url` (`str`) - Centrifugo HTTP API URL address, for example, `http://localhost:8000`
+* `api_key` (`str`) - Centrifugo HTTP API key for auth
 
 Optional arguments:
 
