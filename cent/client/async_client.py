@@ -5,7 +5,6 @@ from aiohttp import ClientSession
 from cent.client.session import AiohttpSession
 from cent.dto import CentRequest
 
-
 T = TypeVar("T")
 
 

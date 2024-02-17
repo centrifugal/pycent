@@ -5,7 +5,6 @@ from requests import Session
 from cent.client.session import RequestsSession
 from cent.dto import CentRequest
 
-
 T = TypeVar("T")
 
 

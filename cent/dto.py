@@ -328,7 +328,7 @@ class BatchRequest(CentRequest[BatchResult]):
     __returning__ = BatchResult
     __api_method__ = "batch"
 
-    commands: List[CentRequest[Any]]
+    commands: List[Any]
     parallel: Optional[bool] = None
 
 
