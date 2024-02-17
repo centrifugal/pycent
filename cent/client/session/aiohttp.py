@@ -1,10 +1,9 @@
 import asyncio
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from aiohttp import ClientSession, ClientError
 
 from cent.client.session.base_http_async import BaseHttpAsyncSession
-from cent.dto import CentType, CentRequest, BatchRequest
 from cent.exceptions import CentNetworkError, CentTimeoutError
 
 
@@ -34,19 +33,15 @@ class AiohttpSession(BaseHttpAsyncSession):
     async def make_request(
         self,
         api_key: str,
-        request: CentRequest[CentType],
+        method: str,
+        json_data: Dict[str, Any],
         timeout: Optional[float] = None,
-    ) -> CentType:
+    ) -> str:
         session = self._session
         if api_key:
             session.headers["X-API-Key"] = api_key
 
-        if isinstance(request, BatchRequest):
-            json_data = self.get_batch_json_data(request)
-        else:
-            json_data = request.model_dump(exclude_none=True)
-
-        url = f"{self._base_url}/{request.__api_method__}"
+        url = f"{self._base_url}/{method}"
 
         try:
             async with session.post(
@@ -57,19 +52,14 @@ class AiohttpSession(BaseHttpAsyncSession):
                 raw_result = await resp.text()
         except asyncio.TimeoutError as error:
             raise CentTimeoutError(
-                request=request,
                 message="Request timeout",
             ) from error
         except ClientError as error:
             raise CentNetworkError(
-                request=request,
                 message=f"{type(error).__name__}: {error}",
             ) from error
-        return self.check_response(
-            request=request,
-            status_code=resp.status,
-            content=raw_result,
-        )
+        self.check_status_code(status_code=resp.status)
+        return raw_result
 
     def __del__(self) -> None:
         if self._session and not self._session.closed:

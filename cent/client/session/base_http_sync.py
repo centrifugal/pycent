@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from cent.client.session.base_http import BaseHttpSession
-from cent.dto import CentType, CentRequest
 
 
 class BaseHttpSyncSession(BaseHttpSession, ABC):
@@ -16,21 +15,10 @@ class BaseHttpSyncSession(BaseHttpSession, ABC):
     def make_request(
         self,
         api_key: str,
-        request: CentRequest[CentType],
+        method: str,
+        json_data: Dict[str, Any],
         timeout: Optional[float] = None,
-    ) -> CentType:
+    ) -> str:
         """
-        Make request to Centrifugo API.
-
-        :param api_key: Centrifugo API key.
-        :param request: Centrifugo API request.
-        :param timeout: Request timeout.
+        Make request to Centrifugo HTTP API.
         """
-
-    def __call__(
-        self,
-        api_key: str,
-        request: CentRequest[CentType],
-        timeout: Optional[float] = None,
-    ) -> CentType:
-        return self.make_request(api_key, request, timeout)

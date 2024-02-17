@@ -1,6 +1,3 @@
-from cent.dto import CentType, CentRequest
-
-
 class CentError(Exception):
     """
     Wrapper for all exceptions coming from this library.
@@ -10,8 +7,7 @@ class CentError(Exception):
 class CentNetworkError(CentError):
     """CentNetworkError raised when Centrifugo is unreachable or not available."""
 
-    def __init__(self, request: CentRequest[CentType], message: str) -> None:
-        self.request = request
+    def __init__(self, message: str) -> None:
         self.message = message
 
     def __str__(self) -> str:
@@ -24,8 +20,7 @@ class CentNetworkError(CentError):
 class CentTransportError(CentError):
     """CentTransportError raised when HTTP request results into non-200 status code."""
 
-    def __init__(self, request: CentRequest[CentType], status_code: int):
-        self.request = request
+    def __init__(self, status_code: int):
         self.status_code = status_code
 
     def __str__(self) -> str:
@@ -38,8 +33,7 @@ class CentTransportError(CentError):
 class CentTimeoutError(CentError):
     """CentTimeoutError raised when request is timed out"""
 
-    def __init__(self, request: CentRequest[CentType], message: str) -> None:
-        self.request = request
+    def __init__(self, message: str) -> None:
         self.message = message
 
     def __str__(self) -> str:
@@ -67,8 +61,7 @@ class CentApiResponseError(CentError):
     any error as a result of API command execution.
     """
 
-    def __init__(self, request: CentRequest[CentType], code: int, message: str) -> None:
-        self.request = request
+    def __init__(self, code: int, message: str) -> None:
         self.code = code
         self.message = message
 

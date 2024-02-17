@@ -1,11 +1,9 @@
-from typing import Optional, Any, TypeVar
+from typing import Optional, Any, cast
 
 from requests import Session
 
 from cent.client.session import RequestsSession
-from cent.dto import CentRequest
-
-T = TypeVar("T")
+from cent.dto import CentRequest, CentResultType
 
 
 class Client:
@@ -31,8 +29,19 @@ class Client:
             session=session,
         )
 
-    def send(self, request: CentRequest[T], timeout: Optional[float] = None) -> T:
-        return self._session(self._api_key, request, timeout=timeout)
+    def send(
+        self,
+        request: CentRequest[CentResultType],
+        timeout: Optional[float] = None,
+    ) -> CentResultType:
+        content = self._session.make_request(
+            self._api_key,
+            request.get_method(),
+            request.to_json(),
+            timeout=timeout,
+        )
+        response = request.get_result(content)
+        return cast(CentResultType, response.result)
 
     def close(self) -> None:
         self._session.close()

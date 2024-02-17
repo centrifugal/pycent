@@ -1,6 +1,9 @@
+import json
 from abc import ABC, abstractmethod
 from typing import TypeVar, Any, Generic, TYPE_CHECKING, ClassVar, Optional, List, Dict
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
+
+from cent.exceptions import CentDecodeError, CentApiResponseError
 
 
 class Error(BaseModel):
@@ -8,15 +11,27 @@ class Error(BaseModel):
     message: str
 
 
-CentType = TypeVar("CentType", bound=Any)
+class CentResult(BaseModel, ABC):
+    model_config = ConfigDict(
+        use_enum_values=True,
+        extra="allow",
+        validate_assignment=True,
+        frozen=True,
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        defer_build=True,
+    )
 
 
-class Response(BaseModel, Generic[CentType]):
+CentResultType = TypeVar("CentResultType", bound=CentResult)
+
+
+class Response(BaseModel, Generic[CentResultType]):
     error: Optional[Error] = None
-    result: Optional[CentType] = None
+    result: Optional[CentResultType] = None
 
 
-class CentRequest(BaseModel, Generic[CentType], ABC):
+class CentRequest(BaseModel, Generic[CentResultType], ABC):
     model_config = ConfigDict(
         extra="allow",
         populate_by_name=True,
@@ -38,17 +53,39 @@ class CentRequest(BaseModel, Generic[CentType], ABC):
         def __api_method__(self) -> str:
             pass
 
+    def to_json(self) -> Any:
+        return self.model_dump(exclude_none=True)
 
-class CentResult(BaseModel, ABC):
-    model_config = ConfigDict(
-        use_enum_values=True,
-        extra="allow",
-        validate_assignment=True,
-        frozen=True,
-        populate_by_name=True,
-        arbitrary_types_allowed=True,
-        defer_build=True,
-    )
+    def get_method(self) -> str:
+        return self.__api_method__
+
+    def get_result(
+        self,
+        content: str,
+    ) -> Response[CentResult]:
+        try:
+            json_data = json.loads(content)
+        except Exception as err:
+            raise CentDecodeError from err
+
+        if isinstance(self, BatchRequest):
+            json_data = _validate_batch(self, json_data["replies"])
+
+        try:
+            response_type = Response[self.__returning__]  # type: ignore
+            response = TypeAdapter(response_type).validate_python(
+                json_data,
+            )
+        except ValidationError as err:
+            raise CentDecodeError from err
+
+        if response.error:
+            raise CentApiResponseError(
+                code=response.error.code,
+                message=response.error.message,
+            )
+
+        return response
 
 
 class NestedModel(BaseModel, ABC):
@@ -57,6 +94,48 @@ class NestedModel(BaseModel, ABC):
         populate_by_name=True,
         arbitrary_types_allowed=True,
     )
+
+
+class BatchResult(CentResult):
+    """Batch response.
+
+    Attributes:
+        replies: List of results from batch request.
+    """
+
+    replies: List[CentResult]
+
+
+class BatchRequest(CentRequest[BatchResult]):
+    """Batch request."""
+
+    __returning__ = BatchResult
+    __api_method__ = "batch"
+
+    requests: List[Any]
+    parallel: Optional[bool] = None
+
+    def to_json(self) -> Any:
+        commands = [
+            {request.__api_method__: request.model_dump(exclude_none=True)}
+            for request in self.requests
+        ]
+        return {"commands": commands, "parallel": bool(self.parallel)}
+
+
+def _validate_batch(
+    request: BatchRequest,
+    json_replies: List[Dict[str, Any]],
+) -> Dict[str, Dict[str, List[Any]]]:
+    replies: List[CentRequest[Any]] = []
+    for command_method, json_data in zip(request.requests, json_replies):
+        validated_request: CentRequest[Any] = TypeAdapter(
+            command_method.__returning__
+        ).validate_python(
+            json_data[command_method.__api_method__],
+        )
+        replies.append(validated_request)
+    return {"result": {"replies": replies}}
 
 
 class Disconnect(NestedModel):
@@ -199,16 +278,6 @@ class Node(CentResult):
     process: Optional[ProcessStats] = None
 
 
-class BatchResult(CentResult):
-    """Batch response.
-
-    Attributes:
-        replies: List of results from batch request.
-    """
-
-    replies: List[Any]
-
-
 class PublishResult(CentResult):
     """Publish result.
 
@@ -316,20 +385,6 @@ class SubscribeResult(CentResult):
 
 class UnsubscribeResult(CentResult):
     """Unsubscribe result."""
-
-
-class BatchRequest(CentRequest[BatchResult]):
-    """Batch request.
-
-    Attributes:
-        commands: List of commands to execute in batch.
-    """
-
-    __returning__ = BatchResult
-    __api_method__ = "batch"
-
-    commands: List[CentRequest[CentResult]]
-    parallel: Optional[bool] = None
 
 
 class BroadcastRequest(CentRequest[BroadcastResult]):

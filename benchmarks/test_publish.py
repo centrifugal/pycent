@@ -1,22 +1,26 @@
 import random
 
 from benchmarks.conftest import BenchmarkDecoratorType
-from cent import AsyncClient, Client
+from cent import AsyncClient, Client, PublishRequest
 
 
 def sync_requests(client: Client) -> None:
     channel_number = random.randint(0, 1000)  # noqa: S311
-    client.publish(
-        channel=f"personal_{channel_number}",
-        data={"message": "Hello world!"},
+    client.send(
+        PublishRequest(
+            channel=f"personal_{channel_number}",
+            data={"message": "Hello world!"},
+        )
     )
 
 
 async def async_requests(client: AsyncClient) -> None:
     channel_number = random.randint(0, 1000)  # noqa: S311
-    await client.publish(
-        channel=f"personal_{channel_number}",
-        data={"message": "Hello world!"},
+    await client.send(
+        PublishRequest(
+            channel=f"personal_{channel_number}",
+            data={"message": "Hello world!"},
+        )
     )
 
 

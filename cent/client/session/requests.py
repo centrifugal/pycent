@@ -1,10 +1,9 @@
-from typing import Optional
+from typing import Optional, Dict, Any
 
 import requests
 from requests import Session
 
 from cent.client.session.base_http_sync import BaseHttpSyncSession
-from cent.dto import CentType, CentRequest, BatchRequest
 from cent.exceptions import CentNetworkError, CentTimeoutError
 
 
@@ -31,17 +30,14 @@ class RequestsSession(BaseHttpSyncSession):
     def make_request(
         self,
         api_key: str,
-        request: CentRequest[CentType],
+        method: str,
+        json_data: Dict[str, Any],
         timeout: Optional[float] = None,
-    ) -> CentType:
+    ) -> str:
         if api_key:
             self._session.headers["X-API-Key"] = api_key
-        if isinstance(request, BatchRequest):
-            json_data = self.get_batch_json_data(request)
-        else:
-            json_data = request.model_dump(exclude_none=True)
 
-        url = f"{self._base_url}/{request.__api_method__}"
+        url = f"{self._base_url}/{method}"
 
         try:
             raw_result = self._session.post(
@@ -51,19 +47,16 @@ class RequestsSession(BaseHttpSyncSession):
             )
         except requests.exceptions.Timeout as error:
             raise CentTimeoutError(
-                request=request,
                 message="Request timeout",
             ) from error
         except requests.exceptions.ConnectionError as error:
             raise CentNetworkError(
-                request=request,
                 message=f"{type(error).__name__}: {error}",
             ) from error
-        return self.check_response(
-            request=request,
+        self.check_status_code(
             status_code=raw_result.status_code,
-            content=raw_result.text,
         )
+        return raw_result.text
 
     def __del__(self) -> None:
         self.close()

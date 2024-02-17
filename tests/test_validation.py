@@ -1,4 +1,6 @@
 import uuid
+from typing import List, cast
+
 import pytest
 
 from cent import (
@@ -11,7 +13,6 @@ from cent import (
     StreamPosition,
     Disconnect,
     SubscribeRequest,
-    BatchRequest,
     UnsubscribeRequest,
     PresenceStatsRequest,
     HistoryRequest,
@@ -20,11 +21,48 @@ from cent import (
     ChannelsRequest,
     DisconnectRequest,
     RefreshRequest,
-    BatchResult,
     HistoryResult,
+    CentResult,
+    PublishResult,
+    BroadcastResult,
+    PresenceResult,
+    Response,
+    BatchRequest,
 )
 
+
 from tests.conftest import UNKNOWN_CHANNEL_ERROR_CODE
+
+
+def test_serialization_none() -> None:
+    request = PublishRequest(
+        channel="personal_1",
+        data={"data": None},
+    )
+    assert request.to_json() == {"channel": "personal_1", "data": {"data": None}}
+
+
+def test_serialization_batch() -> None:
+    requests = [
+        PublishRequest(
+            channel="personal_1",
+            data={"data": "Second data"},
+        ),
+        PublishRequest(
+            channel="personal_2",
+            data={"data": "First data"},
+        ),
+    ]
+    batch_request = BatchRequest(
+        requests=requests,
+    )
+    assert batch_request.to_json() == {
+        "commands": [
+            {"publish": {"channel": "personal_1", "data": {"data": "Second data"}}},
+            {"publish": {"channel": "personal_2", "data": {"data": "First data"}}},
+        ],
+        "parallel": False,
+    }
 
 
 async def test_publish(sync_client: Client, async_client: AsyncClient) -> None:
@@ -44,6 +82,14 @@ async def test_publish(sync_client: Client, async_client: AsyncClient) -> None:
 
 async def test_broadcast(sync_client: Client, async_client: AsyncClient) -> None:
     channels = ["personal_1", "personal_2"]
+
+    def check_result(res: BroadcastResult) -> None:
+        assert len(res.responses) == len(channels)
+        resp = res.responses[0]
+        assert resp.error is None
+        assert resp.result is not None
+        assert resp.result.offset
+
     request = BroadcastRequest(
         channels=channels,
         data={"data": "data"},
@@ -52,10 +98,10 @@ async def test_broadcast(sync_client: Client, async_client: AsyncClient) -> None
         idempotency_key="idempotency_key",
     )
     result = sync_client.send(request)
-    assert len(result.responses) == len(channels)
+    check_result(result)
 
     result = await async_client.send(request)
-    assert len(result.responses) == len(channels)
+    check_result(result)
 
 
 async def test_subscribe(sync_client: Client, async_client: AsyncClient) -> None:
@@ -181,41 +227,51 @@ async def test_refresh(sync_client: Client, async_client: AsyncClient) -> None:
 
 
 async def test_batch(sync_client: Client, async_client: AsyncClient) -> None:
+    def check_result(res: List[CentResult]) -> None:
+        num_expected_replies = 4
+        assert len(res) == num_expected_replies
+        assert cast(PublishResult, res[0]).offset
+        assert cast(PublishResult, res[1]).offset
+        broadcast_result = cast(BroadcastResult, res[2])
+        num_expected_responses = 2
+        assert len(broadcast_result.responses) == num_expected_responses
+        response_0 = broadcast_result.responses[0]
+        response_1 = broadcast_result.responses[1]
+        assert isinstance(response_0, Response)
+        assert isinstance(response_1, Response)
+        assert isinstance(response_0.result, PublishResult)
+        assert isinstance(response_1.result, PublishResult)
+        assert response_0.result.offset
+        assert response_1.result.offset
+        assert cast(PresenceResult, res[3]).presence == {}
+
+    requests = [
+        PublishRequest(
+            channel="personal_1",
+            data={"data": "Second data"},
+        ),
+        PublishRequest(
+            channel="personal_2",
+            data={"data": "First data"},
+        ),
+        BroadcastRequest(
+            channels=["personal_1", "personal_2"],
+            data={"data": "Third data"},
+        ),
+        PresenceRequest(
+            channel="personal_1",
+        ),
+    ]
+
     request = BatchRequest(
-        commands=[
-            PublishRequest(
-                channel="personal_1",
-                data={"data": "Second data"},
-            ),
-            PublishRequest(
-                channel="personal_2",
-                data={"data": "First data"},
-            ),
-            BroadcastRequest(
-                channels=["personal_1", "personal_2"],
-                data={"data": "Third data"},
-            ),
-            PresenceRequest(
-                channel="personal_1",
-            ),
-        ],
-        parallel=True,
+        requests=requests,
     )
 
-    def check_result(res: BatchResult) -> None:
-        num_expected_replies = 4
-        assert len(res.replies) == num_expected_replies
-        assert res.replies[0].offset
-        assert res.replies[1].offset
-        assert res.replies[2].responses[0].result.offset
-        assert res.replies[2].responses[1].result.offset
-        assert res.replies[3].presence == {}
-
     result = sync_client.send(request)
-    check_result(result)
+    check_result(result.replies)
 
     result = await async_client.send(request)
-    check_result(result)
+    check_result(result.replies)
 
 
 async def test_error_publish(sync_client: Client, async_client: AsyncClient) -> None:
