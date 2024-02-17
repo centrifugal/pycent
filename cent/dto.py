@@ -53,10 +53,12 @@ class CentRequest(BaseModel, Generic[CentResultType], ABC):
         def __api_method__(self) -> str:
             pass
 
-    def to_json(self) -> Any:
+    @property
+    def api_payload(self) -> Any:
         return self.model_dump(exclude_none=True)
 
-    def get_api_method(self) -> str:
+    @property
+    def api_method(self) -> str:
         return self.__api_method__
 
     def parse_response(
@@ -115,7 +117,8 @@ class BatchRequest(CentRequest[BatchResult]):
     requests: List[Any]
     parallel: Optional[bool] = None
 
-    def to_json(self) -> Any:
+    @property
+    def api_payload(self) -> Any:
         commands = [
             {request.__api_method__: request.model_dump(exclude_none=True)}
             for request in self.requests

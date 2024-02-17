@@ -39,7 +39,7 @@ def test_serialization_none() -> None:
         channel="personal_1",
         data={"data": None},
     )
-    assert request.to_json() == {"channel": "personal_1", "data": {"data": None}}
+    assert request.api_payload == {"channel": "personal_1", "data": {"data": None}}
 
 
 def test_serialization_batch() -> None:
@@ -53,16 +53,24 @@ def test_serialization_batch() -> None:
             data={"data": "First data"},
         ),
     ]
-    batch_request = BatchRequest(
+    request = BatchRequest(
         requests=requests,
     )
-    assert batch_request.to_json() == {
+    assert request.api_payload == {
         "commands": [
             {"publish": {"channel": "personal_1", "data": {"data": "Second data"}}},
             {"publish": {"channel": "personal_2", "data": {"data": "First data"}}},
         ],
         "parallel": False,
     }
+
+
+def test_method() -> None:
+    request = PublishRequest(
+        channel="personal_1",
+        data={"data": None},
+    )
+    assert request.api_method == "publish"
 
 
 async def test_publish(sync_client: Client, async_client: AsyncClient) -> None:

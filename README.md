@@ -98,14 +98,14 @@ This library raises exceptions if sth goes wrong. All exceptions are subclasses 
 
 ## Using for async consumers
 
-You can use this library to constructs commands to Centrifugo over [async consumers](https://centrifugal.dev/docs/server/consumers). For example, to get proper method and payload for async publish:
+You can use this library to constructs events for Centrifugo [async consumers](https://centrifugal.dev/docs/server/consumers). For example, to get proper method and payload for async publish:
 
 ```python
 from cent import PublishRequest
 
 request = PublishRequest(channel="channel", data={"input": "Hello world!"})
-method = request.get_api_method()
-payload = request.to_json()
+method = request.api_method
+payload = request.api_payload
 # use method and payload to construct async consumer event.
 ```
 

@@ -32,8 +32,8 @@ class AsyncClient:
         request: CentRequest[CentResultType],
         timeout: Optional[float] = None,
     ) -> CentResultType:
-        method = request.get_api_method()
-        payload = request.to_json()
+        method = request.api_method
+        payload = request.api_payload
         content = await self._session.make_request(
             self._api_key,
             method,

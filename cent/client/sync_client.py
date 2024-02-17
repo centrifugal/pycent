@@ -36,8 +36,8 @@ class Client:
     ) -> CentResultType:
         content = self._session.make_request(
             self._api_key,
-            request.get_api_method(),
-            request.to_json(),
+            request.api_method,
+            request.api_payload,
             timeout=timeout,
         )
         response = request.parse_response(content)
