@@ -146,8 +146,8 @@ class Disconnect(NestedModel):
         reason (str): Disconnect reason.
     """
 
-    code: int
-    reason: str
+    code: int = 0
+    reason: str = ""
 
 
 class BoolValue(NestedModel):
@@ -201,8 +201,8 @@ class ProcessStats(CentResult):
         rss (int): Process Resident Set Size (RSS) in bytes.
     """
 
-    cpu: float = Field(default=0.0)
-    rss: int
+    cpu: float = 0.0
+    rss: int = 0
 
 
 class ClientInfo(CentResult):
@@ -218,8 +218,8 @@ class ClientInfo(CentResult):
             settings or preferences related to the channel.
     """
 
-    client: str
-    user: str
+    client: str = ""
+    user: str = ""
     conn_info: Optional[Any] = None
     chan_info: Optional[Any] = None
 
@@ -234,7 +234,7 @@ class Publication(CentResult):
     """
 
     data: Any
-    offset: int = Field(default=0)
+    offset: int = 0
     tags: Optional[Dict[str, str]] = None
 
 
@@ -246,7 +246,7 @@ class Metrics(CentResult):
         items (Dict[str, float]): metric values.
     """
 
-    interval: float = Field(default=0.0)
+    interval: float = 0.0
     items: Dict[str, float]
 
 
@@ -268,12 +268,12 @@ class Node(CentResult):
 
     uid: str
     name: str
-    version: str
-    num_clients: int = Field(default=0)
-    num_subs: int = Field(default=0)
-    num_users: int = Field(default=0)
-    num_channels: int = Field(default=0)
-    uptime: int = Field(default=0)
+    version: str = ""
+    num_clients: int = 0
+    num_subs: int = 0
+    num_users: int = 0
+    num_channels: int = 0
+    uptime: int = 0
     metrics: Optional[Metrics] = None
     process: Optional[ProcessStats] = None
 
@@ -286,8 +286,8 @@ class PublishResult(CentResult):
         epoch: Epoch of current stream.
     """
 
-    offset: Optional[int] = None
-    epoch: Optional[str] = None
+    offset: int = 0
+    epoch: str = ""
 
 
 class BroadcastResult(CentResult):
@@ -308,7 +308,7 @@ class ChannelInfoResult(CentResult):
         num_clients: Total number of connections currently subscribed to a channel.
     """
 
-    num_clients: int = Field(default=0)
+    num_clients: int = 0
 
 
 class ChannelsResult(CentResult):
@@ -339,8 +339,8 @@ class HistoryResult(CentResult):
     """
 
     publications: List[Publication] = Field(default_factory=list)
-    offset: Optional[int] = None
-    epoch: Optional[str] = None
+    offset: int = 0
+    epoch: str = ""
 
 
 class InfoResult(CentResult):
@@ -371,8 +371,8 @@ class PresenceStatsResult(CentResult):
         num_users: Total number of unique users in channel.
     """
 
-    num_clients: int = Field(default=0)
-    num_users: int = Field(default=0)
+    num_clients: int = 0
+    num_users: int = 0
 
 
 class RefreshResult(CentResult):
@@ -621,32 +621,30 @@ class UnsubscribeRequest(CentRequest[UnsubscribeResult]):
 class ConnectionTokenInfo(NestedModel):
     """Connection token info."""
 
-    uid: str
-    issued_at: int
+    uid: Optional[str] = None
+    issued_at: Optional[int] = None
 
 
 class SubscriptionTokenInfo(NestedModel):
     """Subscription token info."""
 
-    uid: str
-    issued_at: int
+    uid: Optional[str] = None
+    issued_at: Optional[int] = None
 
 
 class ChannelContext(NestedModel):
     """Channel context."""
 
-    source: int
+    source: Optional[int] = None
 
 
 class ConnectionState(NestedModel):
-    """
-    Connection state.
-    """
+    """Connection state."""
 
-    channels: Dict[str, ChannelContext]
-    connection_token: ConnectionTokenInfo
-    subscription_tokens: Dict[str, SubscriptionTokenInfo]
-    meta: Any
+    channels: Optional[Dict[str, ChannelContext]] = None
+    connection_token: Optional[ConnectionTokenInfo] = None
+    subscription_tokens: Optional[Dict[str, SubscriptionTokenInfo]] = None
+    meta: Optional[Any] = None
 
 
 class ConnectionInfo(NestedModel):
@@ -656,8 +654,8 @@ class ConnectionInfo(NestedModel):
     app_version: Optional[str] = ""
     transport: str
     protocol: str
-    user: str
-    state: ConnectionState
+    user: Optional[str] = None
+    state: Optional[ConnectionState] = None
 
 
 class ConnectionsResult(CentResult):
@@ -687,7 +685,6 @@ class UpdateUserStatusRequest(CentRequest[UpdateUserStatusResult]):
     __returning__ = UpdateUserStatusResult
 
     users: List[str]
-    state: str
 
 
 class UserStatus(NestedModel):
@@ -696,9 +693,8 @@ class UserStatus(NestedModel):
     """
 
     user: str
-    active: int
-    online: int
-    state: str
+    active: Optional[int] = None
+    online: Optional[int] = None
 
 
 class GetUserStatusResult(CentResult):
@@ -751,7 +747,7 @@ class BlockUserRequest(CentRequest[BlockUserResult]):
     __api_method__ = "block_user"
     __returning__ = BlockUserResult
 
-    expire_at: int
+    expire_at: Optional[int] = None
     user: str
 
 
@@ -786,7 +782,7 @@ class RevokeTokenRequest(CentRequest[RevokeTokenResult]):
     __api_method__ = "revoke_token"
     __returning__ = RevokeTokenResult
 
-    expire_at: int
+    expire_at: Optional[int] = None
     uid: str
 
 
@@ -804,9 +800,9 @@ class InvalidateUserTokensRequest(CentRequest[InvalidateUserTokensResult]):
     __api_method__ = "invalidate_user_tokens"
     __returning__ = InvalidateUserTokensResult
 
-    expire_at: int
+    expire_at: Optional[int] = None
     user: str
-    issued_before: int
+    issued_before: Optional[int] = None
     channel: Optional[str] = None
 
 
@@ -814,6 +810,8 @@ class DeviceRegisterResult(CentResult):
     """
     Device register result.
     """
+
+    id: str
 
 
 class DeviceRegisterRequest(CentRequest[DeviceRegisterResult]):
@@ -824,13 +822,13 @@ class DeviceRegisterRequest(CentRequest[DeviceRegisterResult]):
     __api_method__ = "device_register"
     __returning__ = DeviceRegisterResult
 
-    id: str
+    id: Optional[str] = None
     provider: str
     token: str
     platform: str
-    user: str
-    meta: Dict[str, str]
-    topics: List[str]
+    user: Optional[str] = None
+    meta: Optional[Dict[str, str]] = None
+    topics: Optional[List[str]] = None
 
 
 class DeviceUserUpdate(NestedModel):
@@ -893,8 +891,8 @@ class DeviceRemoveRequest(CentRequest[DeviceRemoveResult]):
     __api_method__ = "device_remove"
     __returning__ = DeviceRemoveResult
 
-    ids: List[str]
-    users: List[str]
+    ids: Optional[List[str]] = None
+    users: Optional[List[str]] = None
 
 
 class DeviceFilter(NestedModel):
@@ -902,11 +900,11 @@ class DeviceFilter(NestedModel):
     Device filter.
     """
 
-    ids: List[str]
-    users: List[str]
-    topics: List[str]
-    providers: List[str]
-    platforms: List[str]
+    ids: Optional[List[str]] = None
+    users: Optional[List[str]] = None
+    topics: Optional[List[str]] = None
+    providers: Optional[List[str]] = None
+    platforms: Optional[List[str]] = None
 
 
 class Device(NestedModel):
@@ -918,11 +916,11 @@ class Device(NestedModel):
     platform: str
     provider: str
     token: str
-    user: str
+    user: str = ""
     created_at: int
     updated_at: int
-    meta: Dict[str, str]
-    topics: List[str]
+    meta: Optional[Dict[str, str]] = None
+    topics: Optional[List[str]] = None
 
 
 class DeviceListResult(CentResult):
@@ -931,8 +929,8 @@ class DeviceListResult(CentResult):
     """
 
     items: List[Device]
-    next_cursor: str
-    total_count: int
+    next_cursor: Optional[str] = None
+    total_count: Optional[int] = None
 
 
 class DeviceListRequest(CentRequest[DeviceListResult]):
@@ -943,12 +941,12 @@ class DeviceListRequest(CentRequest[DeviceListResult]):
     __api_method__ = "device_list"
     __returning__ = DeviceListResult
 
-    filter: DeviceFilter
-    include_total_count: bool
-    include_meta: bool
-    include_topics: bool
-    cursor: str
-    limit: int
+    filter: Optional[DeviceFilter] = None
+    include_total_count: Optional[bool] = None
+    include_meta: Optional[bool] = None
+    include_topics: Optional[bool] = None
+    cursor: Optional[str] = None
+    limit: Optional[int] = None
 
 
 class DeviceTopicFilter(NestedModel):
@@ -956,12 +954,12 @@ class DeviceTopicFilter(NestedModel):
     Device topic filter.
     """
 
-    device_ids: List[str]
-    device_providers: List[str]
-    device_platforms: List[str]
-    device_users: List[str]
-    topics: List[str]
-    topic_prefix: str
+    device_ids: Optional[List[str]] = None
+    device_providers: Optional[List[str]] = None
+    device_platforms: Optional[List[str]] = None
+    device_users: Optional[List[str]] = None
+    topics: Optional[List[str]] = None
+    topic_prefix: Optional[str] = None
 
 
 class DeviceTopic(NestedModel):
@@ -980,8 +978,8 @@ class DeviceTopicListResult(CentResult):
     """
 
     items: List[DeviceTopic]
-    next_cursor: str
-    total_count: int
+    next_cursor: Optional[str] = None
+    total_count: Optional[int] = None
 
 
 class DeviceTopicListRequest(CentRequest[DeviceTopicListResult]):
@@ -992,11 +990,11 @@ class DeviceTopicListRequest(CentRequest[DeviceTopicListResult]):
     __api_method__ = "device_topic_list"
     __returning__ = DeviceTopicListResult
 
-    filter: DeviceTopicFilter
-    include_total_count: bool
-    include_device: bool
-    cursor: str
-    limit: int
+    filter: Optional[DeviceTopicFilter] = None
+    include_total_count: Optional[bool] = None
+    include_device: Optional[bool] = None
+    cursor: Optional[str] = None
+    limit: Optional[int] = None
 
 
 class UserTopicFilter(NestedModel):
@@ -1004,9 +1002,9 @@ class UserTopicFilter(NestedModel):
     User topic filter.
     """
 
-    users: List[str]
-    topics: List[str]
-    topic_prefix: str
+    users: Optional[List[str]] = None
+    topics: Optional[List[str]] = None
+    topic_prefix: Optional[str] = None
 
 
 class UserTopic(NestedModel):
@@ -1025,8 +1023,8 @@ class UserTopicListResult(CentResult):
     """
 
     items: List[UserTopic]
-    next_cursor: str
-    total_count: int
+    next_cursor: Optional[str] = None
+    total_count: Optional[int] = None
 
 
 class UserTopicListRequest(CentRequest[UserTopicListResult]):
@@ -1037,10 +1035,10 @@ class UserTopicListRequest(CentRequest[UserTopicListResult]):
     __api_method__ = "user_topic_list"
     __returning__ = UserTopicListResult
 
-    filter: UserTopicFilter
-    include_total_count: bool
-    cursor: str
-    limit: int
+    filter: Optional[UserTopicFilter] = None
+    include_total_count: Optional[bool] = None
+    cursor: Optional[str] = None
+    limit: Optional[int] = None
 
 
 class DeviceTopicUpdateResult(CentResult):
@@ -1086,14 +1084,14 @@ class PushRecipient(NestedModel):
     Push recipient.
     """
 
-    filter: DeviceFilter
-    fcm_tokens: List[str]
-    fcm_topic: str
-    fcm_condition: str
-    hms_tokens: List[str]
-    hms_topic: str
-    hms_condition: str
-    apns_tokens: List[str]
+    filter: Optional[DeviceFilter] = None
+    fcm_tokens: Optional[List[str]] = None
+    fcm_topic: Optional[str] = None
+    fcm_condition: Optional[str] = None
+    hms_tokens: Optional[List[str]] = None
+    hms_topic: Optional[str] = None
+    hms_condition: Optional[str] = None
+    apns_tokens: Optional[List[str]] = None
 
 
 class FcmPushNotification(NestedModel):
@@ -1117,7 +1115,7 @@ class ApnsPushNotification(NestedModel):
     APNS push notification.
     """
 
-    headers: Dict[str, str]
+    headers: Optional[Dict[str, str]] = None
     payload: Any
 
 
@@ -1126,10 +1124,10 @@ class PushNotification(NestedModel):
     Push notification.
     """
 
-    fcm: FcmPushNotification
-    hms: HmsPushNotification
-    apns: ApnsPushNotification
-    expire_at: int
+    fcm: Optional[FcmPushNotification] = None
+    hms: Optional[HmsPushNotification] = None
+    apns: Optional[ApnsPushNotification] = None
+    expire_at: Optional[int] = None
 
 
 class SendPushNotificationResult(CentResult):
@@ -1150,8 +1148,8 @@ class SendPushNotificationRequest(CentRequest[SendPushNotificationResult]):
 
     recipient: PushRecipient
     notification: PushNotification
-    uid: str
-    send_at: int
+    uid: Optional[str] = None
+    send_at: Optional[int] = None
 
 
 class UpdatePushStatusResult(CentResult):
@@ -1171,7 +1169,7 @@ class UpdatePushStatusRequest(CentRequest[UpdatePushStatusResult]):
     uid: str
     status: str
     device_id: str
-    msg_id: str
+    msg_id: Optional[str] = None
 
 
 class CancelPushResult(CentResult):

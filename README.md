@@ -15,9 +15,9 @@ pip install cent
 
 ## Usage
 
-First of all, see the description of Centrifugo [server API](https://centrifugal.dev/docs/server/server_api) in the documentation.
+First of all, see the description of Centrifugo [server API](https://centrifugal.dev/docs/server/server_api) in the documentation. This library also supports API extensions provided by Centrifugo PRO.
 
-This library contains `Client` and `AsyncClient` to work with Centrifugo HTTP server API. Both clients have the same methods to work with Centrifugo API and raise the same top-level exceptions.
+The library contains `Client` and `AsyncClient` to work with Centrifugo HTTP server API. Both clients have the same methods to work with Centrifugo API and raise the same top-level exceptions.
 
 ## Sync HTTP client
 
@@ -38,13 +38,14 @@ Optional arguments:
 Example:
 
 ```python
-from cent import Client
+from cent import Client, PublishRequest
 
 api_url = "http://localhost:8000/api"
 api_key = "<CENTRIFUGO_API_KEY>"
 
 client = Client(api_url, api_key)
-result = client.publish("channel", {"input": "Hello world!"})
+request = PublishRequest(channel="channel", data={"input": "Hello world!"})
+result = client.send(request)
 print(result)
 ```
 
@@ -68,15 +69,15 @@ Example:
 
 ```python
 import asyncio
-from cent import AsyncClient
+from cent import AsyncClient, PublishRequest
 
 api_url = "http://localhost:8000/api"
 api_key = "<CENTRIFUGO_API_KEY>"
 
-client = AsyncClient(api_url, api_key)
-
 async def main():
-    result = await client.publish("channel", {"input": "Hello world!"})
+    client = AsyncClient(api_url, api_key)
+    request = PublishRequest(channel="channel", data={"input": "Hello world!"})
+    result = await client.send(request)
     print(result)
 
 if __name__ == "__main__":
@@ -128,6 +129,7 @@ make bench
 
 Cent v5 contains the following notable changes compared to Cent v4:
 
-* Constructor slightly changed, refer to the examples above.
+* Client constructor slightly changed, refer to the examples above.
+* To call desired API import and construct a request object (inherited from Pydantic `BaseModel`) and pass it to `send` method of the client.
 * Base exception class is now `CentError` instead of `CentException`, exceptions SDK raises were refactored.
 * To send multiple commands in one HTTP request SDK provides `batch` method.
