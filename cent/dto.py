@@ -561,3 +561,576 @@ class UnsubscribeRequest(CentRequest[UnsubscribeResult]):
     channel: str
     client: Optional[str] = None
     session: Optional[str] = None
+
+
+class ConnectionTokenInfo(NestedModel):
+    """Connection token info."""
+
+    uid: str
+    issued_at: int
+
+
+class SubscriptionTokenInfo(NestedModel):
+    """Subscription token info."""
+
+    uid: str
+    issued_at: int
+
+
+class ChannelContext(NestedModel):
+    """Channel context."""
+
+    source: int
+
+
+class ConnectionState(NestedModel):
+    """
+    Connection state.
+    """
+
+    channels: Dict[str, ChannelContext]
+    connection_token: ConnectionTokenInfo
+    subscription_tokens: Dict[str, SubscriptionTokenInfo]
+    meta: Any
+
+
+class ConnectionInfo(NestedModel):
+    """Connection info."""
+
+    app_name: Optional[str] = ""
+    app_version: Optional[str] = ""
+    transport: str
+    protocol: str
+    user: str
+    state: ConnectionState
+
+
+class ConnectionsResult(CentResult):
+    connections: Dict[str, ConnectionInfo]
+
+
+class ConnectionsRequest(CentRequest[ConnectionsResult]):
+    """Connections request."""
+
+    __api_method__ = "connections"
+    __returning__ = ConnectionsResult
+
+    user: str
+    expression: str
+
+
+class UpdateUserStatusResult(CentResult):
+    """
+    Update user status result.
+    """
+
+
+class UpdateUserStatusRequest(CentRequest[UpdateUserStatusResult]):
+    """Update user status request."""
+
+    __api_method__ = "update_user_status"
+    __returning__ = UpdateUserStatusResult
+
+    users: List[str]
+    state: str
+
+
+class UserStatus(NestedModel):
+    """
+    User status.
+    """
+
+    user: str
+    active: int
+    online: int
+    state: str
+
+
+class GetUserStatusResult(CentResult):
+    """
+    Get user status result.
+    """
+
+    statuses: List[UserStatus]
+
+
+class GetUserStatusRequest(CentRequest[GetUserStatusResult]):
+    """
+    Get user status request.
+    """
+
+    __api_method__ = "get_user_status"
+    __returning__ = GetUserStatusResult
+
+    users: List[str]
+
+
+class DeleteUserStatusResult(CentResult):
+    """
+    Delete user status result.
+    """
+
+
+class DeleteUserStatusRequest(CentRequest[DeleteUserStatusResult]):
+    """
+    Delete user status request.
+    """
+
+    __api_method__ = "delete_user_status"
+    __returning__ = DeleteUserStatusResult
+
+    users: List[str]
+
+
+class BlockUserResult(CentResult):
+    """
+    Block user result.
+    """
+
+
+class BlockUserRequest(CentRequest[BlockUserResult]):
+    """
+    Block user request.
+    """
+
+    __api_method__ = "block_user"
+    __returning__ = BlockUserResult
+
+    expire_at: int
+    user: str
+
+
+class UnblockUserResult(CentResult):
+    """
+    Unblock user result.
+    """
+
+
+class UnblockUserRequest(CentRequest[UnblockUserResult]):
+    """
+    Unblock user request.
+    """
+
+    __api_method__ = "unblock_user"
+    __returning__ = UnblockUserResult
+
+    user: str
+
+
+class RevokeTokenResult(CentResult):
+    """
+    Revoke token result.
+    """
+
+
+class RevokeTokenRequest(CentRequest[RevokeTokenResult]):
+    """
+    Revoke token request.
+    """
+
+    __api_method__ = "revoke_token"
+    __returning__ = RevokeTokenResult
+
+    expire_at: int
+    uid: str
+
+
+class InvalidateUserTokensResult(CentResult):
+    """
+    Invalidate user tokens result.
+    """
+
+
+class InvalidateUserTokensRequest(CentRequest[InvalidateUserTokensResult]):
+    """
+    Invalidate user tokens request.
+    """
+
+    __api_method__ = "invalidate_user_tokens"
+    __returning__ = InvalidateUserTokensResult
+
+    expire_at: int
+    user: str
+    issued_before: int
+    channel: Optional[str] = None
+
+
+class DeviceRegisterResult(CentResult):
+    """
+    Device register result.
+    """
+
+
+class DeviceRegisterRequest(CentRequest[DeviceRegisterResult]):
+    """
+    Device register request.
+    """
+
+    __api_method__ = "device_register"
+    __returning__ = DeviceRegisterResult
+
+    id: str
+    provider: str
+    token: str
+    platform: str
+    user: str
+    meta: Dict[str, str]
+    topics: List[str]
+
+
+class DeviceUserUpdate(NestedModel):
+    """
+    Device user update.
+    """
+
+    user: str
+
+
+class DeviceMetaUpdate(NestedModel):
+    """
+    Device meta update.
+    """
+
+    meta: Dict[str, str]
+
+
+class DeviceTopicsUpdate(NestedModel):
+    """
+    Device topics update.
+    """
+
+    op: str
+    topics: List[str]
+
+
+class DeviceUpdateResult(CentResult):
+    """
+    Device update result.
+    """
+
+
+class DeviceUpdateRequest(CentRequest[DeviceUpdateResult]):
+    """
+    Device update request.
+    """
+
+    __api_method__ = "device_update"
+    __returning__ = DeviceUpdateResult
+
+    ids: Optional[List[str]] = None
+    users: Optional[List[str]] = None
+    user_update: Optional[DeviceUserUpdate] = None
+    meta_update: Optional[DeviceMetaUpdate] = None
+    topics_update: Optional[DeviceTopicsUpdate] = None
+
+
+class DeviceRemoveResult(CentResult):
+    """
+    Device remove result.
+    """
+
+
+class DeviceRemoveRequest(CentRequest[DeviceRemoveResult]):
+    """
+    Device remove request.
+    """
+
+    __api_method__ = "device_remove"
+    __returning__ = DeviceRemoveResult
+
+    ids: List[str]
+    users: List[str]
+
+
+class DeviceFilter(NestedModel):
+    """
+    Device filter.
+    """
+
+    ids: List[str]
+    users: List[str]
+    topics: List[str]
+    providers: List[str]
+    platforms: List[str]
+
+
+class Device(NestedModel):
+    """
+    Device.
+    """
+
+    id: str
+    platform: str
+    provider: str
+    token: str
+    user: str
+    created_at: int
+    updated_at: int
+    meta: Dict[str, str]
+    topics: List[str]
+
+
+class DeviceListResult(CentResult):
+    """
+    Device list result.
+    """
+
+    items: List[Device]
+    next_cursor: str
+    total_count: int
+
+
+class DeviceListRequest(CentRequest[DeviceListResult]):
+    """
+    Device list request.
+    """
+
+    __api_method__ = "device_list"
+    __returning__ = DeviceListResult
+
+    filter: DeviceFilter
+    include_total_count: bool
+    include_meta: bool
+    include_topics: bool
+    cursor: str
+    limit: int
+
+
+class DeviceTopicFilter(NestedModel):
+    """
+    Device topic filter.
+    """
+
+    device_ids: List[str]
+    device_providers: List[str]
+    device_platforms: List[str]
+    device_users: List[str]
+    topics: List[str]
+    topic_prefix: str
+
+
+class DeviceTopic(NestedModel):
+    """
+    Device topic.
+    """
+
+    id: str
+    topic: str
+    device: Device
+
+
+class DeviceTopicListResult(CentResult):
+    """
+    Device topic list result.
+    """
+
+    items: List[DeviceTopic]
+    next_cursor: str
+    total_count: int
+
+
+class DeviceTopicListRequest(CentRequest[DeviceTopicListResult]):
+    """
+    Device topic list request.
+    """
+
+    __api_method__ = "device_topic_list"
+    __returning__ = DeviceTopicListResult
+
+    filter: DeviceTopicFilter
+    include_total_count: bool
+    include_device: bool
+    cursor: str
+    limit: int
+
+
+class UserTopicFilter(NestedModel):
+    """
+    User topic filter.
+    """
+
+    users: List[str]
+    topics: List[str]
+    topic_prefix: str
+
+
+class UserTopic(NestedModel):
+    """
+    User topic.
+    """
+
+    id: str
+    user: str
+    topic: str
+
+
+class UserTopicListResult(CentResult):
+    """
+    User topic list result.
+    """
+
+    items: List[UserTopic]
+    next_cursor: str
+    total_count: int
+
+
+class UserTopicListRequest(CentRequest[UserTopicListResult]):
+    """
+    User topic list request.
+    """
+
+    __api_method__ = "user_topic_list"
+    __returning__ = UserTopicListResult
+
+    filter: UserTopicFilter
+    include_total_count: bool
+    cursor: str
+    limit: int
+
+
+class DeviceTopicUpdateResult(CentResult):
+    """
+    Device topic update result.
+    """
+
+
+class DeviceTopicUpdateRequest(CentRequest[DeviceTopicUpdateResult]):
+    """
+    Device topic update request.
+    """
+
+    __api_method__ = "device_topic_update"
+    __returning__ = DeviceTopicUpdateResult
+
+    device_id: str
+    op: str
+    topics: List[str]
+
+
+class UserTopicUpdateResult(CentResult):
+    """
+    User topic update result.
+    """
+
+
+class UserTopicUpdateRequest(CentRequest[UserTopicUpdateResult]):
+    """
+    User topic update request.
+    """
+
+    __api_method__ = "user_topic_update"
+    __returning__ = UserTopicUpdateResult
+
+    user: str
+    op: str
+    topics: List[str]
+
+
+class PushRecipient(NestedModel):
+    """
+    Push recipient.
+    """
+
+    filter: DeviceFilter
+    fcm_tokens: List[str]
+    fcm_topic: str
+    fcm_condition: str
+    hms_tokens: List[str]
+    hms_topic: str
+    hms_condition: str
+    apns_tokens: List[str]
+
+
+class FcmPushNotification(NestedModel):
+    """
+    FCM push notification.
+    """
+
+    message: Any
+
+
+class HmsPushNotification(NestedModel):
+    """
+    HMS push notification.
+    """
+
+    message: Any
+
+
+class ApnsPushNotification(NestedModel):
+    """
+    APNS push notification.
+    """
+
+    headers: Dict[str, str]
+    payload: Any
+
+
+class PushNotification(NestedModel):
+    """
+    Push notification.
+    """
+
+    fcm: FcmPushNotification
+    hms: HmsPushNotification
+    apns: ApnsPushNotification
+    expire_at: int
+
+
+class SendPushNotificationResult(CentResult):
+    """
+    Send push notification result.
+    """
+
+    uid: str
+
+
+class SendPushNotificationRequest(CentRequest[SendPushNotificationResult]):
+    """
+    Send push notification request.
+    """
+
+    __api_method__ = "send_push_notification"
+    __returning__ = SendPushNotificationResult
+
+    recipient: PushRecipient
+    notification: PushNotification
+    uid: str
+    send_at: int
+
+
+class UpdatePushStatusResult(CentResult):
+    """
+    Update push status result.
+    """
+
+
+class UpdatePushStatusRequest(CentRequest[UpdatePushStatusResult]):
+    """
+    Update push status request.
+    """
+
+    __api_method__ = "update_push_status"
+    __returning__ = UpdatePushStatusResult
+
+    uid: str
+    status: str
+    device_id: str
+    msg_id: str
+
+
+class CancelPushResult(CentResult):
+    """
+    Cancel push result.
+    """
+
+
+class CancelPushRequest(CentRequest[CancelPushResult]):
+    """
+    Cancel push request.
+    """
+
+    __returning__ = CancelPushResult
+    __api_method__ = "cancel_push"
+
+    uid: str

@@ -31,3 +31,14 @@ async def async_client(
     client = AsyncClient(BASE_URL, API_KEY)
     yield client
     await client._session.close()
+
+
+@pytest.fixture()
+async def clients(
+    anyio_backend: Any,  # noqa: ARG001
+) -> AsyncGenerator[Any, None]:
+    sync_client = Client(BASE_URL, API_KEY)
+    async_client = AsyncClient(BASE_URL, API_KEY)
+    yield sync_client, async_client
+    await async_client.close()
+    sync_client.close()
