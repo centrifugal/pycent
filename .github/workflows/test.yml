@@ -42,6 +42,10 @@ jobs:
         run: |
           make test
 
-      - name: Run linter
+      - name: Run lint
         run: |
           make lint-ci
+
+      - name: Run mypy
+        run: |
+          make mypy

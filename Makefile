@@ -1,14 +1,14 @@
-.PHONY: proto test lint lint-fix lint-ci bench
+.PHONY: test lint lint-fix lint-ci mypy bench
 
 dev:
 	pip install poetry
 	poetry install
 
-proto:
-	poetry run python -m grpc_tools.protoc -I . --python_betterproto_out=./cent/proto cent/proto/apiproto.proto
-
 test:
 	poetry run pytest -vv tests
+
+mypy:
+	poetry run mypy cent tests benchmarks
 
 lint:
 	poetry run ruff .

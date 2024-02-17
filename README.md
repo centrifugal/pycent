@@ -15,9 +15,9 @@ pip install cent
 
 ## Usage
 
-First of all, see the description of Centrifugo [server API](https://centrifugal.dev/docs/server/server_api) in the documentation. This library also supports API extensions provided by Centrifugo PRO.
+First of all, see the description of Centrifugo [server API](https://centrifugal.dev/docs/server/server_api) in the documentation. This library also supports API extensions provided by Centrifugo PRO. In general, refer to [api.proto](https://github.com/centrifugal/centrifugo/blob/master/internal/apiproto/api.proto) Protobuf schema file as a source of truth about all available Centrifugo server APIs. Don't forget that Centrifugo supports both HTTP and GRPC API – so you can switch to GRPC by using `api.proto` file to generate stubs for communication.
 
-The library contains `Client` and `AsyncClient` to work with Centrifugo HTTP server API. Both clients have the same methods to work with Centrifugo API and raise the same top-level exceptions.
+This library contains `Client` and `AsyncClient` to work with Centrifugo HTTP server API. Both clients have the same methods to work with Centrifugo API and raise the same top-level exceptions.
 
 ## Sync HTTP client
 
@@ -95,6 +95,19 @@ This library raises exceptions if sth goes wrong. All exceptions are subclasses 
 * `CentUnauthorizedError` - raised in case of unauthorized access (signal of invalid API key)
 * `CentDecodeError` - raised in case of server response decoding error
 * `CentApiResponseError` - raised in case of API response error (i.e. error returned by Centrifugo itself, you can inspect code and message returned by Centrifugo in this case)
+
+## Using for async consumers
+
+You can use this library to constructs commands to Centrifugo over [async consumers](https://centrifugal.dev/docs/server/consumers). For example, to get proper method and payload for async publish:
+
+```python
+from cent import PublishRequest
+
+request = PublishRequest(channel="channel", data={"input": "Hello world!"})
+method = request.get_api_method()
+payload = request.to_json()
+# use method and payload to construct async consumer event.
+```
 
 ## For contributors
 

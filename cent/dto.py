@@ -56,7 +56,7 @@ class CentRequest(BaseModel, Generic[CentResultType], ABC):
     def to_json(self) -> Any:
         return self.model_dump(exclude_none=True)
 
-    def get_method(self) -> str:
+    def get_api_method(self) -> str:
         return self.__api_method__
 
     def parse_response(
@@ -650,11 +650,11 @@ class ConnectionState(NestedModel):
 class ConnectionInfo(NestedModel):
     """Connection info."""
 
-    app_name: Optional[str] = ""
-    app_version: Optional[str] = ""
+    app_name: str = ""
+    app_version: str = ""
     transport: str
     protocol: str
-    user: Optional[str] = None
+    user: str = ""
     state: Optional[ConnectionState] = None
 
 
