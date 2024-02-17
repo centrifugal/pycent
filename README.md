@@ -149,6 +149,55 @@ payload = request.api_payload
 # use method and payload to construct async consumer event.
 ```
 
+## Using Broadcast and Batch
+
+To demonstrate the benefits of using `BroadcastRequest` and `BatchRequest` let's compare approaches. Let's say at some point in your app you need to publish the same message into 10k different channels. Let's compare sequential publish, batch publish and broadcast publish. Here is the code to do the comparison:
+
+```python
+from cent import *
+from time import time
+
+
+def main():
+    requests = []
+    channels = []
+    for i in range(10000):
+        channel = f"test_{i}"
+        requests.append(PublishRequest(channel=channel, data={"msg": "hello"}))
+        channels.append(channel)
+    batch = BatchRequest(requests=requests)
+    broadcast = BroadcastRequest(channels=channels, data={"msg": "hello"})
+
+    client = Client("http://localhost:8000/api", "api_key")
+
+    start = time()
+    for request in requests:
+        client.send(request)
+    print("sequential", time() - start)
+
+    start = time()
+    client.send(batch)
+    print("batch", time() - start)
+
+    start = time()
+    client.send(broadcast)
+    print("broadcast", time() - start)
+
+
+if __name__ == "__main__":
+    main()
+```
+
+On local machine, the output may look like this:
+
+```
+sequential 5.731332778930664
+batch 0.12313580513000488
+broadcast 0.06050515174865723
+```
+
+So `BatchRequest` is much faster than sequential requests in this case, and `BroadcastRequest` is the fastest - publication to 10k Centrifugo channels took only 60ms. Because all the work is done in one network round-trip. In reality the difference will be even more significant because of network latency.
+
 ## For contributors
 
 ### Tests and benchmarks
