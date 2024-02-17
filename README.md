@@ -96,6 +96,46 @@ This library raises exceptions if sth goes wrong. All exceptions are subclasses 
 * `CentDecodeError` - raised in case of server response decoding error
 * `CentApiResponseError` - raised in case of API response error (i.e. error returned by Centrifugo itself, you can inspect code and message returned by Centrifugo in this case)
 
+Note, that `BroadcastRequest` and `BatchRequest` are quite special – since they contain multiple commands in one request, handling `CentApiResponseError` is still required, but not enough – you also need to manually iterate over the results to check for individual errors. For example, one publish command can fail while another one can succeed. For example:
+
+```python
+from cent import *
+c = Client("http://localhost:8000/api", "api_key")
+req = BroadcastRequest(channels=["1", "2"], data={})
+c.send(req)
+# BroadcastResult(
+#   responses=[
+#       Response[PublishResult](error=None, result=PublishResult(offset=7, epoch='rqKx')),
+#       Response[PublishResult](error=None, result=PublishResult(offset=7, epoch='nUrf'))
+#   ]
+# )
+req = BroadcastRequest(channels=["invalid:1", "2"], data={})
+c.send(req)
+# BroadcastResult(
+#   responses=[
+#       Response[PublishResult](error=Error(code=102, message='unknown channel'), result=None),
+#       Response[PublishResult](error=None, result=PublishResult(offset=8, epoch='nUrf'))
+#   ]
+# )
+```
+
+I.e. `cent` library does not raise exceptions for individual errors in `BroadcastRequest` or `BatchRequest`, only for top-level response error, for example, sending empty list of channels in broadcast:
+
+```
+req = BroadcastRequest(channels=[], data={})
+c.send(req)
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "/Users/centrifugal/pycent/cent/client/sync_client.py", line 43, in send
+    response = request.parse_response(content)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/centrifugal/pycent/cent/dto.py", line 85, in parse_response
+    raise CentApiResponseError(
+cent.exceptions.CentApiResponseError: Server API response error #107: bad request
+```
+
+So this all adds some complexity, but that's the trade-off for the performance and efficiency of these two methods. You can always write some convenient wrappers around `cent` library to handle errors in a way that suits your application.
+
 ## Using for async consumers
 
 You can use this library to constructs events for Centrifugo [async consumers](https://centrifugal.dev/docs/server/consumers). For example, to get proper method and payload for async publish:
