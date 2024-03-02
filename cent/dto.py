@@ -830,6 +830,8 @@ class DeviceRegisterRequest(CentRequest[DeviceRegisterResult]):
     token: str
     platform: str
     user: Optional[str] = None
+    timezone: Optional[str] = None
+    language: Optional[str] = None
     meta: Optional[Dict[str, str]] = None
     topics: Optional[List[str]] = None
 
@@ -840,6 +842,22 @@ class DeviceUserUpdate(NestedModel):
     """
 
     user: str
+
+
+class DeviceTimezoneUpdate(NestedModel):
+    """
+    Device timezone update.
+    """
+
+    timezone: str
+
+
+class DeviceLanguageUpdate(NestedModel):
+    """
+    Device language update.
+    """
+
+    language: str
 
 
 class DeviceMetaUpdate(NestedModel):
@@ -876,6 +894,8 @@ class DeviceUpdateRequest(CentRequest[DeviceUpdateResult]):
     ids: Optional[List[str]] = None
     users: Optional[List[str]] = None
     user_update: Optional[DeviceUserUpdate] = None
+    timezone_update: Optional[DeviceTimezoneUpdate] = None
+    language_update: Optional[DeviceLanguageUpdate] = None
     meta_update: Optional[DeviceMetaUpdate] = None
     topics_update: Optional[DeviceTopicsUpdate] = None
 
@@ -1134,11 +1154,34 @@ class PushNotification(NestedModel):
 
 
 class SendPushNotificationResult(CentResult):
-    """
-    Send push notification result.
-    """
-
+    """Send push notification result."""
     uid: str
+
+
+class PushLocalization(NestedModel):
+    translations: Dict[str, str]
+
+
+class RateLimitPolicy(NestedModel):
+    rate: int
+    interval_ms: int
+
+
+class PushRateLimitStrategy(NestedModel):
+    key: str
+    policies: List[RateLimitPolicy]
+    drop_if_rate_limited: bool
+
+
+class PushTimeLimitStrategy(NestedModel):
+    send_after_time: str
+    send_before_time: str
+    no_tz_send_now: bool
+
+
+class PushLimitStrategy(NestedModel):
+    rate_limit: Optional[PushRateLimitStrategy] = None
+    time_limit: Optional[PushTimeLimitStrategy] = None
 
 
 class SendPushNotificationRequest(CentRequest[SendPushNotificationResult]):
@@ -1153,6 +1196,12 @@ class SendPushNotificationRequest(CentRequest[SendPushNotificationResult]):
     notification: PushNotification
     uid: Optional[str] = None
     send_at: Optional[int] = None
+    analytics_uid: Optional[str] = None
+    optimize_for_reliability: Optional[bool] = None
+    limit_strategy: Optional[PushLimitStrategy] = None
+    localizations: Optional[Dict[str, PushLocalization]] = None
+    use_templating: Optional[bool] = None
+    use_meta: Optional[bool] = None
 
 
 class UpdatePushStatusResult(CentResult):
@@ -1169,7 +1218,7 @@ class UpdatePushStatusRequest(CentRequest[UpdatePushStatusResult]):
     __api_method__ = "update_push_status"
     __returning__ = UpdatePushStatusResult
 
-    uid: str
+    alalytics_uid: str
     status: str
     device_id: str
     msg_id: Optional[str] = None
