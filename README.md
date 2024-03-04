@@ -45,7 +45,7 @@ api_key = "<CENTRIFUGO_API_KEY>"
 
 client = Client(api_url, api_key)
 request = PublishRequest(channel="channel", data={"input": "Hello world!"})
-result = client._send(request)
+result = client.publish(request)
 print(result)
 ```
 
@@ -77,7 +77,7 @@ api_key = "<CENTRIFUGO_API_KEY>"
 async def main():
     client = AsyncClient(api_url, api_key)
     request = PublishRequest(channel="channel", data={"input": "Hello world!"})
-    result = await client.send(request)
+    result = await client.publish(request)
     print(result)
 
 if __name__ == "__main__":
@@ -103,7 +103,7 @@ from cent import *
 
 c = Client("http://localhost:8000/api", "api_key")
 req = BroadcastRequest(channels=["1", "2"], data={})
-c._send(req)
+c.broadcast(req)
 # BroadcastResult(
 #   responses=[
 #       Response[PublishResult](error=None, result=PublishResult(offset=7, epoch='rqKx')),
@@ -111,7 +111,7 @@ c._send(req)
 #   ]
 # )
 req = BroadcastRequest(channels=["invalid:1", "2"], data={})
-c._send(req)
+c.broadcast(req)
 # BroadcastResult(
 #   responses=[
 #       Response[PublishResult](error=Error(code=102, message='unknown channel'), result=None),
@@ -124,13 +124,9 @@ I.e. `cent` library does not raise exceptions for individual errors in `Broadcas
 
 ```
 req = BroadcastRequest(channels=[], data={})
-c.send(req)
+c.broadcast(req)
 Traceback (most recent call last):
-  File "<stdin>", line 1, in <module>
-  File "/Users/centrifugal/pycent/cent/client/sync_client.py", line 43, in send
-    response = request.parse_response(content)
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/centrifugal/pycent/cent/dto.py", line 85, in parse_response
+    ...
     raise CentApiResponseError(
 cent.exceptions.CentApiResponseError: Server API response error #107: bad request
 ```
@@ -160,28 +156,28 @@ from time import time
 
 
 def main():
-    requests = []
+    publish_requests = []
     channels = []
     for i in range(10000):
         channel = f"test_{i}"
-        requests.append(PublishRequest(channel=channel, data={"msg": "hello"}))
+        publish_requests.append(PublishRequest(channel=channel, data={"msg": "hello"}))
         channels.append(channel)
-    batch = BatchRequest(requests=requests)
-    broadcast = BroadcastRequest(channels=channels, data={"msg": "hello"})
+    batch_request = BatchRequest(requests=publish_requests)
+    broadcast_request = BroadcastRequest(channels=channels, data={"msg": "hello"})
 
     client = Client("http://localhost:8000/api", "api_key")
 
     start = time()
-    for request in requests:
-        client._send(request)
+    for request in publish_requests:
+        client.publish(request)
     print("sequential", time() - start)
 
     start = time()
-    client._send(batch)
+    client.batch(batch_request)
     print("batch", time() - start)
 
     start = time()
-    client._send(broadcast)
+    client.broadcast(broadcast_request)
     print("broadcast", time() - start)
 
 
