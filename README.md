@@ -45,7 +45,7 @@ api_key = "<CENTRIFUGO_API_KEY>"
 
 client = Client(api_url, api_key)
 request = PublishRequest(channel="channel", data={"input": "Hello world!"})
-result = client.send(request)
+result = client._send(request)
 print(result)
 ```
 
@@ -100,9 +100,10 @@ Note, that `BroadcastRequest` and `BatchRequest` are quite special – since the
 
 ```python
 from cent import *
+
 c = Client("http://localhost:8000/api", "api_key")
 req = BroadcastRequest(channels=["1", "2"], data={})
-c.send(req)
+c._send(req)
 # BroadcastResult(
 #   responses=[
 #       Response[PublishResult](error=None, result=PublishResult(offset=7, epoch='rqKx')),
@@ -110,7 +111,7 @@ c.send(req)
 #   ]
 # )
 req = BroadcastRequest(channels=["invalid:1", "2"], data={})
-c.send(req)
+c._send(req)
 # BroadcastResult(
 #   responses=[
 #       Response[PublishResult](error=Error(code=102, message='unknown channel'), result=None),
@@ -172,15 +173,15 @@ def main():
 
     start = time()
     for request in requests:
-        client.send(request)
+        client._send(request)
     print("sequential", time() - start)
 
     start = time()
-    client.send(batch)
+    client._send(batch)
     print("batch", time() - start)
 
     start = time()
-    client.send(broadcast)
+    client._send(broadcast)
     print("broadcast", time() - start)
 
 

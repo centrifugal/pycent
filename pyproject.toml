@@ -74,6 +74,7 @@ ignore = [
     "PGH003", # use specific rule code when ignore
     "T201",
     "PLR0917",
+    "PLR0904", # Centrifugo has many API methods
 ]
 
 [tool.ruff.per-file-ignores]

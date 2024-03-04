@@ -81,10 +81,10 @@ async def test_publish(sync_client: Client, async_client: AsyncClient) -> None:
         tags={"tag": "tag"},
         idempotency_key="idempotency_key",
     )
-    result = sync_client.send(request)
+    result = sync_client._send(request)
     assert result.offset
 
-    result = await async_client.send(request)
+    result = await async_client.publish(request)
     assert result.offset
 
 
@@ -105,10 +105,10 @@ async def test_broadcast(sync_client: Client, async_client: AsyncClient) -> None
         tags={"tag": "tag"},
         idempotency_key="idempotency_key",
     )
-    result = sync_client.send(request)
+    result = sync_client._send(request)
     check_result(result)
 
-    result = await async_client.send(request)
+    result = await async_client.broadcast(request)
     check_result(result)
 
 
@@ -124,8 +124,8 @@ async def test_subscribe(sync_client: Client, async_client: AsyncClient) -> None
             epoch="1",
         ),
     )
-    sync_client.send(request)
-    await async_client.send(request)
+    sync_client._send(request)
+    await async_client.subscribe(request)
 
 
 async def test_unsubscribe(sync_client: Client, async_client: AsyncClient) -> None:
@@ -135,31 +135,31 @@ async def test_unsubscribe(sync_client: Client, async_client: AsyncClient) -> No
         session="session",
         client="client",
     )
-    sync_client.send(request)
-    await async_client.send(request)
+    sync_client._send(request)
+    await async_client.unsubscribe(request)
 
 
 async def test_presence(sync_client: Client, async_client: AsyncClient) -> None:
     request = PresenceRequest(
         channel="personal_1",
     )
-    sync_client.send(request)
-    await async_client.send(request)
+    sync_client._send(request)
+    await async_client.presence(request)
 
 
 async def test_presence_stats(sync_client: Client, async_client: AsyncClient) -> None:
     request = PresenceStatsRequest(
         channel="personal_1",
     )
-    sync_client.send(request)
-    await async_client.send(request)
+    sync_client._send(request)
+    await async_client.presence_stats(request)
 
 
 async def test_history(sync_client: Client, async_client: AsyncClient) -> None:
     num_pubs = 10
     channel = "personal_" + uuid.uuid4().hex
     for i in range(num_pubs):
-        sync_client.send(
+        sync_client._send(
             PublishRequest(
                 channel=channel,
                 data={"data": f"data {i}"},
@@ -178,10 +178,10 @@ async def test_history(sync_client: Client, async_client: AsyncClient) -> None:
         assert len(res.publications) == num_pubs
         assert res.publications[0].data == {"data": "data 0"}
 
-    result = sync_client.send(request)
+    result = sync_client._send(request)
     check_result(result)
 
-    result = await async_client.send(request)
+    result = await async_client.history(request)
     check_result(result)
 
 
@@ -189,20 +189,20 @@ async def test_history_remove(sync_client: Client, async_client: AsyncClient) ->
     request = HistoryRemoveRequest(
         channel="personal_1",
     )
-    sync_client.send(request)
-    await async_client.send(request)
+    sync_client._send(request)
+    await async_client.history_remove(request)
 
 
 async def test_info(sync_client: Client, async_client: AsyncClient) -> None:
-    sync_client.send(InfoRequest())
-    await async_client.send(InfoRequest())
+    sync_client._send(InfoRequest())
+    await async_client.info(InfoRequest())
 
 
 async def test_channels(sync_client: Client, async_client: AsyncClient) -> None:
     request = ChannelsRequest(pattern="*")
 
-    sync_client.send(request)
-    await async_client.send(request)
+    sync_client._send(request)
+    await async_client.channels(request)
 
 
 async def test_disconnect(sync_client: Client, async_client: AsyncClient) -> None:
@@ -217,8 +217,8 @@ async def test_disconnect(sync_client: Client, async_client: AsyncClient) -> Non
         ),
     )
 
-    sync_client.send(request)
-    await async_client.send(request)
+    sync_client._send(request)
+    await async_client.disconnect(request)
 
 
 async def test_refresh(sync_client: Client, async_client: AsyncClient) -> None:
@@ -230,8 +230,8 @@ async def test_refresh(sync_client: Client, async_client: AsyncClient) -> None:
         expired=True,
     )
 
-    sync_client.send(request)
-    await async_client.send(request)
+    sync_client._send(request)
+    await async_client.refresh(request)
 
 
 async def test_batch(sync_client: Client, async_client: AsyncClient) -> None:
@@ -275,10 +275,10 @@ async def test_batch(sync_client: Client, async_client: AsyncClient) -> None:
         requests=requests,
     )
 
-    result = sync_client.send(request)
+    result = sync_client._send(request)
     check_result(result.replies)
 
-    result = await async_client.send(request)
+    result = await async_client.batch(request)
     check_result(result.replies)
 
 
@@ -289,9 +289,9 @@ async def test_error_publish(sync_client: Client, async_client: AsyncClient) -> 
     )
 
     with pytest.raises(CentApiResponseError, match="unknown channel") as exc_info:
-        sync_client.send(request)
+        sync_client._send(request)
     assert exc_info.value.code == UNKNOWN_CHANNEL_ERROR_CODE
 
     with pytest.raises(CentApiResponseError, match="unknown channel") as exc_info:
-        await async_client.send(request)
+        await async_client.publish(request)
     assert exc_info.value.code == UNKNOWN_CHANNEL_ERROR_CODE

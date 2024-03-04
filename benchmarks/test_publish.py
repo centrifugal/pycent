@@ -6,7 +6,7 @@ from cent import AsyncClient, Client, PublishRequest
 
 def sync_requests(client: Client) -> None:
     channel_number = random.randint(0, 1000)  # noqa: S311
-    client.send(
+    client._send(
         PublishRequest(
             channel=f"personal_{channel_number}",
             data={"message": "Hello world!"},
@@ -16,7 +16,7 @@ def sync_requests(client: Client) -> None:
 
 async def async_requests(client: AsyncClient) -> None:
     channel_number = random.randint(0, 1000)  # noqa: S311
-    await client.send(
+    await client.publish(
         PublishRequest(
             channel=f"personal_{channel_number}",
             data={"message": "Hello world!"},
