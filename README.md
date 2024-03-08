@@ -8,8 +8,7 @@ pip install cent
 
 ## Centrifugo compatibility
 
-**Cent v5 and higher works only with Centrifugo v5**.
-
+* **Cent v5 and higher works only with Centrifugo v5**.
 * If you need to work with Centrifugo v3, v4 => use Cent v4
 * If you need to work with Centrifugo v2 => use Cent v3
 

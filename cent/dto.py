@@ -1155,6 +1155,7 @@ class PushNotification(NestedModel):
 
 class SendPushNotificationResult(CentResult):
     """Send push notification result."""
+
     uid: str
 
 
@@ -1218,7 +1219,7 @@ class UpdatePushStatusRequest(CentRequest[UpdatePushStatusResult]):
     __api_method__ = "update_push_status"
     __returning__ = UpdatePushStatusResult
 
-    alalytics_uid: str
+    analytics_uid: str
     status: str
     device_id: str
     msg_id: Optional[str] = None
