@@ -1169,7 +1169,7 @@ class RateLimitPolicy(NestedModel):
 
 
 class PushRateLimitStrategy(NestedModel):
-    key: str
+    key: Optional[str] = None
     policies: List[RateLimitPolicy]
     drop_if_rate_limited: bool = False
 
