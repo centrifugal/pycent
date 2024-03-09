@@ -228,6 +228,6 @@ make bench
 Cent v5 contains the following notable changes compared to Cent v4:
 
 * Client constructor slightly changed, refer to the examples above.
-* To call desired API import and construct a request object (inherited from Pydantic `BaseModel`) and pass it to `send` method of the client.
+* To call desired API import and construct a request object (inherited from Pydantic `BaseModel`) and then call corresponding method of client. This should feel very similar to how GRPC is usually structured.
 * Base exception class is now `CentError` instead of `CentException`, exceptions SDK raises were refactored.
 * To send multiple commands in one HTTP request SDK provides `batch` method.
