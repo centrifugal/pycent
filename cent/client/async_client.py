@@ -82,10 +82,13 @@ class AsyncClient:
         session: Optional[ClientSession] = None,
     ) -> None:
         """
-        :param api_url: Centrifugo API URL
-        :param api_key: Centrifugo API key
-        :param timeout: Base timeout for all requests
-        :param session: Custom `aiohttp` session
+        Creates new AsyncClient instance.
+
+        Args:
+            api_url (str): Centrifugo API URL.
+            api_key (str): Centrifugo API key.
+            timeout (float): Base timeout for all requests in seconds.
+            session (aiohttp.ClientSession): Custom `aiohttp` session.
         """
         self._api_key = api_key
         self._session = AiohttpSession(
