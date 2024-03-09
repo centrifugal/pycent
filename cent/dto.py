@@ -1171,13 +1171,13 @@ class RateLimitPolicy(NestedModel):
 class PushRateLimitStrategy(NestedModel):
     key: str
     policies: List[RateLimitPolicy]
-    drop_if_rate_limited: bool
+    drop_if_rate_limited: bool = False
 
 
 class PushTimeLimitStrategy(NestedModel):
-    send_after_time: str
-    send_before_time: str
-    no_tz_send_now: bool
+    send_after_time: str  # use "%H:%M:%S" format, ex. "09:00:00"
+    send_before_time: str  # use "%H:%M:%S" format, ex. "18:00:00"
+    no_tz_send_now: bool = False
 
 
 class PushLimitStrategy(NestedModel):
@@ -1221,7 +1221,7 @@ class UpdatePushStatusRequest(CentRequest[UpdatePushStatusResult]):
 
     analytics_uid: str
     status: str
-    device_id: str
+    device_id: Optional[str] = None
     msg_id: Optional[str] = None
 
 
