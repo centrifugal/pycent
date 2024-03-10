@@ -172,8 +172,8 @@ class StreamPosition(NestedModel):
         epoch (str): Epoch of current stream.
     """
 
-    offset: int
-    epoch: str
+    offset: int = 0
+    epoch: str = ""
 
 
 class ChannelOptionsOverride(NestedModel):
@@ -696,8 +696,8 @@ class UserStatus(NestedModel):
     """
 
     user: str
-    active: Optional[int] = None
-    online: Optional[int] = None
+    active: int = 0
+    online: int = 0
 
 
 class GetUserStatusResult(CentResult):
@@ -936,12 +936,12 @@ class Device(NestedModel):
     """
 
     id: str
-    platform: str
-    provider: str
-    token: str
+    platform: str = ""
+    provider: str = ""
+    token: str = ""
     user: str = ""
-    created_at: int
-    updated_at: int
+    created_at: int = 0
+    updated_at: int = 0
     meta: Optional[Dict[str, str]] = None
     topics: Optional[List[str]] = None
 
@@ -1036,7 +1036,7 @@ class UserTopic(NestedModel):
     """
 
     id: str
-    user: str
+    user: str = ""
     topic: str
 
 
@@ -1171,13 +1171,13 @@ class RateLimitPolicy(NestedModel):
 class PushRateLimitStrategy(NestedModel):
     key: Optional[str] = None
     policies: List[RateLimitPolicy]
-    drop_if_rate_limited: bool = False
+    drop_if_rate_limited: Optional[bool] = False
 
 
 class PushTimeLimitStrategy(NestedModel):
     send_after_time: str  # use "%H:%M:%S" format, ex. "09:00:00"
     send_before_time: str  # use "%H:%M:%S" format, ex. "18:00:00"
-    no_tz_send_now: bool = False
+    no_tz_send_now: Optional[bool] = False
 
 
 class PushLimitStrategy(NestedModel):
