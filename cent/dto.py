@@ -831,7 +831,7 @@ class DeviceRegisterRequest(CentRequest[DeviceRegisterResult]):
     platform: str
     user: Optional[str] = None
     timezone: Optional[str] = None
-    language: Optional[str] = None
+    locale: Optional[str] = None
     meta: Optional[Dict[str, str]] = None
     topics: Optional[List[str]] = None
 
@@ -852,12 +852,12 @@ class DeviceTimezoneUpdate(NestedModel):
     timezone: str
 
 
-class DeviceLanguageUpdate(NestedModel):
+class DeviceLocaleUpdate(NestedModel):
     """
-    Device language update.
+    Device locale update.
     """
 
-    language: str
+    locale: str
 
 
 class DeviceMetaUpdate(NestedModel):
@@ -895,7 +895,7 @@ class DeviceUpdateRequest(CentRequest[DeviceUpdateResult]):
     users: Optional[List[str]] = None
     user_update: Optional[DeviceUserUpdate] = None
     timezone_update: Optional[DeviceTimezoneUpdate] = None
-    language_update: Optional[DeviceLanguageUpdate] = None
+    locale_update: Optional[DeviceLocaleUpdate] = None
     meta_update: Optional[DeviceMetaUpdate] = None
     topics_update: Optional[DeviceTopicsUpdate] = None
 
