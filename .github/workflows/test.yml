@@ -1,0 +1,51 @@
+name: Test
+
+on: [ push, pull_request ]
+
+jobs:
+  build:
+    # Prevent duplicate builds on internal PRs.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+        python-version:
+          - "3.9"
+          - "3.10"
+          - "3.11"
+          - "3.12"
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }} on ${{ matrix.os }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Setup docker
+        if: matrix.os == 'macos-latest'
+        uses: crazy-max/ghaction-setup-docker@v3
+
+      - name: Start Centrifugo
+        run: docker run -d -p 8000:8000 -p 10000:10000 -e CENTRIFUGO_API_KEY=api_key -e CENTRIFUGO_HISTORY_TTL=300s -e CENTRIFUGO_HISTORY_SIZE=100 -e CENTRIFUGO_PRESENCE=true -e CENTRIFUGO_GRPC_API=true centrifugo/centrifugo:v5 centrifugo
+
+      - name: Install dependencies
+        run: |
+          make dev
+
+      - name: Run tests
+        run: |
+          make test
+
+      - name: Run lint
+        run: |
+          make lint-ci
+
+      - name: Run mypy
+        run: |
+          make mypy
