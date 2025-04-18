@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cent"
-version = "5.0.0"
+version = "5.1.0"
 description = "Python library to communicate with Centrifugo v5 server HTTP API"
 authors = ["Alexander Emelin", "Katant Savelev", "Bogdan Evstratenko"]
 license = "MIT"
