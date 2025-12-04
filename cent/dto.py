@@ -234,11 +234,15 @@ class Publication(CentResult):
         offset (int): Offset of publication in history stream.
         data (Any): Custom JSON inside publication.
         tags (Optional[Dict[str, str]]): Tags are optional.
+        info (Optional[ClientInfo]): ClientInfo appended to publication only if publication was
+            sent using client SDK's publish method. If publication was sent over server publish API
+            this info object is missing as we don't have publisher client context in that case
     """
 
     data: Any
     offset: int = 0
     tags: Optional[Dict[str, str]] = None
+    info: Optional[ClientInfo] = None
 
 
 class Metrics(CentResult):
