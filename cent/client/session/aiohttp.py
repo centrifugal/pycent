@@ -60,11 +60,3 @@ class AiohttpSession(BaseHttpAsyncSession):
             ) from error
         self.check_status_code(status_code=resp.status)
         return raw_result
-
-    def __del__(self) -> None:
-        if self._session and not self._session.closed:
-            if self._session.connector is not None and self._session.connector_owner:
-                # Use synchronous close to avoid "coroutine was never awaited" warning
-                # https://github.com/aio-libs/aiohttp/blob/cfdafac20c10b849f6e6d1794b7168e545668878/aiohttp/connector.py#L326
-                self._session.connector._close_immediately()
-            self._session._connector = None
