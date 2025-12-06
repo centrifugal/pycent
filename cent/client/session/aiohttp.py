@@ -60,9 +60,3 @@ class AiohttpSession(BaseHttpAsyncSession):
             ) from error
         self.check_status_code(status_code=resp.status)
         return raw_result
-
-    def __del__(self) -> None:
-        if self._session and not self._session.closed:
-            if self._session.connector is not None and self._session.connector_owner:
-                self._session.connector.close()
-            self._session._connector = None
