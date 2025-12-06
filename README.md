@@ -1,4 +1,4 @@
-Python SDK to communicate with Centrifugo v5 HTTP API. Python >= 3.9 supported.
+Python SDK to communicate with Centrifugo [HTTP API](https://centrifugal.dev/docs/server/server_api). Python >= 3.9 supported. If you are looking for real-time WebSocket SDK – then you need [centrifuge-python](https://github.com/centrifugal/centrifuge-python).
 
 To install run:
 
