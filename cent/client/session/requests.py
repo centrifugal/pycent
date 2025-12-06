@@ -57,6 +57,3 @@ class RequestsSession(BaseHttpSyncSession):
             status_code=raw_result.status_code,
         )
         return raw_result.text
-
-    def __del__(self) -> None:
-        self.close()
