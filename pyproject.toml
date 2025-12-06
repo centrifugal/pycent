@@ -29,7 +29,7 @@ classifiers = [
 [tool.poetry.dependencies]
 python = "^3.9"
 aiohttp = "^3"
-pydantic = "^2.10"
+pydantic = "^2.8"
 requests = "^2"
 types-requests = "^2"
 
