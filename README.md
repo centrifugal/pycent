@@ -433,7 +433,9 @@ from cent import sharedpoll
 
 def sign(request: cent.HTTPRequest, channel: str, keys: list[str]) -> tuple[list[str], str]:
     allowed = readable(user, channel, keys)  # the rest are revoked
-    return allowed, sharedpoll.sign(secret, user, channel, allowed, datetime.now(UTC) + timedelta(hours=1))
+    return allowed, sharedpoll.sign(
+        secret, user=user, channel=channel, keys=allowed, expires_at=datetime.now(UTC) + timedelta(hours=1)
+    )
 
 
 signature = endpoints.SharedPollSignature(sign)

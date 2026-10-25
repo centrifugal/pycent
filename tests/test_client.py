@@ -910,3 +910,21 @@ def test_retryable() -> None:
         net = cent.NetworkError("x")
         net.__cause__ = e
     assert not cent.retryable(net)
+
+
+def test_broadcast_with_retry_retries_a_hung_attempt() -> None:
+    """Without a timeout the call has no bound of its own: an attempt which
+    hangs times out on its own - request_timeout - and is retried."""
+    calls = [0]
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        calls[0] += 1
+        if calls[0] == 1:
+            time.sleep(0.3)  # past request_timeout, as an attempt which hangs
+            raise httpx2.ReadTimeout("hung", request=request)
+        return httpx2.Response(200, json={"result": {"responses": [{"result": {"offset": 1}}]}})
+
+    c = cent.Client(ENDPOINT, request_timeout=0.2, http_client=httpx2.Client(transport=httpx2.MockTransport(handler)))
+    res = c.broadcast_with_retry(cent.BroadcastRequest(channels=["a"], data=1), on_attempt_error=lambda a: 0.0)
+    assert calls[0] == 2
+    assert res.attempts == 2

@@ -57,7 +57,9 @@ def test_spec_shared_poll_vectors() -> None:
 
 
 def test_shared_poll_sign() -> None:
-    sig = sharedpoll.sign(b"s", "u", "poll:x", ["a"], datetime.now(UTC) + timedelta(minutes=1))
+    sig = sharedpoll.sign(
+        b"s", user="u", channel="poll:x", keys=["a"], expires_at=datetime.now(UTC) + timedelta(minutes=1)
+    )
     iat, exp, mac = sig.split(":")
     assert int(exp) - int(iat) in (59, 60)
     assert len(mac) == 64
@@ -66,9 +68,9 @@ def test_shared_poll_sign() -> None:
         "s", "alice:news", "tech", [], None, now=1
     )
     with pytest.raises(ValueError, match="naive"):
-        sharedpoll.sign("s", "u", "c", [], datetime(2030, 1, 1))
+        sharedpoll.sign("s", user="u", channel="c", keys=[], expires_at=datetime(2030, 1, 1))
     with pytest.raises(ValueError, match="empty secret"):
-        sharedpoll.sign("", "u", "c", [])
+        sharedpoll.sign("", user="u", channel="c", keys=[])
 
 
 # Claims.

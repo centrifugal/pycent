@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import inspect
+import math
 import secrets
 import threading
 import time
@@ -467,13 +468,17 @@ class Client(_ClientAPI):
         - The result holds every channel's last outcome, and the key: retrying
           later with it publishes only into the channels which did not get it.
 
-        timeout bounds the whole call, waits included (request_timeout when
-        None), attempt_timeout each attempt. on_attempt_error decides the wait
+        timeout, when set, bounds the whole call, waits included;
+        attempt_timeout - request_timeout by default - bounds each attempt. on_attempt_error decides the wait
         between attempts, and may stop them: see BroadcastAttemptCallback. It raises as
         broadcast does.
         """
         _retry_options(request, max_attempts, attempt_timeout)
-        deadline = self._cfg.deadline(timeout)
+        # Without a timeout the call has no bound of its own: each attempt
+        # has attempt_timeout, or request_timeout as a call alone would, so
+        # that an attempt which hangs leaves time to retry.
+        deadline = self._cfg.deadline(timeout) if timeout is not None else math.inf
+        per_attempt = attempt_timeout if attempt_timeout is not None else self._cfg.request_timeout
         state = _RetryState(request)
         last: Exception | None = None
         for attempt in range(1, max_attempts + 1):
@@ -482,7 +487,7 @@ class Client(_ClientAPI):
                 last = last or CentTimeoutError("broadcast: timed out")
                 break
             attempt_req = state.attempt_request(request)
-            per = left if attempt_timeout is None else min(left, attempt_timeout)
+            per = min(left, per_attempt)
             try:
                 res = self.broadcast(attempt_req, timeout=per)
                 err: Exception | None = None
@@ -729,7 +734,11 @@ class AsyncClient(_AsyncClientAPI):
         """Broadcasts and retries the channels which may still succeed, as
         Client.broadcast_with_retry does."""
         _retry_options(request, max_attempts, attempt_timeout)
-        deadline = self._cfg.deadline(timeout)
+        # Without a timeout the call has no bound of its own: each attempt
+        # has attempt_timeout, or request_timeout as a call alone would, so
+        # that an attempt which hangs leaves time to retry.
+        deadline = self._cfg.deadline(timeout) if timeout is not None else math.inf
+        per_attempt = attempt_timeout if attempt_timeout is not None else self._cfg.request_timeout
         state = _RetryState(request)
         last: Exception | None = None
         for attempt in range(1, max_attempts + 1):
@@ -738,7 +747,7 @@ class AsyncClient(_AsyncClientAPI):
                 last = last or CentTimeoutError("broadcast: timed out")
                 break
             attempt_req = state.attempt_request(request)
-            per = left if attempt_timeout is None else min(left, attempt_timeout)
+            per = min(left, per_attempt)
             try:
                 res = await self.broadcast(attempt_req, timeout=per)
                 err: Exception | None = None

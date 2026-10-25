@@ -16,7 +16,9 @@ from datetime import datetime
 __all__ = ["sign"]
 
 
-def sign(secret: bytes | str, user: str, channel: str, keys: Sequence[str], expires_at: datetime | None = None) -> str:
+def sign(
+    secret: bytes | str, *, user: str, channel: str, keys: Sequence[str], expires_at: datetime | None = None
+) -> str:
     """The signature authorizing user to track keys in channel until expires_at,
     as Centrifugo verifies it: "iat:exp:hmac", iat now and exp expires_at in
     Unix seconds - 0 when expires_at is None, for a signature which does not
@@ -24,7 +26,10 @@ def sign(secret: bytes | str, user: str, channel: str, keys: Sequence[str], expi
     of the connection's user, empty for an anonymous one.
 
     The signature covers exactly keys, in their order: a client tracking other
-    keys, or the same in another order, is refused.
+    keys, or the same in another order, is refused. The arguments but secret
+    are keyword-only, so that a user and a channel cannot be swapped:
+
+    >>> sharedpoll.sign(secret, user="42", channel="poll:prices", keys=["AAPL"], expires_at=exp)
     """
     return _sign_at(secret, user, channel, keys, expires_at, now=int(time.time()))
 
