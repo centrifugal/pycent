@@ -259,6 +259,18 @@ def test_wsgi() -> None:
     assert seen[0].raw is environ
 
 
+def test_wsgi_without_content_length_reads_no_body() -> None:
+    class Hang(io.BytesIO):
+        def read(self, size: int | None = -1) -> bytes:
+            raise AssertionError("read past the request: it would wait on a kept-alive connection")
+
+    started: list[str] = []
+    environ = {"REQUEST_METHOD": "GET", "PATH_INFO": "/", "QUERY_STRING": "", "wsgi.input": Hang()}
+    out = endpoints.ConnectionToken(lambda r: "t").wsgi(environ, lambda s, h: started.append(s))
+    assert started == ["200 OK"]
+    assert json.loads(b"".join(out)) == {"token": "t"}
+
+
 # The proxy.
 
 

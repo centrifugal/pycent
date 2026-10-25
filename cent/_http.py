@@ -248,7 +248,13 @@ class Handler:
         limit = self.max_body + 1
         body = b""
         if stream is not None:
-            body = stream.read(min(length, limit)) if length >= 0 else stream.read(limit)
+            if length >= 0:
+                body = stream.read(min(length, limit))
+            elif environ.get("wsgi.input_terminated"):
+                # A server which ends the input itself, for a chunked body.
+                body = stream.read(limit)
+            # Otherwise no length means no body: reading on would wait for the
+            # client to close a kept-alive connection (PEP 3333).
         headers = [(k[5:].replace("_", "-"), v) for k, v in environ.items() if k.startswith("HTTP_")]
         if environ.get("CONTENT_TYPE"):
             headers.append(("Content-Type", environ["CONTENT_TYPE"]))
