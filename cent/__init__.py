@@ -40,6 +40,7 @@ from cent._errors import (
     UnrecoverablePositionError,
     retryable,
 )
+from cent._http import HTTPRequest, HTTPResponse
 from cent._payload import JSON, RawJSON
 from cent._retry import BroadcastAttempt, exponential_backoff
 
@@ -67,6 +68,8 @@ __all__ = [
     "ConflictError",
     "DecodeError",
     "HTTPError",
+    "HTTPRequest",
+    "HTTPResponse",
     "InternalError",
     "InvalidConfigError",
     "InvalidRequestError",
