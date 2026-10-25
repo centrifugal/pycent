@@ -351,6 +351,19 @@ def django_view(handler):
 urlpatterns = [path("centrifugo/connect", django_view(connect_handler))]
 ```
 
+Mounted as an ASGI or WSGI app, a handler runs outside your framework's
+routing, so its function sees the request's headers but not, say, a FastAPI
+dependency. To use your framework's authentication, call the core from a route
+of your own, as the Django view does, and hand the function what it needs in
+`raw`:
+
+```python
+@app.post("/centrifugo/connect")
+async def connect(request: Request, user: User = Depends(current_user)) -> Response:
+    res = await connect_handler.ahandle(request.method, request.headers, await request.body(), raw=user)
+    return Response(res.body, status_code=res.status, headers=dict(res.headers))
+```
+
 ## Proxy
 
 `cent.proxy` is the backend side of Centrifugo's HTTP proxy, which calls your

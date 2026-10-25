@@ -9,11 +9,7 @@ description = "Python SDK for Centrifugo's HTTP server API: API client, tokens, 
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
-authors = [
-    { name = "Alexander Emelin" },
-    { name = "Katant Savelev" },
-    { name = "Bogdan Evstratenko" },
-]
+authors = [{ name = "Centrifugal Labs LTD" }]
 requires-python = ">=3.11"
 dependencies = ["httpx2>=2.16"]
 classifiers = [
