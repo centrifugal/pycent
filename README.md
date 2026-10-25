@@ -73,11 +73,13 @@ from cent import AsyncClient, PublishRequest
 api_url = "http://localhost:8000/api"
 api_key = "<CENTRIFUGO_API_KEY>"
 
+
 async def main():
     client = AsyncClient(api_url, api_key)
     request = PublishRequest(channel="channel", data={"input": "Hello world!"})
     result = await client.publish(request)
     print(result)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
