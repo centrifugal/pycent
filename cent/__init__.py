@@ -9,6 +9,7 @@ See https://github.com/centrifugal/pycent for the documentation.
 
 from cent import _api
 from cent._api import *  # noqa: F403 - the generated request and result types
+from cent._autobatch import AutoBatch
 from cent._batch import AsyncBatch, Batch, BatchResult, Pending
 from cent._broadcast import BroadcastResult, ChannelResult
 from cent._client import AsyncClient, Client, OnAttemptError
@@ -49,6 +50,7 @@ __all__ = [
     "ApiError",
     "AsyncBatch",
     "AsyncClient",
+    "AutoBatch",
     "BadRequestError",
     "Batch",
     "BatchFailedCommandsError",

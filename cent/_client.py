@@ -17,6 +17,7 @@ import httpx
 from cent import _broadcast, _core
 from cent import _wire as _w
 from cent._api import BroadcastRequest, _AsyncClientAPI, _ClientAPI
+from cent._autobatch import AsyncBatcher, AutoBatch, SyncBatcher
 from cent._batch import AsyncBatch, Batch
 from cent._broadcast import BroadcastResult, ChannelResult
 from cent._core import RequestInfo
@@ -25,6 +26,7 @@ from cent._errors import (
     BroadcastFailedChannelsError,
     CentTimeoutError,
     ClosedError,
+    InvalidConfigError,
     InvalidRequestError,
     retryable,
 )
@@ -43,6 +45,12 @@ attempt - and may log or count meanwhile. To stop, it raises: its exception
 propagates, chained to the broadcast's error (``__cause__``), which carries
 the result when Centrifugo replied. The wait never outlasts the call's
 timeout."""
+
+
+def _auto_batch(auto_batch: Any) -> AutoBatch | None:
+    if auto_batch is not None and not isinstance(auto_batch, AutoBatch):
+        raise InvalidConfigError("auto_batch must be a cent.AutoBatch")
+    return auto_batch
 
 
 def _idempotency_key() -> str:
@@ -125,6 +133,15 @@ class _Calls:
             self._active += 1
 
     def __exit__(self, *exc: object) -> None:
+        self.leave()
+
+    def add(self) -> None:
+        """Counts in work going on for calls already counted - an automatic
+        batch which outlives its callers - closed or not."""
+        with self._cond:
+            self._active += 1
+
+    def leave(self) -> None:
         with self._cond:
             self._active -= 1
             if self._active == 0:
@@ -150,6 +167,12 @@ class _AsyncCalls:
         self._active += 1
 
     def __exit__(self, *exc: object) -> None:
+        self.leave()
+
+    def add(self) -> None:
+        self._active += 1
+
+    def leave(self) -> None:
         self._active -= 1
         if self._active == 0 and self._idle is not None:
             self._idle.set()
@@ -226,6 +249,7 @@ class Client(_ClientAPI):
     - on_request: called after every HTTP request with a RequestInfo, for
       metrics without a dependency of cent's. It runs in the calling thread,
       and the call waits for it.
+    - auto_batch: sends calls made concurrently in batches - see AutoBatch.
     """
 
     def __init__(
@@ -239,6 +263,7 @@ class Client(_ClientAPI):
         request_timeout: float | None = None,
         headers: Mapping[str, str] | None = None,
         on_request: Callable[[RequestInfo], None] | None = None,
+        auto_batch: AutoBatch | None = None,
     ) -> None:
         self._cfg = _core.Config(
             api_endpoint=api_endpoint,
@@ -250,12 +275,12 @@ class Client(_ClientAPI):
             on_request=on_request,
         )
         if http_client is not None and not isinstance(http_client, httpx.Client):
-            raise _core.InvalidConfigError(
-                "http_client must be an httpx.Client; an AsyncClient takes httpx.AsyncClient"
-            )
+            raise InvalidConfigError("http_client must be an httpx.Client; an AsyncClient takes httpx.AsyncClient")
         self._own_http = http_client is None
         self._http = http_client if http_client is not None else _core.default_http_client()
         self._calls = _Calls()
+        ab = _auto_batch(auto_batch)
+        self._batcher = SyncBatcher(self, ab) if ab is not None else None
 
     # Sending.
 
@@ -291,11 +316,10 @@ class Client(_ClientAPI):
         make_body: Callable[[], bytes],
         *,
         commands: int,
-        timeout: float | None,
+        deadline: float,
         parse: Callable[[bytes], tuple[_T, int]],
         auto: bool = False,
     ) -> _T:
-        deadline = self._cfg.deadline(timeout)
         info = RequestInfo(method=method, commands=commands, auto_batch=auto)
         start = time.monotonic()
         try:
@@ -309,15 +333,27 @@ class Client(_ClientAPI):
     def _result(self, request: Any, timeout: float | None) -> dict[str, Any]:
         method = method_of(request)
         validate(request)
-        with self._calls:
+        deadline = self._cfg.deadline(timeout)
 
-            def parse(raw: bytes) -> tuple[tuple[dict[str, Any], ApiError | None], int]:
-                result, err = _core.envelope(raw, method)
-                return (result, err), 0 if err is None else 1
+        def parse(raw: bytes) -> tuple[tuple[dict[str, Any], ApiError | None], int]:
+            result, err = _core.envelope(raw, method)
+            return (result, err), 0 if err is None else 1
 
-            result, err = self._call(
-                method, lambda: _w.encode(request._to_wire(), method), commands=1, timeout=timeout, parse=parse
+        def alone() -> tuple[dict[str, Any], ApiError | None]:
+            return self._call(
+                method, lambda: _w.encode(request._to_wire(), method), commands=1, deadline=deadline, parse=parse
             )
+
+        with self._calls:
+            if self._batcher is None:
+                result, err = alone()
+            else:
+                went_alone, out = self._batcher.call(method, request, deadline, alone)
+                if went_alone:
+                    result, err = out
+                else:
+                    err = _core.command_error(out, 0, method)
+                    result = _w.obj(out.get(method) or {}, f"{method} reply")
         if err is not None:
             raise err
         return result
@@ -336,7 +372,18 @@ class Client(_ClientAPI):
         with self._calls:
             if body is None:
                 return []
-            return self._call("batch", lambda: body, commands=n, timeout=timeout, parse=parse)
+            return self._call("batch", lambda: body, commands=n, deadline=self._cfg.deadline(timeout), parse=parse)
+
+    def _send_auto_batch(self, body: bytes, n: int, timeout: float) -> list[dict[str, Any]]:
+        """An automatic batch: counted as a call by its batcher, closed or not."""
+
+        def parse(raw: bytes) -> tuple[list[dict[str, Any]], int]:
+            replies = _core.batch_replies(raw, n)
+            return replies, sum(1 for r in replies if r.get("error") is not None)
+
+        return self._call(
+            "batch", lambda: body, commands=n, deadline=time.monotonic() + timeout, parse=parse, auto=True
+        )
 
     # Broadcast.
 
@@ -496,6 +543,7 @@ class AsyncClient(_AsyncClientAPI):
         request_timeout: float | None = None,
         headers: Mapping[str, str] | None = None,
         on_request: Callable[[RequestInfo], None] | None = None,
+        auto_batch: AutoBatch | None = None,
     ) -> None:
         self._cfg = _core.Config(
             api_endpoint=api_endpoint,
@@ -507,10 +555,12 @@ class AsyncClient(_AsyncClientAPI):
             on_request=on_request,
         )
         if http_client is not None and not isinstance(http_client, httpx.AsyncClient):
-            raise _core.InvalidConfigError("http_client must be an httpx.AsyncClient; a Client takes httpx.Client")
+            raise InvalidConfigError("http_client must be an httpx.AsyncClient; a Client takes httpx.Client")
         self._own_http = http_client is None
         self._http = http_client if http_client is not None else _core.default_async_http_client()
         self._calls = _AsyncCalls()
+        ab = _auto_batch(auto_batch)
+        self._batcher = AsyncBatcher(self, ab) if ab is not None else None
 
     async def _roundtrip(
         self, method: str, make_body: Callable[[], bytes], deadline: float, info: RequestInfo
@@ -554,11 +604,10 @@ class AsyncClient(_AsyncClientAPI):
         make_body: Callable[[], bytes],
         *,
         commands: int,
-        timeout: float | None,
+        deadline: float,
         parse: Callable[[bytes], tuple[_T, int]],
         auto: bool = False,
     ) -> _T:
-        deadline = self._cfg.deadline(timeout)
         info = RequestInfo(method=method, commands=commands, auto_batch=auto)
         start = time.monotonic()
         try:
@@ -572,15 +621,27 @@ class AsyncClient(_AsyncClientAPI):
     async def _result(self, request: Any, timeout: float | None) -> dict[str, Any]:
         method = method_of(request)
         validate(request)
-        with self._calls:
+        deadline = self._cfg.deadline(timeout)
 
-            def parse(raw: bytes) -> tuple[tuple[dict[str, Any], ApiError | None], int]:
-                result, err = _core.envelope(raw, method)
-                return (result, err), 0 if err is None else 1
+        def parse(raw: bytes) -> tuple[tuple[dict[str, Any], ApiError | None], int]:
+            result, err = _core.envelope(raw, method)
+            return (result, err), 0 if err is None else 1
 
-            result, err = await self._call(
-                method, lambda: _w.encode(request._to_wire(), method), commands=1, timeout=timeout, parse=parse
+        async def alone() -> tuple[dict[str, Any], ApiError | None]:
+            return await self._call(
+                method, lambda: _w.encode(request._to_wire(), method), commands=1, deadline=deadline, parse=parse
             )
+
+        with self._calls:
+            if self._batcher is None:
+                result, err = await alone()
+            else:
+                went_alone, out = await self._batcher.call(method, request, deadline, alone)
+                if went_alone:
+                    result, err = out
+                else:
+                    err = _core.command_error(out, 0, method)
+                    result = _w.obj(out.get(method) or {}, f"{method} reply")
         if err is not None:
             raise err
         return result
@@ -599,7 +660,20 @@ class AsyncClient(_AsyncClientAPI):
         with self._calls:
             if body is None:
                 return []
-            return await self._call("batch", lambda: body, commands=n, timeout=timeout, parse=parse)
+            return await self._call(
+                "batch", lambda: body, commands=n, deadline=self._cfg.deadline(timeout), parse=parse
+            )
+
+    async def _send_auto_batch(self, body: bytes, n: int, timeout: float) -> list[dict[str, Any]]:
+        """An automatic batch: counted as a call by its batcher, closed or not."""
+
+        def parse(raw: bytes) -> tuple[list[dict[str, Any]], int]:
+            replies = _core.batch_replies(raw, n)
+            return replies, sum(1 for r in replies if r.get("error") is not None)
+
+        return await self._call(
+            "batch", lambda: body, commands=n, deadline=time.monotonic() + timeout, parse=parse, auto=True
+        )
 
     async def broadcast(self, request: BroadcastRequest, *, timeout: float | None = None) -> BroadcastResult:
         """Publishes the same data into many channels in one request, as
