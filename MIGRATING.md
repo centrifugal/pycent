@@ -68,7 +68,7 @@ for response in result.responses:
 try:
     client.broadcast(cent.BroadcastRequest(channels=channels, data=data))
 except cent.BroadcastFailedChannelsError as e:
-    for ch in e.failed:            # ChannelResult: channel, error, result
+    for ch in e.failed:  # ChannelResult: channel, error, result
         ...
 ```
 
@@ -84,7 +84,7 @@ result.replies[0]
 batch = client.new_batch(parallel=True)
 p1 = batch.publish(req1)
 p2 = batch.presence(req2)
-batch.send()          # raises BatchFailedCommandsError when any command failed
+batch.send()  # raises BatchFailedCommandsError when any command failed
 p1.result()
 ```
 
