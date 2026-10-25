@@ -7,11 +7,6 @@ including those of Centrifugo PRO, in a blocking `Client` and an async
 handlers and the endpoints client SDKs call. For a real-time client over
 WebSocket, see [centrifuge-python](https://github.com/centrifugal/centrifuge-python).
 
-Centrifugo PRO is commercial software, under the [Centrifugal Labs License
-Agreement](https://centrifugal.dev/license) - not under cent's MIT license.
-cent's methods for it are MIT licensed like the rest of cent; calling them
-needs a Centrifugo PRO server, whose use that agreement governs.
-
 ```
 pip install cent            # httpx2 is the only dependency
 pip install cent[crypto]    # RSA, ECDSA and Ed25519 tokens, with cryptography
@@ -284,6 +279,8 @@ any user can call the server API with their connection token:
 - set `http_api.jwks.audience` and `http_api.jwks.scope` to values only API
   tokens carry - `token.api` refuses claims with neither.
 
+The API keys rotate as client keys do: see [Key rotation with JWKS](#key-rotation-with-jwks).
+
 Rejected credentials make every call raise `cent.UnauthorizedError`.
 
 ## HTTP client, tracing and metrics
@@ -415,10 +412,70 @@ connection_token = endpoints.ConnectionToken(issue, on_error=log_error)
 
 An expiry is required: an aware `datetime`, or `token.NEVER` for a token
 accepted forever. `endpoints.SubscriptionToken` serves subscription tokens the
-same way, with the channel the client asks for. With RSA, ECDSA or Ed25519
-keys - `token.Key.from_pem(pem)` - `endpoints.JWKS(*keys)` publishes the public
-keys for Centrifugo's `jwks_public_endpoint`: the way to rotate keys without
-restarting Centrifugo.
+same way, with the channel the client asks for. To rotate keys without
+restarting Centrifugo, see [Key rotation with JWKS](#key-rotation-with-jwks).
+
+## Key rotation with JWKS
+
+By default Centrifugo verifies tokens with a single key from its
+configuration: `client.token.hmac_secret_key`, or an RSA, ECDSA or Ed25519
+public key. Changing that key means restarting Centrifugo, and from that
+moment it refuses every token signed with the old key. To rotate keys without
+that, your application can serve the keys itself, as a JSON Web Key Set (JWKS)
+at Centrifugo's `client.token.jwks_public_endpoint`. Each key in the set has an
+ID, and Centrifugo verifies a token with the key its `kid` header names:
+
+```python
+from pathlib import Path
+from cent import endpoints, token
+
+# An ID for each key, never reused for another key: Centrifugo caches keys by ID.
+key = token.Key.from_pem(Path("keys/2026-10.pem").read_bytes()).with_key_id("2026-10")
+
+jwks = endpoints.JWKS(key)  # served at the URL of jwks_public_endpoint
+tok = token.connection(key, token.ConnectionClaims(user="42", expires_at=expires_at))
+```
+
+```json
+{"client": {"token": {"jwks_public_endpoint": "https://app.example.com/centrifugo/jwks"}}}
+```
+
+Only RSA, ECDSA and Ed25519 keys can go in a set (`pip install cent[crypto]`).
+An HMAC secret has no public part to publish. Once `jwks_public_endpoint` is
+set, Centrifugo verifies tokens with the set only, and refuses tokens signed
+with the key it was configured with before. So moving to a JWKS is a
+one-time restart.
+
+How Centrifugo reads the set:
+
+- when a token names a key ID Centrifugo doesn't know, it fetches the set
+  again, at most once every 5 seconds;
+- it keeps the keys it fetched for 5 minutes (an hour before Centrifugo
+  v6.10.2), so a key dropped from the set stops working within that time;
+- when the endpoint can't be reached, it keeps using the keys it already has;
+- a token whose key isn't in the set is refused as expired, and the client
+  SDK asks for a new token.
+
+Rotate a key in three steps. Each step is one deploy of your application, and
+every instance should finish a step before any instance moves to the next:
+
+1. **Publish the new key alongside the current one,** and keep signing with
+   the current one: `endpoints.JWKS(current, new)`.
+2. **Sign with the new key.** Centrifugo fetches the set the first time it
+   sees the new ID.
+3. **Drop the old key** once every token it signed has expired: wait longer
+   than the longest `expires_at` you give.
+
+If a key leaks, do all three steps now, without waiting in step 3. Within
+5 minutes Centrifugo refuses new connections with the leaked key's tokens.
+Clients that connected before stay connected until their tokens expire:
+disconnect them with the server API if needed.
+
+Centrifugo PRO's API tokens rotate the same way, from a set of their own at
+`http_api.jwks.endpoint` (see [Authentication](#authentication)).
+`token.APITokens(current_key=...)` takes the key to sign with from a
+function, so it can switch to the new key at step 2. Each API token is reused
+for half its `ttl`, so in step 3 wait at least `ttl` after the switch.
 
 ## Shared poll signatures
 
