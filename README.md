@@ -470,6 +470,8 @@ which also covers sizing history for a whole response.
 
 ## More
 
+- [API.md](API.md): the API reference, every class, function and field, made
+  from the docstrings by `make docs`.
 - Docs for agents and LLMs: [centrifugal.dev/llms.txt](https://centrifugal.dev/llms.txt),
   an index of the current (v6) documentation.
 - Development: see [AGENTS.md](AGENTS.md); `make check` runs what CI does but

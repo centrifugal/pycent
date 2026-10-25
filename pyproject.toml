@@ -55,6 +55,9 @@ packages = ["cent"]
 [tool.ruff]
 line-length = 120
 target-version = "py311"
+# Generated from the docstrings by gen/api_docs.py: formatting it would make
+# it differ from what `make docs-check` compares it with.
+extend-exclude = ["API.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S", "C4", "SIM", "RUF", "PT", "ASYNC", "PIE", "RET", "PL"]

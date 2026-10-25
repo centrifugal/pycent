@@ -13,6 +13,7 @@ concurrency and hard to misuse. Read this before changing code.
 | `proto/api.proto`, `proto/proxy.proto` | Copies of Centrifugo's protos, from a released tag (`make sync-proto CENTRIFUGO_REF=v6.10.2`) |
 | `gen/` | The generator: `proto.py` parses the protos, `generate.py` writes the code |
 | `cent/_api.py`, `cent/proxy/_types.py` | Generated - never edited |
+| `API.md` | The API reference, generated from the docstrings by `gen/api_docs.py` (`make docs`) - never edited |
 | `cent/_client.py` | `Client` and `AsyncClient`: the two mirror each other line for line |
 | `cent/_core.py` | What both clients share: configuration, headers, reading replies - no I/O |
 | `cent/_wire.py`, `cent/_payload.py` | Encoding requests, decoding replies, payloads and `RawJSON` |
@@ -29,7 +30,9 @@ These are not preferences. A change that breaks one is wrong even if every test
 passes; if you find yourself about to break one, stop and say so instead.
 
 1. **The generated files are never edited.** Change `proto/` or `gen/`, then
-   `make generate`; `make generate-check` fails when they are stale.
+   `make generate`; `make generate-check` fails when they are stale. After a
+   change to a docstring or the public API, `make docs` regenerates `API.md`;
+   `make check` fails when it is stale.
 2. **A call raises unless it did everything asked.** A broadcast or batch in
    which some parts failed raises `BroadcastFailedChannelsError` or
    `BatchFailedCommandsError`, whose `result` holds every part's outcome. A

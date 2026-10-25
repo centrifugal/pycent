@@ -21,6 +21,14 @@ generate: ## Regenerate cent/_api.py from proto/api.proto
 generate-check: ## Fail when the generated code is stale
 	$(PY) gen/generate.py --check
 
+.PHONY: docs
+docs: ## Regenerate API.md, the API reference, from the docstrings
+	$(PY) gen/api_docs.py
+
+.PHONY: docs-check
+docs-check: ## Fail when API.md is stale
+	$(PY) gen/api_docs.py --check
+
 .PHONY: lint
 lint: ## ruff and mypy --strict
 	$(PY) -m ruff check .
@@ -36,7 +44,7 @@ test-integration: ## Integration tests, against the Centrifugo of testdata/ on :
 	$(PY) -m pytest -q -m integration
 
 .PHONY: check
-check: generate-check lint test ## What CI runs, but integration
+check: generate-check docs-check lint test ## What CI runs, but integration
 
 .PHONY: sync-proto
 sync-proto: ## Copy api.proto and proxy.proto from Centrifugo at CENTRIFUGO_REF (a tag), and regenerate
@@ -47,4 +55,4 @@ sync-proto: ## Copy api.proto and proxy.proto from Centrifugo at CENTRIFUGO_REF 
 	grep -q '^service CentrifugoApi' proto/api.proto.new || { rm -f proto/*.new; echo "not Centrifugo's api.proto"; exit 1; }; \
 	grep -q '^service CentrifugoProxy' proto/proxy.proto.new || { rm -f proto/*.new; echo "not Centrifugo's proxy.proto"; exit 1; }; \
 	mv proto/api.proto.new proto/api.proto; mv proto/proxy.proto.new proto/proxy.proto
-	$(MAKE) generate
+	$(MAKE) generate docs
