@@ -40,9 +40,13 @@ passes; if you find yourself about to break one, stop and say so instead.
    200 reply.
 4. **One deadline per call.** Its `timeout`, or `request_timeout`, bounds the
    whole call - the endpoint and token functions, connecting, the reply read.
-   The blocking client checks it between body chunks on top of httpx2's
-   per-phase timeouts; the async one wraps the call in `asyncio.timeout`. Any
-   timeout raises `CentTimeoutError`.
+   The async client wraps the call in `asyncio.timeout`. The blocking client's
+   default HTTP client sends through `cent/_deadline.py`: an httpcore2 network
+   backend bounding every connect, read and write by the time left, so a reply
+   trickling in - headers included - stops at the deadline. With a caller's
+   HTTP client, or an environment proxy, it falls back to httpx2's per-phase
+   timeouts and a check between body chunks. Any timeout raises
+   `CentTimeoutError`.
 5. **A payload is carried exactly.** A payload from a reply sent back unchanged
    is the same JSON value; `RawJSON` is sent as its text; NaN, infinities,
    bytes and invalid JSON never leave the client.
@@ -50,7 +54,9 @@ passes; if you find yourself about to break one, stop and say so instead.
    policy: credentials and headers go on each request.
 7. **Automatic batching never delays a call below `max_in_flight`**, never
    gives a caller a reply which is not its own, never sends a call whose caller
-   gave up while it queued, and `close` waits for batches whose callers left.
+   gave up while it queued, and `close` waits for batches whose callers left. A
+   batch runs in a context of its own - an empty `contextvars.Context` - which
+   carries callers' values only through `batch_context`.
 8. **`Client` and `AsyncClient` behave the same.** A change to one is made to
    the other, and the unit tests run each scenario against both (`Api` in
    `tests/test_client.py`).
@@ -105,6 +111,13 @@ which Centrifugo reaches as `host.docker.internal`.
 - **Payloads are spliced into the request's JSON** behind random placeholders:
   `RawJSON` keeps its number text, and no string of the request can pass for a
   placeholder.
+- **The default client's connection pool is replaced** (`_deadline.py`): httpx2
+  has no option for another network backend. `test_deadline_bounds_a_trickling_reply`
+  fails if httpx2 changes the attribute.
+- **No `wait(deadline, d)` helper** (spec 6): `time.sleep` and `asyncio.sleep` -
+  which cancellation ends - are the language's waits, and Python code carries
+  no deadline object to bound them by. `broadcast_with_retry` bounds its own
+  waits by its timeout.
 - **`rpc` is not offered**: it calls server API extensions, which Centrifugo
   does not provide.
 - **`BoolValue` fields are `bool | None`.** `None` leaves the server's setting

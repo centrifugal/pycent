@@ -4,16 +4,20 @@ flight. See AutoBatch."""
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import contextvars
+import copy
 import threading
 import time
 from collections import deque
 from collections.abc import Awaitable, Callable
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import Any, TypeVar
 
 from cent import _core
 from cent import _wire as _w
-from cent._errors import CentTimeoutError, InvalidConfigError
+from cent._errors import CentError, CentTimeoutError, InvalidConfigError
 
 _T = TypeVar("_T")
 
@@ -64,7 +68,7 @@ class _Queued:
     """A call waiting to be sent in a batch. Until done, its fields belong to the
     batcher; afterwards, to the caller."""
 
-    __slots__ = ("command", "deadline", "done", "error", "gone", "reply", "taken")
+    __slots__ = ("command", "context", "deadline", "done", "error", "gone", "index", "reply", "taken")
 
     def __init__(self, command: str, deadline: float, done: Any) -> None:
         # Encoded before it queued: the batch never reads the caller's request.
@@ -76,6 +80,10 @@ class _Queued:
         # taken once in a batch; gone once its caller gave up before that.
         self.taken = False
         self.gone = False
+        # Its place in the batch which carried it, for error messages.
+        self.index = 0
+        # The caller's context, for batch_context.
+        self.context = contextvars.copy_context()
 
 
 def _encode(method: str, request: Any) -> str:
@@ -90,8 +98,38 @@ def _take(queue: deque[_Queued], max_batch: int) -> list[_Queued]:
         if q.gone:
             continue
         q.taken = True
+        q.index = len(items)
         items.append(q)
     return items
+
+
+def _own(err: Exception) -> Exception:
+    """A copy of the error of a batch for one of its callers: raised in each
+    caller's thread or task, one shared object would gather all their
+    tracebacks."""
+    own = copy.copy(err)
+    own.__traceback__ = None
+    own.__cause__ = err.__cause__
+    return own
+
+
+BatchContext = Callable[[list[contextvars.Context]], AbstractContextManager[Any]]
+"""Makes the context an automatic batch's request runs in from its callers'
+contexts, in the order they queued: a context manager entered around the
+request, in a context of the batch's own. For a tracing span linked to each
+caller's span, say::
+
+    def batch_context(callers):
+        links = [trace.Link(c.run(trace.get_current_span).get_span_context()) for c in callers]
+        return tracer.start_as_current_span("cent batch", links=links)
+
+Use only the callers' values: some callers may be gone."""
+
+
+def _batch_context(make: BatchContext | None, items: list[_Queued]) -> AbstractContextManager[Any]:
+    if make is None:
+        return contextlib.nullcontext()
+    return make([q.context for q in items])
 
 
 def _drop_gone(queue: deque[_Queued]) -> None:
@@ -113,8 +151,9 @@ def _batch_deadline(items: list[_Queued], request_timeout: float) -> float:
 class SyncBatcher:
     """AutoBatch for Client, with threads."""
 
-    def __init__(self, client: Any, opts: AutoBatch) -> None:
+    def __init__(self, client: Any, opts: AutoBatch, batch_context: BatchContext | None = None) -> None:
         self._client = client
+        self._batch_context = batch_context
         self._max_in_flight = opts.max_in_flight
         self._max_batch = opts.max_batch_size
         self._lock = threading.Lock()
@@ -123,7 +162,8 @@ class SyncBatcher:
 
     def call(self, method: str, request: Any, deadline: float, alone: Callable[[], _T]) -> tuple[bool, Any]:
         """(True, what alone returned) when a slot was free and the call went
-        alone; (False, its command's reply) when it went in a batch."""
+        alone; (False, (its place in the batch, its command's reply)) when it
+        went in a batch."""
         command: str | None = None
         q: _Queued | None = None
         with self._lock:
@@ -151,7 +191,7 @@ class SyncBatcher:
                 self._release()
         return False, self._wait(q, method, deadline)
 
-    def _wait(self, q: _Queued, method: str, deadline: float) -> dict[str, Any]:
+    def _wait(self, q: _Queued, method: str, deadline: float) -> tuple[int, dict[str, Any]]:
         if not q.done.wait(max(0.0, deadline - time.monotonic())):
             with self._lock:
                 taken = q.taken
@@ -164,8 +204,8 @@ class SyncBatcher:
                 raise CentTimeoutError(f"{method}: timed out before it was sent")
             # The reply came as the deadline ended: it is the call's outcome.
         if q.error is not None:
-            raise q.error
-        return q.reply
+            raise _own(q.error)
+        return q.index, q.reply
 
     def _release(self) -> None:
         """Hands the slot of a finished request to the calls waiting, if any, and
@@ -183,30 +223,36 @@ class SyncBatcher:
 
     def _flush(self, items: list[_Queued]) -> None:
         try:
-            if not items:
-                return
-            body = _batch_body(items)
-            timeout = _batch_deadline(items, self._client._cfg.request_timeout) - time.monotonic()
-            try:
-                replies = self._client._send_auto_batch(body, len(items), timeout)
-            except Exception as e:
-                for q in items:
-                    q.error = e
-                    q.done.set()
-                return
-            for q, r in zip(items, replies, strict=True):
-                q.reply = r
-                q.done.set()
+            if items:
+                # A batch is no one caller's: it runs in a context of its own,
+                # which carries the callers' values only through batch_context.
+                contextvars.Context().run(self._send, items)
         finally:
             self._release()
             self._client._calls.leave()
+
+    def _send(self, items: list[_Queued]) -> None:
+        body = _batch_body(items)
+        timeout = _batch_deadline(items, self._client._cfg.request_timeout) - time.monotonic()
+        try:
+            with _batch_context(self._batch_context, items):
+                replies = self._client._send_auto_batch(body, len(items), timeout)
+        except Exception as e:
+            for q in items:
+                q.error = e
+                q.done.set()
+            return
+        for q, r in zip(items, replies, strict=True):
+            q.reply = r
+            q.done.set()
 
 
 class AsyncBatcher:
     """AutoBatch for AsyncClient, on its event loop."""
 
-    def __init__(self, client: Any, opts: AutoBatch) -> None:
+    def __init__(self, client: Any, opts: AutoBatch, batch_context: BatchContext | None = None) -> None:
         self._client = client
+        self._batch_context = batch_context
         self._max_in_flight = opts.max_in_flight
         self._max_batch = opts.max_batch_size
         self._in_flight = 0
@@ -242,8 +288,8 @@ class AsyncBatcher:
                 raise CentTimeoutError(f"{method}: timed out")
             raise CentTimeoutError(f"{method}: timed out before it was sent")
         if q.error is not None:
-            raise q.error
-        return False, q.reply
+            raise _own(q.error)
+        return False, (q.index, q.reply)
 
     def _release(self) -> None:
         _drop_gone(self._queue)
@@ -252,7 +298,9 @@ class AsyncBatcher:
             return
         items = _take(self._queue, self._max_batch)
         self._client._calls.add()
-        task = asyncio.get_running_loop().create_task(self._flush(items))
+        # A batch is no one caller's: it runs in a context of its own, which
+        # carries the callers' values only through batch_context.
+        task = asyncio.get_running_loop().create_task(self._flush(items), context=contextvars.Context())
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 
@@ -263,12 +311,18 @@ class AsyncBatcher:
             body = _batch_body(items)
             timeout = _batch_deadline(items, self._client._cfg.request_timeout) - time.monotonic()
             try:
-                replies = await self._client._send_auto_batch(body, len(items), timeout)
-            except Exception as e:
+                with _batch_context(self._batch_context, items):
+                    replies = await self._client._send_auto_batch(body, len(items), timeout)
+            except BaseException as e:
+                # Cancelled too - at the loop's shutdown, say: the callers must
+                # not wait for a reply nothing will give them.
+                err = e if isinstance(e, Exception) else CentError(f"batch interrupted: {e!r}")
                 for q in items:
-                    q.error = e
+                    q.error = err
                     if not q.done.done():
                         q.done.set_result(None)
+                if not isinstance(e, Exception):
+                    raise
                 return
             for q, r in zip(items, replies, strict=True):
                 q.reply = r

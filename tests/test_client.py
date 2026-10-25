@@ -95,7 +95,7 @@ def test_publish(api: Api, fake: Fake) -> None:
 def test_every_method_reaches_its_endpoint(api: Api, fake: Fake) -> None:
     methods = [m for m in cent._api.METHODS if m not in ("batch", "broadcast")]
     for m in methods:
-        request_type = next(t for t in cent._api.REQUESTS if m == t.API_METHOD)
+        request_type = next(t for t in cent._api.REQUESTS if m == t.api_method)
         req = request_type()
         if m == "publish":
             req = cent.PublishRequest(channel="ch", data=1)
@@ -277,7 +277,7 @@ def test_validation(api: Api, fake: Fake) -> None:
     ]
     for req, msg in cases:
         with pytest.raises(cent.InvalidRequestError, match=re.escape(msg)):
-            getattr(api, req.API_METHOD)(req)
+            getattr(api, req.api_method)(req)
     assert fake.requests == []
 
 
@@ -657,12 +657,16 @@ def test_new_command() -> None:
         ({"api_endpoint": "http://x/api/publish"}, "ends with the method"),
         ({"api_endpoint": ENDPOINT, "api_endpoint_func": lambda: ENDPOINT}, "not both"),
         ({"api_endpoint": ENDPOINT, "api_key": "k", "bearer_token_func": lambda: "t"}, "not both"),
-        ({"api_endpoint": ENDPOINT, "api_key": "k\n"}, "control character"),
+        ({"api_endpoint": ENDPOINT, "api_key": "k\n"}, "printable ASCII"),
+        ({"api_endpoint": ENDPOINT, "api_key": "clé"}, "printable ASCII"),
+        ({"api_endpoint_func": 123}, "callable"),
+        ({"api_endpoint": ENDPOINT, "bearer_token_func": "token"}, "callable"),
         ({"api_endpoint": ENDPOINT, "headers": {"X-Api-Key": "k"}}, "use api_key"),
         ({"api_endpoint": ENDPOINT, "headers": {"authorization": "x"}}, "bearer_token_func"),
         ({"api_endpoint": ENDPOINT, "headers": {"Content-Type": "x"}}, "Content-Type"),
         ({"api_endpoint": ENDPOINT, "headers": {"Bad Name": "x"}}, "not a valid HTTP header name"),
-        ({"api_endpoint": ENDPOINT, "headers": {"X-A": "a\r\nb"}}, "control character"),
+        ({"api_endpoint": ENDPOINT, "headers": {"X-A": "a\r\nb"}}, "printable ASCII"),
+        ({"api_endpoint": ENDPOINT, "headers": {"X-A": "é"}}, "printable ASCII"),
         ({"api_endpoint": ENDPOINT, "request_timeout": -1}, "positive"),
         ({"api_endpoint": ENDPOINT, "http_client": httpx2.AsyncClient()}, "must be an httpx2.Client"),
     ],

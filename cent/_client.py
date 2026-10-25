@@ -14,10 +14,10 @@ from typing import Any, TypeVar
 
 import httpx2
 
-from cent import _broadcast, _core
+from cent import _broadcast, _core, _deadline
 from cent import _wire as _w
 from cent._api import BroadcastRequest, _AsyncClientAPI, _ClientAPI
-from cent._autobatch import AsyncBatcher, AutoBatch, SyncBatcher
+from cent._autobatch import AsyncBatcher, AutoBatch, BatchContext, SyncBatcher
 from cent._batch import AsyncBatch, Batch
 from cent._broadcast import BroadcastResult, ChannelResult
 from cent._core import RequestInfo
@@ -26,6 +26,7 @@ from cent._errors import (
     BroadcastFailedChannelsError,
     CentTimeoutError,
     ClosedError,
+    DecodeError,
     InvalidConfigError,
     InvalidRequestError,
     retryable,
@@ -60,6 +61,12 @@ def _check_http_client(http_client: Any, want: type[Any], name: str) -> None:
     raise InvalidConfigError(
         f"http_client must be an httpx2.{want.__name__} for a {name}, not {t.__name__}; a {other} takes httpx2.{other}"
     )
+
+
+def _callable(f: Any) -> Any:
+    if f is not None and not callable(f):
+        raise InvalidConfigError("batch_context must be callable")
+    return f
 
 
 def _auto_batch(auto_batch: Any) -> AutoBatch | None:
@@ -266,6 +273,10 @@ class Client(_ClientAPI):
       metrics without a dependency of cent's. It runs in the calling thread,
       and the call waits for it.
     - auto_batch: sends calls made concurrently in batches - see AutoBatch.
+    - batch_context: with auto_batch, makes the context of a batch's request
+      from its callers' - for a tracing span linking every caller's - see
+      BatchContext. Without it, a batch runs in a context of its own, carrying
+      no caller's values.
     """
 
     def __init__(
@@ -280,6 +291,7 @@ class Client(_ClientAPI):
         headers: Mapping[str, str] | None = None,
         on_request: Callable[[RequestInfo], None] | None = None,
         auto_batch: AutoBatch | None = None,
+        batch_context: BatchContext | None = None,
     ) -> None:
         self._cfg = _core.Config(
             api_endpoint=api_endpoint,
@@ -295,7 +307,7 @@ class Client(_ClientAPI):
         self._http = http_client if http_client is not None else _core.default_http_client()
         self._calls = _Calls()
         ab = _auto_batch(auto_batch)
-        self._batcher = SyncBatcher(self, ab) if ab is not None else None
+        self._batcher = SyncBatcher(self, ab, _callable(batch_context)) if ab is not None else None
 
     # Sending.
 
@@ -307,6 +319,7 @@ class Client(_ClientAPI):
         token = _core.checked_token(cfg.token_func()) if cfg.token_func is not None else None
         body = make_body()
         left = _core.remaining(deadline, method)
+        bound = _deadline.deadline.set(deadline)
         try:
             with self._http.stream(
                 "POST",
@@ -322,8 +335,12 @@ class Client(_ClientAPI):
                     _read(chunks, deadline, method, _core.MAX_DRAIN_BYTES)
                     raise _core.http_error(method, resp.status_code, data, resp.headers)
                 return _read(resp.iter_bytes(), deadline, method)
-        except httpx2.TransportError as e:
+        except httpx2.DecodingError as e:
+            raise DecodeError(f"{method}: the reply cannot be decoded: {e}") from e
+        except httpx2.HTTPError as e:
             raise _core.transport_error(method, e) from e
+        finally:
+            _deadline.deadline.reset(bound)
 
     def _call(
         self,
@@ -367,8 +384,9 @@ class Client(_ClientAPI):
                 if went_alone:
                     result, err = out
                 else:
-                    err = _core.command_error(out, 0, method)
-                    result = _w.obj(out.get(method) or {}, f"{method} reply")
+                    index, reply = out
+                    err = _core.command_error(reply, index, method)
+                    result = _w.obj(reply.get(method) or {}, f"replies[{index}].{method}")
         if err is not None:
             raise err
         return result
@@ -559,6 +577,7 @@ class AsyncClient(_AsyncClientAPI):
         headers: Mapping[str, str] | None = None,
         on_request: Callable[[RequestInfo], None] | None = None,
         auto_batch: AutoBatch | None = None,
+        batch_context: BatchContext | None = None,
     ) -> None:
         self._cfg = _core.Config(
             api_endpoint=api_endpoint,
@@ -574,7 +593,7 @@ class AsyncClient(_AsyncClientAPI):
         self._http = http_client if http_client is not None else _core.default_async_http_client()
         self._calls = _AsyncCalls()
         ab = _auto_batch(auto_batch)
-        self._batcher = AsyncBatcher(self, ab) if ab is not None else None
+        self._batcher = AsyncBatcher(self, ab, _callable(batch_context)) if ab is not None else None
 
     async def _roundtrip(
         self, method: str, make_body: Callable[[], bytes], deadline: float, info: RequestInfo
@@ -605,7 +624,9 @@ class AsyncClient(_AsyncClientAPI):
                         await _aread(chunks, _core.MAX_DRAIN_BYTES)
                         raise _core.http_error(method, resp.status_code, data, resp.headers)
                     return await resp.aread()
-        except httpx2.TransportError as e:
+        except httpx2.DecodingError as e:
+            raise DecodeError(f"{method}: the reply cannot be decoded: {e}") from e
+        except httpx2.HTTPError as e:
             raise _core.transport_error(method, e) from e
         except TimeoutError as e:
             if timer.expired() and not isinstance(e, CentTimeoutError):
@@ -654,8 +675,9 @@ class AsyncClient(_AsyncClientAPI):
                 if went_alone:
                     result, err = out
                 else:
-                    err = _core.command_error(out, 0, method)
-                    result = _w.obj(out.get(method) or {}, f"{method} reply")
+                    index, reply = out
+                    err = _core.command_error(reply, index, method)
+                    result = _w.obj(reply.get(method) or {}, f"replies[{index}].{method}")
         if err is not None:
             raise err
         return result

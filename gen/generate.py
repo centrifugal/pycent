@@ -196,7 +196,7 @@ def emit_message(out: list[str], m: Message, api_method: str | None, protocol: s
     out.extend(docstring(doc, "    "))
     if api_method is not None:
         p("")
-        p(f"    API_METHOD: ClassVar[str] = {api_method!r}")
+        p(f"    api_method: ClassVar[str] = {api_method!r}")
         p('    """The server API method the request is sent to."""')
     for f in m.fields:
         ann, default = field_type(f)

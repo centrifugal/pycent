@@ -137,7 +137,7 @@ __all__ = [
 class PublishRequest:
     """PublishRequest publishes data into a channel."""
 
-    API_METHOD: ClassVar[str] = "publish"
+    api_method: ClassVar[str] = "publish"
     """The server API method the request is sent to."""
 
     channel: str = ""
@@ -254,7 +254,7 @@ class PublishResult:
 class BroadcastRequest:
     """BroadcastRequest publishes the same data into many channels."""
 
-    API_METHOD: ClassVar[str] = "broadcast"
+    api_method: ClassVar[str] = "broadcast"
     """The server API method the request is sent to."""
 
     channels: list[str] = field(default_factory=list)
@@ -409,7 +409,7 @@ class SubscribeRequest:
     for the caller.
     """
 
-    API_METHOD: ClassVar[str] = "subscribe"
+    api_method: ClassVar[str] = "subscribe"
     """The server API method the request is sent to."""
 
     channel: str = ""
@@ -588,7 +588,7 @@ class SubscribeResult:
 class UnsubscribeRequest:
     """UnsubscribeRequest unsubscribes a user from a channel."""
 
-    API_METHOD: ClassVar[str] = "unsubscribe"
+    api_method: ClassVar[str] = "unsubscribe"
     """The server API method the request is sent to."""
 
     channel: str = ""
@@ -692,7 +692,7 @@ class Disconnect:
 class DisconnectRequest:
     """DisconnectRequest disconnects a user's connections."""
 
-    API_METHOD: ClassVar[str] = "disconnect"
+    api_method: ClassVar[str] = "disconnect"
     """The server API method the request is sent to."""
 
     user: str = ""
@@ -777,7 +777,7 @@ class PresenceRequest:
     currently subscribed to it. Presence must be enabled for the channel.
     """
 
-    API_METHOD: ClassVar[str] = "presence"
+    api_method: ClassVar[str] = "presence"
     """The server API method the request is sent to."""
 
     channel: str = ""
@@ -864,7 +864,7 @@ class PresenceStatsRequest:
     channel.
     """
 
-    API_METHOD: ClassVar[str] = "presence_stats"
+    api_method: ClassVar[str] = "presence_stats"
     """The server API method the request is sent to."""
 
     channel: str = ""
@@ -944,7 +944,7 @@ class HistoryRequest:
     History must be enabled for the channel.
     """
 
-    API_METHOD: ClassVar[str] = "history"
+    api_method: ClassVar[str] = "history"
     """The server API method the request is sent to."""
 
     channel: str = ""
@@ -1064,7 +1064,7 @@ class HistoryRemoveRequest:
     disconnected because of insufficient state.
     """
 
-    API_METHOD: ClassVar[str] = "history_remove"
+    api_method: ClassVar[str] = "history_remove"
     """The server API method the request is sent to."""
 
     channel: str = ""
@@ -1103,7 +1103,7 @@ class HistoryRemoveResult:
 class InfoRequest:
     """InfoRequest returns information about the running Centrifugo nodes."""
 
-    API_METHOD: ClassVar[str] = "info"
+    api_method: ClassVar[str] = "info"
     """The server API method the request is sent to."""
 
     def _to_wire(self) -> dict[str, Any]:
@@ -1143,7 +1143,7 @@ class RefreshRequest:
     non-expiring.
     """
 
-    API_METHOD: ClassVar[str] = "refresh"
+    api_method: ClassVar[str] = "refresh"
     """The server API method the request is sent to."""
 
     user: str = ""
@@ -1365,7 +1365,7 @@ class ChannelsRequest:
     It can be heavy on large deployments: there is no pagination.
     """
 
-    API_METHOD: ClassVar[str] = "channels"
+    api_method: ClassVar[str] = "channels"
     """The server API method the request is sent to."""
 
     pattern: str = ""
@@ -1434,7 +1434,7 @@ class ConnectionsRequest:
     label_filter must be set. Centrifugo PRO only.
     """
 
-    API_METHOD: ClassVar[str] = "connections"
+    api_method: ClassVar[str] = "connections"
     """The server API method the request is sent to."""
 
     user: str = ""
@@ -1712,7 +1712,7 @@ class UpdateUserStatusRequest:
     their state when one is given. Centrifugo PRO only.
     """
 
-    API_METHOD: ClassVar[str] = "update_user_status"
+    api_method: ClassVar[str] = "update_user_status"
     """The server API method the request is sent to."""
 
     users: list[str] = field(default_factory=list)
@@ -1759,7 +1759,7 @@ class UpdateUserStatusResult:
 class GetUserStatusRequest:
     """GetUserStatusRequest returns the status of users. Centrifugo PRO only."""
 
-    API_METHOD: ClassVar[str] = "get_user_status"
+    api_method: ClassVar[str] = "get_user_status"
     """The server API method the request is sent to."""
 
     users: list[str] = field(default_factory=list)
@@ -1849,7 +1849,7 @@ class UserStatus:
 class DeleteUserStatusRequest:
     """DeleteUserStatusRequest deletes the status of users. Centrifugo PRO only."""
 
-    API_METHOD: ClassVar[str] = "delete_user_status"
+    api_method: ClassVar[str] = "delete_user_status"
     """The server API method the request is sent to."""
 
     users: list[str] = field(default_factory=list)
@@ -1890,7 +1890,7 @@ class BlockUserRequest:
     connect again until unblocked or the block expires. Centrifugo PRO only.
     """
 
-    API_METHOD: ClassVar[str] = "block_user"
+    api_method: ClassVar[str] = "block_user"
     """The server API method the request is sent to."""
 
     expire_at: int = 0
@@ -1938,7 +1938,7 @@ class BlockUserResult:
 class UnblockUserRequest:
     """UnblockUserRequest unblocks a user. Centrifugo PRO only."""
 
-    API_METHOD: ClassVar[str] = "unblock_user"
+    api_method: ClassVar[str] = "unblock_user"
     """The server API method the request is sent to."""
 
     user: str = ""
@@ -1980,7 +1980,7 @@ class RevokeTokenRequest:
     with it again. Centrifugo PRO only.
     """
 
-    API_METHOD: ClassVar[str] = "revoke_token"
+    api_method: ClassVar[str] = "revoke_token"
     """The server API method the request is sent to."""
 
     expire_at: int = 0
@@ -2029,7 +2029,7 @@ class InvalidateUserTokensRequest:
     certain time (based on the iat claim of a JWT). Centrifugo PRO only.
     """
 
-    API_METHOD: ClassVar[str] = "invalidate_user_tokens"
+    api_method: ClassVar[str] = "invalidate_user_tokens"
     """The server API method the request is sent to."""
 
     expire_at: int = 0
@@ -2094,7 +2094,7 @@ class DeviceRegisterRequest:
     updates a registered one. Centrifugo PRO only.
     """
 
-    API_METHOD: ClassVar[str] = "device_register"
+    api_method: ClassVar[str] = "device_register"
     """The server API method the request is sent to."""
 
     id: str = ""
@@ -2181,7 +2181,7 @@ class DeviceUpdateRequest:
     users. Centrifugo PRO only.
     """
 
-    API_METHOD: ClassVar[str] = "device_update"
+    api_method: ClassVar[str] = "device_update"
     """The server API method the request is sent to."""
 
     ids: list[str] = field(default_factory=list)
@@ -2252,7 +2252,7 @@ class DeviceRemoveRequest:
     Centrifugo PRO only.
     """
 
-    API_METHOD: ClassVar[str] = "device_remove"
+    api_method: ClassVar[str] = "device_remove"
     """The server API method the request is sent to."""
 
     ids: list[str] = field(default_factory=list)
@@ -2440,7 +2440,7 @@ class DeviceListRequest:
     Centrifugo PRO only.
     """
 
-    API_METHOD: ClassVar[str] = "device_list"
+    api_method: ClassVar[str] = "device_list"
     """The server API method the request is sent to."""
 
     filter: DeviceFilter | None = None
@@ -2563,7 +2563,7 @@ class DeviceTopicListRequest:
     subscriptions. Centrifugo PRO only.
     """
 
-    API_METHOD: ClassVar[str] = "device_topic_list"
+    api_method: ClassVar[str] = "device_topic_list"
     """The server API method the request is sent to."""
 
     filter: DeviceTopicFilter | None = None
@@ -2652,7 +2652,7 @@ class UserTopicListRequest:
     subscriptions. Centrifugo PRO only.
     """
 
-    API_METHOD: ClassVar[str] = "user_topic_list"
+    api_method: ClassVar[str] = "user_topic_list"
     """The server API method the request is sent to."""
 
     filter: UserTopicFilter | None = None
@@ -2703,7 +2703,7 @@ class DeviceTopicUpdateRequest:
     Centrifugo PRO only.
     """
 
-    API_METHOD: ClassVar[str] = "device_topic_update"
+    api_method: ClassVar[str] = "device_topic_update"
     """The server API method the request is sent to."""
 
     device_id: str = ""
@@ -2750,7 +2750,7 @@ class UserTopicUpdateRequest:
     applied to the user's registered devices. Centrifugo PRO only.
     """
 
-    API_METHOD: ClassVar[str] = "user_topic_update"
+    api_method: ClassVar[str] = "user_topic_update"
     """The server API method the request is sent to."""
 
     user: str = ""
@@ -3378,7 +3378,7 @@ class SendPushNotificationRequest:
     Centrifugo PRO only.
     """
 
-    API_METHOD: ClassVar[str] = "send_push_notification"
+    api_method: ClassVar[str] = "send_push_notification"
     """The server API method the request is sent to."""
 
     recipient: PushRecipient | None = None
@@ -3671,7 +3671,7 @@ class UpdatePushStatusRequest:
     push notification to analytics. Experimental. Centrifugo PRO only.
     """
 
-    API_METHOD: ClassVar[str] = "update_push_status"
+    api_method: ClassVar[str] = "update_push_status"
     """The server API method the request is sent to."""
 
     analytics_uid: str = ""
@@ -3734,7 +3734,7 @@ class CancelPushRequest:
     send_at). Centrifugo PRO only.
     """
 
-    API_METHOD: ClassVar[str] = "cancel_push"
+    api_method: ClassVar[str] = "cancel_push"
     """The server API method the request is sent to."""
 
     uid: str = ""
@@ -3773,7 +3773,7 @@ class CancelPushResult:
 class MapPublishRequest:
     """MapPublishRequest publishes or updates a key in a map channel."""
 
-    API_METHOD: ClassVar[str] = "map_publish"
+    api_method: ClassVar[str] = "map_publish"
     """The server API method the request is sent to."""
 
     channel: str = ""
@@ -3929,7 +3929,7 @@ class MapPublishResult:
 class MapRemoveRequest:
     """MapRemoveRequest removes a key from a map channel."""
 
-    API_METHOD: ClassVar[str] = "map_remove"
+    api_method: ClassVar[str] = "map_remove"
     """The server API method the request is sent to."""
 
     channel: str = ""
@@ -4014,7 +4014,7 @@ class MapReadStateRequest:
     optional pagination.
     """
 
-    API_METHOD: ClassVar[str] = "map_read_state"
+    api_method: ClassVar[str] = "map_read_state"
     """The server API method the request is sent to."""
 
     channel: str = ""
@@ -4186,7 +4186,7 @@ class MapEntry:
 class MapReadStreamRequest:
     """MapReadStreamRequest reads the change stream of a map channel."""
 
-    API_METHOD: ClassVar[str] = "map_read_stream"
+    api_method: ClassVar[str] = "map_read_stream"
     """The server API method the request is sent to."""
 
     channel: str = ""
@@ -4273,7 +4273,7 @@ class MapReadStreamResult:
 class MapStatsRequest:
     """MapStatsRequest returns statistics about a map channel."""
 
-    API_METHOD: ClassVar[str] = "map_stats"
+    api_method: ClassVar[str] = "map_stats"
     """The server API method the request is sent to."""
 
     channel: str = ""
@@ -4318,7 +4318,7 @@ class MapStatsResult:
 class MapClearRequest:
     """MapClearRequest removes all state and stream data of a map channel."""
 
-    API_METHOD: ClassVar[str] = "map_clear"
+    api_method: ClassVar[str] = "map_clear"
     """The server API method the request is sent to."""
 
     channel: str = ""
@@ -4358,7 +4358,7 @@ class SharedPollPublishRequest:
     versioned mode and publish_enabled on the namespace.
     """
 
-    API_METHOD: ClassVar[str] = "shared_poll_publish"
+    api_method: ClassVar[str] = "shared_poll_publish"
     """The server API method the request is sent to."""
 
     channel: str = ""

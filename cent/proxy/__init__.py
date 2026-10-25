@@ -167,7 +167,7 @@ class _ProxyHandler(Handler, Generic[_Req, _Res]):
             return allow("POST")
         try:
             decoded = self._request._from_wire(json.loads(body))
-        except (ValueError, DecodeError) as e:
+        except (ValueError, RecursionError, DecodeError) as e:
             return self._fail(req, 400, ValueError(f"proxy: malformed {self._name} request: {e}"))
         return (decoded,)
 

@@ -59,7 +59,7 @@ class _Endpoint(Handler):
     def _json(self, req: HTTPRequest, body: bytes) -> dict[str, Any] | HTTPResponse:
         try:
             d = json.loads(body)
-        except ValueError as e:
+        except (ValueError, RecursionError) as e:
             return self._fail(req, 400, ValueError(f"malformed request: {e}"))
         if not isinstance(d, dict):
             return self._fail(req, 400, ValueError("malformed request: not a JSON object"))

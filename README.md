@@ -83,9 +83,9 @@ seconds by default - bounds it:
 client.info(timeout=0.5)
 ```
 
-The timeout bounds the whole call, connecting and reading included. However a
-call times out, it raises `cent.CentTimeoutError`, which is also a builtin
-`TimeoutError`. In asyncio code an `asyncio.timeout()` around a call, or
+The timeout bounds the whole call, connecting and reading included - also a
+reply trickling in, headers and all. However a call times out, it raises
+`cent.CentTimeoutError`, which is also a builtin `TimeoutError`. In asyncio code an `asyncio.timeout()` around a call, or
 cancelling its task, ends it sooner.
 
 `broadcast_with_retry` makes several requests in one call: its `timeout`
@@ -240,6 +240,19 @@ Every call still gets its own result or error, and keeps its own timeout. Calls
 sharing a batch share its request, though: if the request itself fails - the
 network, a body too large for a proxy in front of Centrifugo - every call in it
 fails. A smaller `max_in_flight` batches more; 8 suits most applications.
+
+A batch belongs to no single caller: it runs in a context of its own, which
+carries no caller's `contextvars`. `batch_context` makes it one from the
+callers' contexts - for a tracing span linking each caller's span:
+
+```python
+def batch_context(callers: list[contextvars.Context]):
+    links = [trace.Link(c.run(trace.get_current_span).get_span_context()) for c in callers]
+    return tracer.start_as_current_span("cent batch", links=links)
+
+
+client = cent.Client(endpoint, api_key=key, auto_batch=cent.AutoBatch(max_in_flight=8), batch_context=batch_context)
+```
 
 ## Authentication
 

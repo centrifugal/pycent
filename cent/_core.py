@@ -20,6 +20,7 @@ from cent._errors import (
     DecodeError,
     HTTPError,
     InvalidConfigError,
+    InvalidRequestError,
     NetworkError,
     UnauthorizedError,
 )
@@ -107,7 +108,8 @@ def valid_header_name(name: str) -> bool:
 
 
 def valid_header_value(value: str) -> bool:
-    return all((ord(c) >= 0x20 or c == "\t") and ord(c) != 0x7F for c in value)
+    """Printable ASCII and tab: what HTTP header values carry without an encoding."""
+    return all((0x20 <= ord(c) < 0x7F) or c == "\t" for c in value)
 
 
 class Config:
@@ -129,6 +131,8 @@ class Config:
         if api_endpoint is not None and api_endpoint_func is not None:
             raise InvalidConfigError("set api_endpoint or api_endpoint_func, not both")
         self.endpoint = check_endpoint(api_endpoint) if api_endpoint is not None else ""
+        if api_endpoint_func is not None and not callable(api_endpoint_func):
+            raise InvalidConfigError("api_endpoint_func must be callable")
         self.endpoint_func = api_endpoint_func
 
         if not isinstance(api_key, str):
@@ -138,7 +142,9 @@ class Config:
                 "set api_key or bearer_token_func, not both: a request with a bearer token is judged by the token alone"
             )
         if not valid_header_value(api_key):
-            raise InvalidConfigError("api_key contains a line break or another control character")
+            raise InvalidConfigError("api_key must be printable ASCII: no line breaks, control or non-ASCII characters")
+        if bearer_token_func is not None and not callable(bearer_token_func):
+            raise InvalidConfigError("bearer_token_func must be callable")
         self.token_func = bearer_token_func
 
         hdrs: dict[str, str] = {}
@@ -153,7 +159,9 @@ class Config:
             if not valid_header_name(k):
                 raise InvalidConfigError(f"headers: {k!r} is not a valid HTTP header name")
             if not isinstance(v, str) or not valid_header_value(v):
-                raise InvalidConfigError(f"headers: {k} has a value with a line break or another control character")
+                raise InvalidConfigError(
+                    f"headers: {k} must be printable ASCII: no line breaks, control or non-ASCII characters"
+                )
             if lk == "host" and not v:
                 raise InvalidConfigError("headers: Host must not be empty")
             hdrs[k] = v
@@ -180,7 +188,7 @@ class Config:
         if timeout is None:
             timeout = self.request_timeout
         elif isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout < 0:
-            raise ValueError("timeout must be a non-negative number of seconds")
+            raise InvalidRequestError("timeout must be a non-negative number of seconds")
         return time.monotonic() + timeout
 
     def request_headers(self, token: str | None) -> dict[str, str]:
@@ -208,8 +216,7 @@ def checked_endpoint(addr: Any) -> str:
 def checked_token(token: Any) -> str:
     if not isinstance(token, str) or not token or not valid_header_value(token):
         raise InvalidConfigError(
-            "bearer_token_func returned an empty token, not a str, "
-            "or one with a line break or another control character"
+            "bearer_token_func returned an empty token, not a str, or one which is not printable ASCII"
         )
     return token
 
@@ -228,7 +235,7 @@ def http_error(method: str, status: int, body: bytes, headers: Mapping[str, str]
     if status in _TRANSPORT_MODE_STATUSES:
         try:
             d = json.loads(body)
-        except ValueError:
+        except (ValueError, RecursionError):
             d = None
         # A body whose code is an HTTP error status - {"code": 429} from a rate
         # limiting gateway - is a gateway's, not Centrifugo's.
@@ -250,7 +257,7 @@ def envelope(body: bytes, method: str) -> tuple[dict[str, Any], ApiError | None]
     """The decoded reply of a method: its result, or its error."""
     try:
         d = json.loads(body)
-    except ValueError as e:
+    except (ValueError, RecursionError) as e:
         raise DecodeError(f"{method}: the reply is not JSON: {e}") from e
     if not isinstance(d, dict):
         raise DecodeError(f"{method}: the reply is not a JSON object")
@@ -268,7 +275,7 @@ def batch_replies(body: bytes, n: int) -> list[dict[str, Any]]:
     """The replies of a batch of n commands."""
     try:
         d = json.loads(body)
-    except ValueError as e:
+    except (ValueError, RecursionError) as e:
         raise DecodeError(f"batch: the reply is not JSON: {e}") from e
     if not isinstance(d, dict):
         raise DecodeError("batch: the reply is not a JSON object")
@@ -304,9 +311,11 @@ def command_error(reply: dict[str, Any], i: int, method: str) -> ApiError | None
 
 
 def default_http_client() -> httpx2.Client:
-    """The HTTP client of a Client created without one."""
-    # No timeouts of its own: each request has exactly one deadline, set per request.
-    return httpx2.Client(limits=POOL_LIMITS, follow_redirects=False, timeout=None)
+    """The HTTP client of a Client created without one: no timeouts of its own,
+    each request bounded by one deadline - see _deadline."""
+    from cent import _deadline  # noqa: PLC0415 - _deadline imports httpcore2, which only this needs
+
+    return _deadline.http_client(POOL_LIMITS)
 
 
 def default_async_http_client() -> httpx2.AsyncClient:

@@ -13,7 +13,7 @@ def method_of(request: Any) -> str:
     """The API method of a request, or TypeError for anything else."""
     if type(request) not in REQUESTS:
         raise TypeError(f"{type(request).__name__} is not a request of the Centrifugo server API")
-    method: str = request.API_METHOD
+    method: str = request.api_method
     return method
 
 
