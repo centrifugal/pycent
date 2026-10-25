@@ -4,7 +4,7 @@ v6.0.0
 A rewrite to the [Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/v4_dev/spec.md).
 Migrating from cent 5: see [MIGRATING.md](MIGRATING.md).
 
-* Python 3.11 or newer. httpx2 - the maintained fork of httpx - is the only dependency; `cryptography` is optional, for RSA, ECDSA and Ed25519 tokens (`pip install cent[crypto]`).
+* Python 3.11 or newer. httpx2 - the maintained fork of httpx - is the only dependency; `cryptography` 49 or newer is optional, for RSA, ECDSA and Ed25519 tokens (`pip install cent[crypto]`).
 * Requests and results are dataclasses generated from Centrifugo's `api.proto`, with its documentation: every API method, including the map and shared poll methods and those of Centrifugo PRO. No pydantic.
 * `Client` and `AsyncClient` with the same methods, options and errors. One deadline per call - its `timeout`, or `request_timeout` - whatever the HTTP library's own timeouts. Redirects are not followed. A caller's HTTP client is never changed.
 * A broadcast or batch in which some parts failed raises `BroadcastFailedChannelsError` or `BatchFailedCommandsError`, carrying every part's outcome. cent 5 returned normally.

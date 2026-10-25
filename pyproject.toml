@@ -28,7 +28,7 @@ classifiers = [
 
 [project.optional-dependencies]
 # RSA, ECDSA and Ed25519 tokens; HMAC tokens need nothing.
-crypto = ["cryptography>=42"]
+crypto = ["cryptography>=49"]
 
 [project.urls]
 Homepage = "https://github.com/centrifugal/pycent"
@@ -37,11 +37,11 @@ Changelog = "https://github.com/centrifugal/pycent/blob/master/CHANGELOG.md"
 
 [dependency-groups]
 dev = [
-    "cryptography>=42",
+    "cryptography>=49",
     # httpx itself only for the test refusing its clients with the fix.
     "httpx",
     "mypy>=1.13",
-    "pytest>=8",
+    "pytest>=9.0.3",
     "pytest-asyncio>=0.24",
     "ruff>=0.8",
 ]
