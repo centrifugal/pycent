@@ -1,0 +1,127 @@
+name: CI
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+# Every job runs Makefile targets, so what passes locally passes here. Each job
+# skips a pull request from this repository's own branches, which the push
+# already ran.
+
+env:
+  PY: python
+
+jobs:
+  test:
+    name: test (${{ matrix.os }}, Python ${{ matrix.python }})
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.11", "3.12", "3.13", "3.14"]
+        include:
+          - os: macos-latest
+            python: "3.14"
+          - os: windows-latest
+            python: "3.14"
+    # The Makefile recipes are POSIX sh, so Windows runs them under Git Bash.
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install make
+        if: runner.os == 'Windows'
+        run: choco install make --no-progress -y
+      - run: python -m pip install --upgrade pip
+      - run: make dev
+      - run: make test
+
+  check:
+    name: check (lint, types, generated code)
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - run: python -m pip install --upgrade pip
+      - run: make dev
+      - run: make check
+
+  integration:
+    name: integration (Centrifugo)
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    # The same setup as testdata/centrifugo.json, through Centrifugo's
+    # environment variables.
+    services:
+      centrifugo:
+        image: centrifugo/centrifugo:v6.10.2
+        ports:
+          - 8100:8000
+        # The proxy tests' backend runs on the runner, which Centrifugo
+        # reaches as host.docker.internal.
+        options: --add-host=host.docker.internal:host-gateway
+        env:
+          CENTRIFUGO_HTTP_API_KEY: api_key
+          CENTRIFUGO_CHANNEL_WITHOUT_NAMESPACE_HISTORY_SIZE: "1000"
+          CENTRIFUGO_CHANNEL_WITHOUT_NAMESPACE_HISTORY_TTL: 300s
+          CENTRIFUGO_CHANNEL_WITHOUT_NAMESPACE_PRESENCE: "true"
+          CENTRIFUGO_CLIENT_TOKEN_HMAC_SECRET_KEY: client_secret
+          CENTRIFUGO_CLIENT_TOKEN_ED25519_PUBLIC_KEY: |
+            -----BEGIN PUBLIC KEY-----
+            MCowBQYDK2VwAyEAgTl3Dqh9F19Wo1Rmw0x+zMuNipG07jeiXfYPW4/Js5Q=
+            -----END PUBLIC KEY-----
+          CENTRIFUGO_UNI_HTTP_STREAM_ENABLED: "true"
+          CENTRIFUGO_CLIENT_PROXY_CONNECT_ENABLED: "true"
+          CENTRIFUGO_CLIENT_PROXY_CONNECT_ENDPOINT: http://host.docker.internal:3100/connect
+          CENTRIFUGO_CLIENT_PROXY_CONNECT_TIMEOUT: 3s
+          CENTRIFUGO_CLIENT_PROXY_REFRESH_ENABLED: "true"
+          CENTRIFUGO_CLIENT_PROXY_REFRESH_ENDPOINT: http://host.docker.internal:3100/refresh
+          CENTRIFUGO_CLIENT_PROXY_REFRESH_TIMEOUT: 3s
+          CENTRIFUGO_SHARED_POLL_HMAC_SECRET_KEY: shared_poll_secret
+          CENTRIFUGO_CHANNEL_PROXY_SHARED_POLL_REFRESH_ENDPOINT: http://localhost:3000/shared_poll_refresh
+          CENTRIFUGO_CHANNEL_NAMESPACES: >-
+            [{"name":"map","subscription_type":"map","map":{"mode":"recoverable","key_ttl":"60s","stream_size":100,"stream_ttl":"300s","meta_ttl":"600s"}},
+            {"name":"poll","subscription_type":"shared_poll","shared_poll":{"mode":"versioned","publish_enabled":true}}]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - run: python -m pip install --upgrade pip
+      - run: make dev
+      - run: make test-integration
+
+  integration-pro:
+    name: integration (Centrifugo PRO)
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    # testdata/centrifugo-pro.compose.yml, which also runs it locally: Centrifugo
+    # PRO with Redis and PostgreSQL. PYCENT_TEST_PRO fails the PRO tests, rather
+    # than skipping them, if the server turns out not to be PRO. The tests use
+    # Centrifugo PRO in sandbox mode, without a license key. Centrifugo PRO is
+    # commercial software, under the Centrifugal Labs License Agreement
+    # (https://centrifugal.dev/license), not cent's MIT license.
+    env:
+      PYCENT_TEST_PRO: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - run: python -m pip install --upgrade pip
+      - run: make dev
+      - run: docker compose -f testdata/centrifugo-pro.compose.yml up -d --wait
+      - run: make test-integration
+      - name: Centrifugo logs
+        if: failure()
+        run: docker compose -f testdata/centrifugo-pro.compose.yml logs centrifugo
