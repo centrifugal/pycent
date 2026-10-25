@@ -51,7 +51,7 @@ client.publish(cent.PublishRequest(channel="news", data={"text": "hello"}))
   configured.
 - A payload which is not JSON - NaN, bytes - raises `InvalidRequestError`
   before sending. JSON text you already have goes in `cent.RawJSON(text)`.
-- `request.api_method` and `request.api_payload`, for async consumers, are
+- `request.api_method` stays. `request.api_payload`, for async consumers, is
   now `cent.new_command(request)`: its `method` and `payload`, or `to_json()`.
   It validates the request first.
 
