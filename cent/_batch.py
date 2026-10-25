@@ -13,7 +13,7 @@ from cent._errors import (
     BatchNotSentError,
     BatchSentError,
     CentError,
-    CommandError,
+    FailedCommand,
     InvalidRequestError,
 )
 from cent._validate import method_of, validate
@@ -31,14 +31,14 @@ class BatchResult:
 
     __slots__ = ("_failed", "replied")
 
-    def __init__(self, replied: bool, failed: list[CommandError]) -> None:
+    def __init__(self, replied: bool, failed: list[FailedCommand]) -> None:
         # True when Centrifugo replied to every command, the failed ones
         # included; False when the batch failed as a whole. True for an empty
         # batch.
         self.replied = replied
         self._failed = failed
 
-    def failed(self) -> list[CommandError]:
+    def failed(self) -> list[FailedCommand]:
         """The commands which failed, with their errors, in the order they were
         added. When the batch failed as a whole, that is every command."""
         return list(self._failed)
@@ -161,7 +161,7 @@ class _BatchBase(_BatchAPI):
 
     def _finish(self, replies: list[dict[str, Any]]) -> BatchResult:
         self._replies = replies
-        failed: list[CommandError] = []
+        failed: list[FailedCommand] = []
         for i, r in enumerate(replies):
             err: Exception | None = _core.command_error(r, i, self._methods[i])
             self._command_errors.append(err)
@@ -172,7 +172,7 @@ class _BatchBase(_BatchAPI):
                 except CentError as e:
                     err = e
             if err is not None:
-                failed.append(CommandError(i, self._methods[i], err))
+                failed.append(FailedCommand(i, self._methods[i], err))
         res = BatchResult(True, failed)
         if failed:
             raise BatchFailedCommandsError(failed, len(replies), res)

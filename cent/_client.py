@@ -38,7 +38,7 @@ _T = TypeVar("_T")
 
 DEFAULT_MAX_ATTEMPTS = 2
 
-OnAttemptError = Callable[[BroadcastAttempt], "float | None"]
+BroadcastAttemptCallback = Callable[[BroadcastAttempt], "float | None"]
 """Called by broadcast_with_retry after an attempt which failed in a way a
 retry may fix, except the last. It returns the seconds to wait before the next
 attempt, or None for the default wait - exponential_backoff(0.1, 5.0) of the
@@ -450,7 +450,7 @@ class Client(_ClientAPI):
         *,
         max_attempts: int = DEFAULT_MAX_ATTEMPTS,
         attempt_timeout: float | None = None,
-        on_attempt_error: OnAttemptError | None = None,
+        on_attempt_error: BroadcastAttemptCallback | None = None,
         timeout: float | None = None,
     ) -> BroadcastResult:
         """Broadcasts as broadcast does, and retries the channels which failed for
@@ -469,7 +469,7 @@ class Client(_ClientAPI):
 
         timeout bounds the whole call, waits included (request_timeout when
         None), attempt_timeout each attempt. on_attempt_error decides the wait
-        between attempts, and may stop them: see OnAttemptError. It raises as
+        between attempts, and may stop them: see BroadcastAttemptCallback. It raises as
         broadcast does.
         """
         _retry_options(request, max_attempts, attempt_timeout)
@@ -723,7 +723,7 @@ class AsyncClient(_AsyncClientAPI):
         *,
         max_attempts: int = DEFAULT_MAX_ATTEMPTS,
         attempt_timeout: float | None = None,
-        on_attempt_error: OnAttemptError | None = None,
+        on_attempt_error: BroadcastAttemptCallback | None = None,
         timeout: float | None = None,
     ) -> BroadcastResult:
         """Broadcasts and retries the channels which may still succeed, as

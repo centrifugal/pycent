@@ -272,7 +272,7 @@ class BroadcastFailedChannelsError(CentError):
         return f"{type(self).__name__}(failed={len(self.failed)}, total={self.total})"
 
 
-class CommandError:
+class FailedCommand:
     """The failure of one command of a batch."""
 
     __slots__ = ("error", "index", "method")
@@ -288,7 +288,7 @@ class CommandError:
         self.error = error
 
     def __repr__(self) -> str:
-        return f"CommandError(index={self.index}, method={self.method!r}, error={self.error!r})"
+        return f"FailedCommand(index={self.index}, method={self.method!r}, error={self.error!r})"
 
 
 class BatchFailedCommandsError(CentError):
@@ -300,11 +300,11 @@ class BatchFailedCommandsError(CentError):
     ``failed``, or at its pending.
     """
 
-    failed: list[CommandError]
+    failed: list[FailedCommand]
     total: int
     result: BatchResult
 
-    def __init__(self, failed: list[CommandError], total: int, result: BatchResult) -> None:
+    def __init__(self, failed: list[FailedCommand], total: int, result: BatchResult) -> None:
         super().__init__(len(failed), total)
         self.failed = failed
         self.total = total

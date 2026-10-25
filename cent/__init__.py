@@ -12,7 +12,7 @@ from cent._api import *  # noqa: F403 - the generated request and result types
 from cent._autobatch import AutoBatch, BatchContext
 from cent._batch import AsyncBatch, Batch, BatchResult, Pending
 from cent._broadcast import BroadcastResult, ChannelResult
-from cent._client import AsyncClient, Client, OnAttemptError
+from cent._client import AsyncClient, BroadcastAttemptCallback, Client
 from cent._command import Command, new_command
 from cent._core import RequestInfo
 from cent._errors import (
@@ -25,9 +25,9 @@ from cent._errors import (
     CentError,
     CentTimeoutError,
     ClosedError,
-    CommandError,
     ConflictError,
     DecodeError,
+    FailedCommand,
     HTTPError,
     InternalError,
     InvalidConfigError,
@@ -59,6 +59,7 @@ __all__ = [
     "BatchResult",
     "BatchSentError",
     "BroadcastAttempt",
+    "BroadcastAttemptCallback",
     "BroadcastFailedChannelsError",
     "BroadcastResult",
     "CentError",
@@ -67,9 +68,9 @@ __all__ = [
     "Client",
     "ClosedError",
     "Command",
-    "CommandError",
     "ConflictError",
     "DecodeError",
+    "FailedCommand",
     "HTTPError",
     "HTTPRequest",
     "HTTPResponse",
@@ -79,7 +80,6 @@ __all__ = [
     "NetworkError",
     "NotAvailableError",
     "NotFoundError",
-    "OnAttemptError",
     "Pending",
     "RawJSON",
     "RequestInfo",
