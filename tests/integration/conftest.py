@@ -21,7 +21,7 @@ from collections.abc import Callable, Iterator
 from typing import Any
 from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
 
-import httpx
+import httpx2
 import pytest
 
 import cent
@@ -102,7 +102,7 @@ class Stream:
     """A client connection over Centrifugo's unidirectional HTTP stream."""
 
     def __init__(self, body: dict[str, Any]) -> None:
-        self._http = httpx.Client(timeout=30)
+        self._http = httpx2.Client(timeout=30)
         self._cm = self._http.stream("POST", ADDR.removesuffix("/api") + "/connection/uni_http_stream", json=body)
         self._resp = self._cm.__enter__()
         self._lines = self._resp.iter_lines()

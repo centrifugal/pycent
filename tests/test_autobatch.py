@@ -9,7 +9,7 @@ import threading
 import time
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 
 import cent
@@ -34,7 +34,7 @@ class Gate:
             return {"error": {"code": 102, "message": "unknown channel"}}
         return {method: {"offset": int(body.get("channel", "0").split(":")[-1] or 0), "epoch": "e"}}
 
-    def respond(self, request: httpx.Request) -> httpx.Response:
+    def respond(self, request: httpx2.Request) -> httpx2.Response:
         method = request.url.path.rsplit("/", 1)[-1]
         body = json.loads(request.content)
         with self.lock:
@@ -42,18 +42,18 @@ class Gate:
             self.paths.append(method)
         if method == "batch":
             if self.fail_batch:
-                return httpx.Response(503)
+                return httpx2.Response(503)
             replies = []
             for cmd in body["commands"]:
                 ((m, b),) = cmd.items()
                 replies.append(self.answer(m, b))
-            return httpx.Response(200, json={"replies": replies})
+            return httpx2.Response(200, json={"replies": replies})
         r = self.answer(method, body)
         if "error" in r:
-            return httpx.Response(200, json=r)
-        return httpx.Response(200, json={"result": r[method]})
+            return httpx2.Response(200, json=r)
+        return httpx2.Response(200, json={"result": r[method]})
 
-    def sync_handler(self, request: httpx.Request) -> httpx.Response:
+    def sync_handler(self, request: httpx2.Request) -> httpx2.Response:
         with self.lock:
             self.in_flight += 1
             self.max_in_flight = max(self.max_in_flight, self.in_flight)
@@ -64,7 +64,7 @@ class Gate:
             with self.lock:
                 self.in_flight -= 1
 
-    async def async_handler(self, request: httpx.Request) -> httpx.Response:
+    async def async_handler(self, request: httpx2.Request) -> httpx2.Response:
         with self.lock:
             self.in_flight += 1
             self.max_in_flight = max(self.max_in_flight, self.in_flight)
@@ -85,12 +85,12 @@ def pub(i: int | str) -> cent.PublishRequest:
 
 
 def sync_client(gate: Gate, **kw: Any) -> cent.Client:
-    http = httpx.Client(transport=httpx.MockTransport(gate.sync_handler))
+    http = httpx2.Client(transport=httpx2.MockTransport(gate.sync_handler))
     return cent.Client(ENDPOINT, http_client=http, auto_batch=cent.AutoBatch(max_in_flight=2), **kw)
 
 
 def async_client(gate: Gate, **kw: Any) -> cent.AsyncClient:
-    http = httpx.AsyncClient(transport=httpx.MockTransport(gate.async_handler))
+    http = httpx2.AsyncClient(transport=httpx2.MockTransport(gate.async_handler))
     return cent.AsyncClient(ENDPOINT, http_client=http, auto_batch=cent.AutoBatch(max_in_flight=2), **kw)
 
 
@@ -205,7 +205,7 @@ def test_auto_batch_config(opts: dict[str, int], msg: str) -> None:
 def test_stress_sync() -> None:
     gate = Gate()
     gate.open.set()
-    http = httpx.Client(transport=httpx.MockTransport(gate.sync_handler))
+    http = httpx2.Client(transport=httpx2.MockTransport(gate.sync_handler))
     c = cent.Client(ENDPOINT, http_client=http, auto_batch=cent.AutoBatch(max_in_flight=3, max_batch_size=5))
     bad: list[str] = []
 
@@ -272,7 +272,7 @@ async def test_async_queued_call_cancelled_is_not_sent() -> None:
 async def test_stress_async() -> None:
     gate = Gate()
     gate.open.set()
-    http = httpx.AsyncClient(transport=httpx.MockTransport(gate.async_handler))
+    http = httpx2.AsyncClient(transport=httpx2.MockTransport(gate.async_handler))
     c = cent.AsyncClient(ENDPOINT, http_client=http, auto_batch=cent.AutoBatch(max_in_flight=3, max_batch_size=4))
     bad: list[str] = []
 

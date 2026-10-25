@@ -12,7 +12,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Mappin
 from types import TracebackType
 from typing import Any, TypeVar
 
-import httpx
+import httpx2
 
 from cent import _broadcast, _core
 from cent import _wire as _w
@@ -45,6 +45,21 @@ attempt - and may log or count meanwhile. To stop, it raises: its exception
 propagates, chained to the broadcast's error (``__cause__``), which carries
 the result when Centrifugo replied. The wait never outlasts the call's
 timeout."""
+
+
+def _check_http_client(http_client: Any, want: type[Any], name: str) -> None:
+    if http_client is None or isinstance(http_client, want):
+        return
+    t = type(http_client)
+    if t.__module__.split(".")[0] == "httpx":
+        raise InvalidConfigError(
+            f"http_client is an httpx.{t.__name__}: cent uses httpx2, the maintained fork of httpx with the same API - "
+            f"import httpx2, and pass httpx2.{want.__name__}(...)"
+        )
+    other = "AsyncClient" if name == "Client" else "Client"
+    raise InvalidConfigError(
+        f"http_client must be an httpx2.{want.__name__} for a {name}, not {t.__name__}; a {other} takes httpx2.{other}"
+    )
 
 
 def _auto_batch(auto_batch: Any) -> AutoBatch | None:
@@ -237,7 +252,8 @@ class Client(_ClientAPI):
     - bearer_token_func: returns the token sent as "Authorization: Bearer"
       with each request, for Centrifugo PRO's JWKS authentication of the API
       - cent.token.APITokens.token, say. Not together with api_key.
-    - http_client: the httpx.Client sending requests. It is never changed:
+    - http_client: the httpx2.Client sending requests - httpx2 is the maintained
+      fork of httpx, with the same API. It is never changed:
       credentials and headers go on each request. Without one, the client
       keeps up to 256 connections to a host alive, never follows redirects,
       and closes idle connections after 50 seconds.
@@ -259,7 +275,7 @@ class Client(_ClientAPI):
         api_endpoint_func: Callable[[], str] | None = None,
         api_key: str = "",
         bearer_token_func: Callable[[], str] | None = None,
-        http_client: httpx.Client | None = None,
+        http_client: httpx2.Client | None = None,
         request_timeout: float | None = None,
         headers: Mapping[str, str] | None = None,
         on_request: Callable[[RequestInfo], None] | None = None,
@@ -274,8 +290,7 @@ class Client(_ClientAPI):
             headers=headers,
             on_request=on_request,
         )
-        if http_client is not None and not isinstance(http_client, httpx.Client):
-            raise InvalidConfigError("http_client must be an httpx.Client; an AsyncClient takes httpx.AsyncClient")
+        _check_http_client(http_client, httpx2.Client, "Client")
         self._own_http = http_client is None
         self._http = http_client if http_client is not None else _core.default_http_client()
         self._calls = _Calls()
@@ -298,7 +313,7 @@ class Client(_ClientAPI):
                 f"{base}/{method}",
                 content=body,
                 headers=cfg.request_headers(token),
-                timeout=httpx.Timeout(left),
+                timeout=httpx2.Timeout(left),
             ) as resp:
                 info.status_code = resp.status_code
                 if resp.status_code != 200:
@@ -307,7 +322,7 @@ class Client(_ClientAPI):
                     _read(chunks, deadline, method, _core.MAX_DRAIN_BYTES)
                     raise _core.http_error(method, resp.status_code, data, resp.headers)
                 return _read(resp.iter_bytes(), deadline, method)
-        except httpx.TransportError as e:
+        except httpx2.TransportError as e:
             raise _core.transport_error(method, e) from e
 
     def _call(
@@ -528,7 +543,7 @@ class AsyncClient(_AsyncClientAPI):
     ...     await client.publish(cent.PublishRequest(channel="news", data={"text": "hello"}))
 
     api_endpoint_func and bearer_token_func may be coroutine functions.
-    http_client is an httpx.AsyncClient. A call's timeout bounds it; an
+    http_client is an httpx2.AsyncClient. A call's timeout bounds it; an
     asyncio.timeout around it, or cancelling its task, ends it sooner.
     """
 
@@ -539,7 +554,7 @@ class AsyncClient(_AsyncClientAPI):
         api_endpoint_func: Callable[[], str | Awaitable[str]] | None = None,
         api_key: str = "",
         bearer_token_func: Callable[[], str | Awaitable[str]] | None = None,
-        http_client: httpx.AsyncClient | None = None,
+        http_client: httpx2.AsyncClient | None = None,
         request_timeout: float | None = None,
         headers: Mapping[str, str] | None = None,
         on_request: Callable[[RequestInfo], None] | None = None,
@@ -554,8 +569,7 @@ class AsyncClient(_AsyncClientAPI):
             headers=headers,
             on_request=on_request,
         )
-        if http_client is not None and not isinstance(http_client, httpx.AsyncClient):
-            raise InvalidConfigError("http_client must be an httpx.AsyncClient; a Client takes httpx.Client")
+        _check_http_client(http_client, httpx2.AsyncClient, "AsyncClient")
         self._own_http = http_client is None
         self._http = http_client if http_client is not None else _core.default_async_http_client()
         self._calls = _AsyncCalls()
@@ -582,7 +596,7 @@ class AsyncClient(_AsyncClientAPI):
                     f"{base}/{method}",
                     content=body,
                     headers=cfg.request_headers(token),
-                    timeout=httpx.Timeout(left),
+                    timeout=httpx2.Timeout(left),
                 ) as resp:
                     info.status_code = resp.status_code
                     if resp.status_code != 200:
@@ -591,7 +605,7 @@ class AsyncClient(_AsyncClientAPI):
                         await _aread(chunks, _core.MAX_DRAIN_BYTES)
                         raise _core.http_error(method, resp.status_code, data, resp.headers)
                     return await resp.aread()
-        except httpx.TransportError as e:
+        except httpx2.TransportError as e:
             raise _core.transport_error(method, e) from e
         except TimeoutError as e:
             if timer.expired() and not isinstance(e, CentTimeoutError):

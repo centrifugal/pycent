@@ -9,7 +9,7 @@ import time
 from collections.abc import Callable, Iterator
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 
 import cent
@@ -26,11 +26,11 @@ class Api:
         self.fake = fake
         self.loop = asyncio.new_event_loop() if kind == "async" else None
         if kind == "async":
-            http_a = opts.pop("http_client", None) or httpx.AsyncClient(transport=httpx.MockTransport(fake))
+            http_a = opts.pop("http_client", None) or httpx2.AsyncClient(transport=httpx2.MockTransport(fake))
             opts.setdefault("api_endpoint", ENDPOINT)
             self.client: Any = cent.AsyncClient(http_client=http_a, **opts)
         else:
-            http_s = opts.pop("http_client", None) or httpx.Client(transport=httpx.MockTransport(fake))
+            http_s = opts.pop("http_client", None) or httpx2.Client(transport=httpx2.MockTransport(fake))
             opts.setdefault("api_endpoint", ENDPOINT)
             self.client = cent.Client(http_client=http_s, **opts)
 
@@ -148,7 +148,7 @@ def test_internal_error_is_retryable_without_temporary(api: Api, fake: Fake) -> 
     [(401, cent.UnauthorizedError, False), (403, cent.HTTPError, False), (503, cent.HTTPError, True)],
 )
 def test_http_errors(api: Api, fake: Fake, status: int, cls: type[Exception], retry: bool) -> None:
-    fake.on("publish", httpx.Response(status, text="go away", headers={"Retry-After": "3"}))
+    fake.on("publish", httpx2.Response(status, text="go away", headers={"Retry-After": "3"}))
     with pytest.raises(cls) as e:
         api.publish(cent.PublishRequest(channel="x", data=1))
     err = e.value
@@ -162,21 +162,21 @@ def test_http_errors(api: Api, fake: Fake, status: int, cls: type[Exception], re
 
 
 def test_429_is_retryable(api: Api, fake: Fake) -> None:
-    fake.on("publish", httpx.Response(429, text=""))
+    fake.on("publish", httpx2.Response(429, text=""))
     with pytest.raises(cent.HTTPError) as e:
         api.publish(cent.PublishRequest(channel="x", data=1))
     assert cent.retryable(e.value)
 
 
 def test_error_body_is_bounded(api: Api, fake: Fake) -> None:
-    fake.on("publish", httpx.Response(502, content=b"x" * 100_000))
+    fake.on("publish", httpx2.Response(502, content=b"x" * 100_000))
     with pytest.raises(cent.HTTPError) as e:
         api.publish(cent.PublishRequest(channel="x", data=1))
     assert len(e.value.body) == 512
 
 
 def test_redirect_is_not_followed(api: Api, fake: Fake) -> None:
-    fake.on("publish", httpx.Response(307, headers={"Location": "https://elsewhere.test/api/publish"}))
+    fake.on("publish", httpx2.Response(307, headers={"Location": "https://elsewhere.test/api/publish"}))
     with pytest.raises(cent.HTTPError) as e:
         api.publish(cent.PublishRequest(channel="x", data=1))
     assert e.value.status_code == 307
@@ -185,8 +185,8 @@ def test_redirect_is_not_followed(api: Api, fake: Fake) -> None:
 
 
 def test_404_hints(api: Api, fake: Fake) -> None:
-    fake.on("connections", httpx.Response(404))
-    fake.on("publish", httpx.Response(404))
+    fake.on("connections", httpx2.Response(404))
+    fake.on("publish", httpx2.Response(404))
     with pytest.raises(cent.HTTPError) as e:
         api.connections(cent.ConnectionsRequest(user="u"))
     assert "connections is a Centrifugo PRO method" in str(e.value)
@@ -196,7 +196,7 @@ def test_404_hints(api: Api, fake: Fake) -> None:
 
 
 def test_transport_error_mode(api: Api, fake: Fake) -> None:
-    fake.on("publish", httpx.Response(400, json={"code": 102, "message": "unknown channel"}))
+    fake.on("publish", httpx2.Response(400, json={"code": 102, "message": "unknown channel"}))
     with pytest.raises(cent.UnknownChannelError):
         api.publish(cent.PublishRequest(channel="x", data=1))
 
@@ -206,33 +206,33 @@ def test_transport_error_mode(api: Api, fake: Fake) -> None:
     [(429, {"code": 429}), (503, {"code": 102}), (400, {"code": 42}), (500, {"message": "x"})],
 )
 def test_gateway_json_errors_stay_http_errors(api: Api, fake: Fake, status: int, body: dict[str, Any]) -> None:
-    fake.on("publish", httpx.Response(status, json=body))
+    fake.on("publish", httpx2.Response(status, json=body))
     with pytest.raises(cent.HTTPError):
         api.publish(cent.PublishRequest(channel="x", data=1))
 
 
 @pytest.mark.parametrize("body", [b"<html>nope</html>", b"[1]", b'{"result": 5}', b'{"result": {"offset": "1"}}'])
 def test_decode_error(api: Api, fake: Fake, body: bytes) -> None:
-    fake.on("publish", httpx.Response(200, content=body))
+    fake.on("publish", httpx2.Response(200, content=body))
     with pytest.raises(cent.DecodeError) as e:
         api.publish(cent.PublishRequest(channel="x", data=1))
     assert not cent.retryable(e.value)
 
 
 def test_network_error(new_api: Callable[..., Api], kind: str, fake: Fake) -> None:
-    def refuse(request: httpx.Request) -> httpx.Response:
-        raise httpx.ConnectError("connection refused", request=request)
+    def refuse(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ConnectError("connection refused", request=request)
 
     a = new_api(http_client=_http(kind, refuse))
     with pytest.raises(cent.NetworkError) as e:
         a.publish(cent.PublishRequest(channel="x", data=1))
-    assert isinstance(e.value.__cause__, httpx.ConnectError)
+    assert isinstance(e.value.__cause__, httpx2.ConnectError)
     assert cent.retryable(e.value)
 
 
 def test_timeout_error(new_api: Callable[..., Api], kind: str, fake: Fake) -> None:
-    def slow(request: httpx.Request) -> httpx.Response:
-        raise httpx.ReadTimeout("timed out", request=request)
+    def slow(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ReadTimeout("timed out", request=request)
 
     a = new_api(http_client=_http(kind, slow))
     with pytest.raises(cent.CentTimeoutError) as e:
@@ -241,16 +241,16 @@ def test_timeout_error(new_api: Callable[..., Api], kind: str, fake: Fake) -> No
     assert cent.retryable(e.value)
 
 
-def _http(kind: str, handler: Callable[[httpx.Request], httpx.Response]) -> Any:
-    t = httpx.MockTransport(handler)
-    return httpx.AsyncClient(transport=t) if kind == "async" else httpx.Client(transport=t)
+def _http(kind: str, handler: Callable[[httpx2.Request], httpx2.Response]) -> Any:
+    t = httpx2.MockTransport(handler)
+    return httpx2.AsyncClient(transport=t) if kind == "async" else httpx2.Client(transport=t)
 
 
 def test_timeout_bounds_the_call(new_api: Callable[..., Api], kind: str, fake: Fake) -> None:
     """A reply which trickles in is cut at the deadline: the call has one
     deadline whatever the HTTP library's own timeouts are per read."""
 
-    class Trickle(httpx.SyncByteStream, httpx.AsyncByteStream):
+    class Trickle(httpx2.SyncByteStream, httpx2.AsyncByteStream):
         def __iter__(self) -> Iterator[bytes]:
             for _ in range(50):
                 time.sleep(0.02)
@@ -261,7 +261,7 @@ def test_timeout_bounds_the_call(new_api: Callable[..., Api], kind: str, fake: F
                 await asyncio.sleep(0.02)
                 yield b" "
 
-    a = new_api(http_client=_http(kind, lambda r: httpx.Response(200, stream=Trickle())))
+    a = new_api(http_client=_http(kind, lambda r: httpx2.Response(200, stream=Trickle())))
     start = time.monotonic()
     with pytest.raises(cent.CentTimeoutError):
         a.publish(cent.PublishRequest(channel="x", data=1), timeout=0.2)
@@ -344,7 +344,7 @@ def test_payload_round_trip(api: Api, fake: Fake) -> None:
     original = '{"a":{},"b":{"0":"a"},"c":18446744073709551617,"d":1.0,"e":[1.5,-0.0],"f":"x"}'
     fake.on(
         "history",
-        httpx.Response(
+        httpx2.Response(
             200, content=b'{"result":{"publications":[{"data":' + original.encode() + b',"offset":7}],"offset":7}}'
         ),
     )
@@ -496,7 +496,7 @@ def test_broadcast_with_retry_stopped_by_callback(api: Api) -> None:
 
 
 def test_broadcast_with_retry_whole_failure(api: Api, fake: Fake) -> None:
-    fake.on("broadcast", httpx.Response(503))
+    fake.on("broadcast", httpx2.Response(503))
     with pytest.raises(cent.HTTPError):
         api.broadcast_with_retry(cent.BroadcastRequest(channels=["a"], data=1), on_attempt_error=lambda a: 0.0)
     assert len(fake.requests) == 2
@@ -593,7 +593,7 @@ def test_batch_pro_method_on_oss_hints(api: Api, fake: Fake) -> None:
 
 
 def test_batch_whole_failure(api: Api, fake: Fake) -> None:
-    fake.on("batch", httpx.Response(500))
+    fake.on("batch", httpx2.Response(500))
     b = api.client.new_batch()
     pub = b.publish(cent.PublishRequest(channel="a", data=1))
     with pytest.raises(cent.HTTPError):
@@ -614,7 +614,7 @@ def test_batch_invalid_command_fails_before_sending(api: Api, fake: Fake) -> Non
 
 
 def test_batch_reply_count_mismatch(api: Api, fake: Fake) -> None:
-    fake.on("batch", httpx.Response(200, json={"replies": [{}]}))
+    fake.on("batch", httpx2.Response(200, json={"replies": [{}]}))
     b = api.client.new_batch()
     b.publish(cent.PublishRequest(channel="a", data=1))
     b.publish(cent.PublishRequest(channel="b", data=1))
@@ -664,7 +664,7 @@ def test_new_command() -> None:
         ({"api_endpoint": ENDPOINT, "headers": {"Bad Name": "x"}}, "not a valid HTTP header name"),
         ({"api_endpoint": ENDPOINT, "headers": {"X-A": "a\r\nb"}}, "control character"),
         ({"api_endpoint": ENDPOINT, "request_timeout": -1}, "positive"),
-        ({"api_endpoint": ENDPOINT, "http_client": httpx.AsyncClient()}, "httpx.Client"),
+        ({"api_endpoint": ENDPOINT, "http_client": httpx2.AsyncClient()}, "must be an httpx2.Client"),
     ],
 )
 def test_invalid_config(opts: dict[str, Any], msg: str) -> None:
@@ -672,8 +672,18 @@ def test_invalid_config(opts: dict[str, Any], msg: str) -> None:
         cent.Client(**opts)
 
 
+def test_httpx_client_refused_with_the_fix() -> None:
+    """An httpx client - httpx2's predecessor, which an agent trained on older
+    code may reach for - is refused with the fix in the message."""
+    httpx = pytest.importorskip("httpx")
+    with pytest.raises(cent.InvalidConfigError, match=r"cent uses httpx2.*import httpx2, and pass httpx2.Client"):
+        cent.Client(ENDPOINT, http_client=httpx.Client())
+    with pytest.raises(cent.InvalidConfigError, match=r"httpx2.AsyncClient"):
+        cent.AsyncClient(ENDPOINT, http_client=httpx.AsyncClient())
+
+
 def test_trailing_slash_dropped(fake: Fake) -> None:
-    c = cent.Client(ENDPOINT + "/", http_client=httpx.Client(transport=httpx.MockTransport(fake)))
+    c = cent.Client(ENDPOINT + "/", http_client=httpx2.Client(transport=httpx2.MockTransport(fake)))
     c.publish(cent.PublishRequest(channel="x", data=1))
     assert str(fake.requests[0].url) == ENDPOINT + "/publish"
 
@@ -750,7 +760,7 @@ def test_on_request(new_api: Callable[..., Api], kind: str, fake: Fake) -> None:
         a.presence(cent.PresenceRequest(channel="x"))
     with pytest.raises(cent.BroadcastFailedChannelsError):
         a.broadcast(cent.BroadcastRequest(channels=["bad:1"], data=1))
-    fake.on("history", httpx.Response(502))
+    fake.on("history", httpx2.Response(502))
     with pytest.raises(cent.HTTPError):
         a.history(cent.HistoryRequest(channel="x"))
     with pytest.raises(cent.InvalidRequestError):
@@ -778,7 +788,7 @@ def test_on_request(new_api: Callable[..., Api], kind: str, fake: Fake) -> None:
 def test_on_request_transport_error_mode(new_api: Callable[..., Api], kind: str, fake: Fake) -> None:
     infos: list[cent.RequestInfo] = []
     a = new_api(on_request=infos.append)
-    fake.on("publish", httpx.Response(400, json={"code": 107, "message": "bad request"}))
+    fake.on("publish", httpx2.Response(400, json={"code": 107, "message": "bad request"}))
     with pytest.raises(cent.BadRequestError):
         a.publish(cent.PublishRequest(channel="x", data=1))
     assert isinstance(infos[0].error, cent.BadRequestError)
@@ -801,12 +811,12 @@ def test_close_waits_for_calls_in_progress() -> None:
 
     started, release = threading.Event(), threading.Event()
 
-    def slow(request: httpx.Request) -> httpx.Response:
+    def slow(request: httpx2.Request) -> httpx2.Response:
         started.set()
         release.wait(5)
-        return httpx.Response(200, json={"result": {}})
+        return httpx2.Response(200, json={"result": {}})
 
-    c = cent.Client(ENDPOINT, http_client=httpx.Client(transport=httpx.MockTransport(slow)))
+    c = cent.Client(ENDPOINT, http_client=httpx2.Client(transport=httpx2.MockTransport(slow)))
     t = threading.Thread(target=lambda: c.publish(cent.PublishRequest(channel="x", data=1)))
     t.start()
     assert started.wait(5)
@@ -820,11 +830,11 @@ def test_close_waits_for_calls_in_progress() -> None:
 async def test_aclose_waits_for_calls_in_progress() -> None:
     release = asyncio.Event()
 
-    async def slow(request: httpx.Request) -> httpx.Response:
+    async def slow(request: httpx2.Request) -> httpx2.Response:
         await release.wait()
-        return httpx.Response(200, json={"result": {}})
+        return httpx2.Response(200, json={"result": {}})
 
-    c = cent.AsyncClient(ENDPOINT, http_client=httpx.AsyncClient(transport=httpx.MockTransport(slow)))
+    c = cent.AsyncClient(ENDPOINT, http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(slow)))
     task = asyncio.create_task(c.publish(cent.PublishRequest(channel="x", data=1)))
     await asyncio.sleep(0.01)
     with pytest.raises(cent.CentTimeoutError):
@@ -835,11 +845,11 @@ async def test_aclose_waits_for_calls_in_progress() -> None:
 
 
 async def test_cancelled_call_is_not_retryable() -> None:
-    async def hang(request: httpx.Request) -> httpx.Response:
+    async def hang(request: httpx2.Request) -> httpx2.Response:
         await asyncio.sleep(10)
         raise AssertionError
 
-    c = cent.AsyncClient(ENDPOINT, http_client=httpx.AsyncClient(transport=httpx.MockTransport(hang)))
+    c = cent.AsyncClient(ENDPOINT, http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(hang)))
     task = asyncio.create_task(c.publish(cent.PublishRequest(channel="x", data=1)))
     await asyncio.sleep(0.01)
     task.cancel()
@@ -849,11 +859,11 @@ async def test_cancelled_call_is_not_retryable() -> None:
 
 
 async def test_outer_asyncio_timeout_ends_a_call_sooner() -> None:
-    async def hang(request: httpx.Request) -> httpx.Response:
+    async def hang(request: httpx2.Request) -> httpx2.Response:
         await asyncio.sleep(10)
         raise AssertionError
 
-    c = cent.AsyncClient(ENDPOINT, http_client=httpx.AsyncClient(transport=httpx.MockTransport(hang)))
+    c = cent.AsyncClient(ENDPOINT, http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(hang)))
     start = time.monotonic()
     with pytest.raises(TimeoutError):
         async with asyncio.timeout(0.05):
@@ -862,13 +872,15 @@ async def test_outer_asyncio_timeout_ends_a_call_sooner() -> None:
 
 
 def test_context_managers(fake: Fake) -> None:
-    with cent.Client(ENDPOINT, http_client=httpx.Client(transport=httpx.MockTransport(fake))) as c:
+    with cent.Client(ENDPOINT, http_client=httpx2.Client(transport=httpx2.MockTransport(fake))) as c:
         c.publish(cent.PublishRequest(channel="x", data=1))
     with pytest.raises(cent.ClosedError):
         c.publish(cent.PublishRequest(channel="x", data=1))
 
     async def main() -> None:
-        async with cent.AsyncClient(ENDPOINT, http_client=httpx.AsyncClient(transport=httpx.MockTransport(fake))) as c:
+        async with cent.AsyncClient(
+            ENDPOINT, http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(fake))
+        ) as c:
             await c.publish(cent.PublishRequest(channel="x", data=1))
 
     asyncio.run(main())
@@ -889,8 +901,8 @@ def test_retryable() -> None:
         try:
             raise ssl.SSLCertVerificationError("bad cert")
         except ssl.SSLCertVerificationError as e:
-            raise httpx.ConnectError("tls") from e
-    except httpx.ConnectError as e:
+            raise httpx2.ConnectError("tls") from e
+    except httpx2.ConnectError as e:
         net = cent.NetworkError("x")
         net.__cause__ = e
     assert not cent.retryable(net)

@@ -1,4 +1,4 @@
-"""A fake Centrifugo for the unit tests, behind httpx's MockTransport."""
+"""A fake Centrifugo for the unit tests, behind httpx2's MockTransport."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 
 import cent
@@ -20,11 +20,11 @@ Handler = Callable[[str, dict[str, Any]], Any]
 @dataclass
 class Fake:
     """Answers each API method with what its handler returns: a result dict
-    (wrapped as {"result": ...}), an httpx.Response, or a cent.ApiError (as
+    (wrapped as {"result": ...}), an httpx2.Response, or a cent.ApiError (as
     {"error": ...}). Batches are answered command by command."""
 
     handlers: dict[str, Handler] = field(default_factory=dict)
-    requests: list[httpx.Request] = field(default_factory=list)
+    requests: list[httpx2.Request] = field(default_factory=list)
 
     def on(self, method: str, handler: Handler | Any) -> None:
         self.handlers[method] = handler if callable(handler) else (lambda _m, _b: handler)
@@ -42,7 +42,7 @@ class Fake:
             return default_result(method, body)
         return h(method, body)
 
-    def __call__(self, request: httpx.Request) -> httpx.Response:
+    def __call__(self, request: httpx2.Request) -> httpx2.Response:
         self.requests.append(request)
         method = request.url.path.rsplit("/", 1)[-1]
         body = json.loads(request.content)
@@ -51,11 +51,11 @@ class Fake:
             for cmd in body["commands"]:
                 ((m, b),) = cmd.items()
                 replies.append(_reply(m, self._answer(m, b)))
-            return httpx.Response(200, json={"replies": replies})
+            return httpx2.Response(200, json={"replies": replies})
         out = self._answer(method, body)
-        if isinstance(out, httpx.Response):
+        if isinstance(out, httpx2.Response):
             return out
-        return httpx.Response(200, json=_envelope(out))
+        return httpx2.Response(200, json=_envelope(out))
 
 
 def _envelope(out: Any) -> dict[str, Any]:
@@ -100,11 +100,11 @@ def fake() -> Fake:
 
 @pytest.fixture
 def client(fake: Fake) -> cent.Client:
-    http = httpx.Client(transport=httpx.MockTransport(fake))
+    http = httpx2.Client(transport=httpx2.MockTransport(fake))
     return cent.Client(ENDPOINT, api_key="key", http_client=http)
 
 
 @pytest.fixture
 def aclient(fake: Fake) -> cent.AsyncClient:
-    http = httpx.AsyncClient(transport=httpx.MockTransport(fake))
+    http = httpx2.AsyncClient(transport=httpx2.MockTransport(fake))
     return cent.AsyncClient(ENDPOINT, api_key="key", http_client=http)

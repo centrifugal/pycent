@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
-import httpx
+import httpx2
 
 from cent._api import METHODS
 from cent._broadcast import api_error
@@ -40,7 +40,7 @@ MAX_DRAIN_BYTES = 64 << 10
 # host, all kept while idle, so that a burst does not open connections only to
 # close them; idle ones closed after 50 seconds, before load balancers commonly
 # close theirs.
-POOL_LIMITS = httpx.Limits(max_connections=256, max_keepalive_connections=256, keepalive_expiry=50)
+POOL_LIMITS = httpx2.Limits(max_connections=256, max_keepalive_connections=256, keepalive_expiry=50)
 
 # Statuses Centrifugo's transport error mode maps errors to.
 _TRANSPORT_MODE_STATUSES = {400, 404, 409, 416, 429, 500}
@@ -286,7 +286,7 @@ def batch_replies(body: bytes, n: int) -> list[dict[str, Any]]:
 
 def transport_error(method: str, err: Exception) -> Exception:
     """The error of a request which failed on its way."""
-    if isinstance(err, httpx.TimeoutException):
+    if isinstance(err, httpx2.TimeoutException):
         return CentTimeoutError(f"{method}: timed out: {err}")
     return NetworkError(f"{method}: {type(err).__name__}: {err}")
 
@@ -303,12 +303,12 @@ def command_error(reply: dict[str, Any], i: int, method: str) -> ApiError | None
     return err
 
 
-def default_http_client() -> httpx.Client:
+def default_http_client() -> httpx2.Client:
     """The HTTP client of a Client created without one."""
     # No timeouts of its own: each request has exactly one deadline, set per request.
-    return httpx.Client(limits=POOL_LIMITS, follow_redirects=False, timeout=None)  # noqa: S113
+    return httpx2.Client(limits=POOL_LIMITS, follow_redirects=False, timeout=None)
 
 
-def default_async_http_client() -> httpx.AsyncClient:
+def default_async_http_client() -> httpx2.AsyncClient:
     """The HTTP client of an AsyncClient created without one."""
-    return httpx.AsyncClient(limits=POOL_LIMITS, follow_redirects=False, timeout=None)  # noqa: S113
+    return httpx2.AsyncClient(limits=POOL_LIMITS, follow_redirects=False, timeout=None)
