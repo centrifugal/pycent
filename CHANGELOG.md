@@ -1,3 +1,21 @@
+v6.0.0
+======
+
+A rewrite to the [Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/v4_dev/spec.md).
+Migrating from cent 5: see [MIGRATING.md](MIGRATING.md).
+
+* Python 3.11 or newer. httpx2 - the maintained fork of httpx - is the only dependency; `cryptography` is optional, for RSA, ECDSA and Ed25519 tokens (`pip install cent[crypto]`).
+* Requests and results are dataclasses generated from Centrifugo's `api.proto`, with its documentation: every API method, including the map and shared poll methods and those of Centrifugo PRO. No pydantic.
+* `Client` and `AsyncClient` with the same methods, options and errors. One deadline per call - its `timeout`, or `request_timeout` - whatever the HTTP library's own timeouts. Redirects are not followed. A caller's HTTP client is never changed.
+* A broadcast or batch in which some parts failed raises `BroadcastFailedChannelsError` or `BatchFailedCommandsError`, carrying every part's outcome. cent 5 returned normally.
+* New exceptions: `ApiError` with a subclass per known code, `HTTPError`, `DecodeError`, `InvalidRequestError`, `InvalidConfigError`, `NetworkError`, `CentTimeoutError`, `ClosedError`; `retryable()`; hints in messages; Centrifugo's transport error mode.
+* Payloads: native values or `RawJSON`, sent as the same JSON value; NaN, infinities and bytes refused before sending; a payload from a reply sent back unchanged is the same JSON value.
+* `broadcast_with_retry`, `exponential_backoff`; automatic batching of concurrent calls (`auto_batch`); `on_request` for metrics; `close()` and `aclose()` waiting for calls in progress.
+* `new_command` for Centrifugo's async consumers.
+* `cent.token`: connection, subscription and Centrifugo PRO server API tokens (HS256, RS256, ES256/384/512, EdDSA), JWKS, `APITokens`.
+* `cent.endpoints`: the token and shared poll signature endpoints client SDKs call, and the JWKS endpoint. `cent.proxy`: a handler for every proxy type, generated from `proxy.proto`. Each is a framework-free core with ASGI and WSGI adapters.
+* `cent.sharedpoll.sign` for shared poll signatures.
+
 v4.1.0
 ======
 
