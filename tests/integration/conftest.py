@@ -44,7 +44,7 @@ def client() -> Iterator[cent.Client]:
 @pytest.fixture
 def pro(client: cent.Client) -> cent.Client:
     try:
-        client.connections(cent.ConnectionsRequest(user="nobody"))
+        client.connections(user="nobody")
     except cent.CentError as e:
         if os.environ.get("PYCENT_TEST_PRO"):
             pytest.fail(f"PYCENT_TEST_PRO is set, but the server is not Centrifugo PRO: {e}")

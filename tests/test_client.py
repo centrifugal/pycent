@@ -80,7 +80,7 @@ def api(new_api: Callable[..., Api]) -> Api:
 
 
 def test_publish(api: Api, fake: Fake) -> None:
-    res = api.publish(cent.PublishRequest(channel="news", data={"text": "hi"}, idempotency_key="k1"))
+    res = api.publish(channel="news", data={"text": "hi"}, idempotency_key="k1")
     assert res == cent.PublishResult(offset=1, epoch="e1")
     (req,) = fake.requests
     assert str(req.url) == ENDPOINT + "/publish"
@@ -95,11 +95,7 @@ def test_publish(api: Api, fake: Fake) -> None:
 def test_every_method_reaches_its_endpoint(api: Api, fake: Fake) -> None:
     methods = [m for m in cent._api.METHODS if m not in ("batch", "broadcast")]
     for m in methods:
-        request_type = next(t for t in cent._api.REQUESTS if m == t.api_method)
-        req = request_type()
-        if m == "publish":
-            req = cent.PublishRequest(channel="ch", data=1)
-        getattr(api, m)(req)
+        getattr(api, m)(**({"channel": "ch", "data": 1} if m == "publish" else {}))
     paths = [r.url.path.rsplit("/", 1)[-1] for r in fake.requests]
     assert paths == methods
 
@@ -114,7 +110,7 @@ def test_empty_request_methods_take_no_argument(api: Api, fake: Fake) -> None:
 def test_api_error_by_code(api: Api, fake: Fake) -> None:
     fake.on("publish", cent.ApiError(102, "unknown channel"))
     with pytest.raises(cent.UnknownChannelError) as e:
-        api.publish(cent.PublishRequest(channel="x", data=1))
+        api.publish(channel="x", data=1)
     assert e.value.code == 102
     assert not cent.retryable(e.value)
     assert str(e.value) == "unknown channel (code 102)"
@@ -123,7 +119,7 @@ def test_api_error_by_code(api: Api, fake: Fake) -> None:
 def test_unknown_code_is_api_error(api: Api, fake: Fake) -> None:
     fake.on("publish", cent.ApiError(9999, "new"))
     with pytest.raises(cent.ApiError) as e:
-        api.publish(cent.PublishRequest(channel="x", data=1))
+        api.publish(channel="x", data=1)
     assert type(e.value) is cent.ApiError
     assert e.value.code == 9999
 
@@ -131,7 +127,7 @@ def test_unknown_code_is_api_error(api: Api, fake: Fake) -> None:
 def test_temporary_error_is_retryable(api: Api, fake: Fake) -> None:
     fake.on("publish", cent.ApiError(108, "not available", temporary=True))
     with pytest.raises(cent.NotAvailableError) as e:
-        api.publish(cent.PublishRequest(channel="x", data=1))
+        api.publish(channel="x", data=1)
     assert e.value.temporary
     assert cent.retryable(e.value)
 
@@ -139,7 +135,7 @@ def test_temporary_error_is_retryable(api: Api, fake: Fake) -> None:
 def test_internal_error_is_retryable_without_temporary(api: Api, fake: Fake) -> None:
     fake.on("publish", cent.ApiError(100, "internal"))
     with pytest.raises(cent.InternalError) as e:
-        api.publish(cent.PublishRequest(channel="x", data=1))
+        api.publish(channel="x", data=1)
     assert cent.retryable(e.value)
 
 
@@ -150,7 +146,7 @@ def test_internal_error_is_retryable_without_temporary(api: Api, fake: Fake) -> 
 def test_http_errors(api: Api, fake: Fake, status: int, cls: type[Exception], retry: bool) -> None:
     fake.on("publish", httpx2.Response(status, text="go away", headers={"Retry-After": "3"}))
     with pytest.raises(cls) as e:
-        api.publish(cent.PublishRequest(channel="x", data=1))
+        api.publish(channel="x", data=1)
     err = e.value
     assert isinstance(err, cent.HTTPError)
     assert err.status_code == status
@@ -164,21 +160,21 @@ def test_http_errors(api: Api, fake: Fake, status: int, cls: type[Exception], re
 def test_429_is_retryable(api: Api, fake: Fake) -> None:
     fake.on("publish", httpx2.Response(429, text=""))
     with pytest.raises(cent.HTTPError) as e:
-        api.publish(cent.PublishRequest(channel="x", data=1))
+        api.publish(channel="x", data=1)
     assert cent.retryable(e.value)
 
 
 def test_error_body_is_bounded(api: Api, fake: Fake) -> None:
     fake.on("publish", httpx2.Response(502, content=b"x" * 100_000))
     with pytest.raises(cent.HTTPError) as e:
-        api.publish(cent.PublishRequest(channel="x", data=1))
+        api.publish(channel="x", data=1)
     assert len(e.value.body) == 512
 
 
 def test_redirect_is_not_followed(api: Api, fake: Fake) -> None:
     fake.on("publish", httpx2.Response(307, headers={"Location": "https://elsewhere.test/api/publish"}))
     with pytest.raises(cent.HTTPError) as e:
-        api.publish(cent.PublishRequest(channel="x", data=1))
+        api.publish(channel="x", data=1)
     assert e.value.status_code == 307
     assert "does not follow" in str(e.value)
     assert len(fake.requests) == 1
@@ -188,17 +184,17 @@ def test_404_hints(api: Api, fake: Fake) -> None:
     fake.on("connections", httpx2.Response(404))
     fake.on("publish", httpx2.Response(404))
     with pytest.raises(cent.HTTPError) as e:
-        api.connections(cent.ConnectionsRequest(user="u"))
+        api.connections(user="u")
     assert "connections is a Centrifugo PRO method" in str(e.value)
     with pytest.raises(cent.HTTPError) as e:
-        api.publish(cent.PublishRequest(channel="x", data=1))
+        api.publish(channel="x", data=1)
     assert "is api_endpoint the API base URL" in str(e.value)
 
 
 def test_transport_error_mode(api: Api, fake: Fake) -> None:
     fake.on("publish", httpx2.Response(400, json={"code": 102, "message": "unknown channel"}))
     with pytest.raises(cent.UnknownChannelError):
-        api.publish(cent.PublishRequest(channel="x", data=1))
+        api.publish(channel="x", data=1)
 
 
 @pytest.mark.parametrize(
@@ -208,14 +204,14 @@ def test_transport_error_mode(api: Api, fake: Fake) -> None:
 def test_gateway_json_errors_stay_http_errors(api: Api, fake: Fake, status: int, body: dict[str, Any]) -> None:
     fake.on("publish", httpx2.Response(status, json=body))
     with pytest.raises(cent.HTTPError):
-        api.publish(cent.PublishRequest(channel="x", data=1))
+        api.publish(channel="x", data=1)
 
 
 @pytest.mark.parametrize("body", [b"<html>nope</html>", b"[1]", b'{"result": 5}', b'{"result": {"offset": "1"}}'])
 def test_decode_error(api: Api, fake: Fake, body: bytes) -> None:
     fake.on("publish", httpx2.Response(200, content=body))
     with pytest.raises(cent.DecodeError) as e:
-        api.publish(cent.PublishRequest(channel="x", data=1))
+        api.publish(channel="x", data=1)
     assert not cent.retryable(e.value)
 
 
@@ -225,7 +221,7 @@ def test_network_error(new_api: Callable[..., Api], kind: str, fake: Fake) -> No
 
     a = new_api(http_client=_http(kind, refuse))
     with pytest.raises(cent.NetworkError) as e:
-        a.publish(cent.PublishRequest(channel="x", data=1))
+        a.publish(channel="x", data=1)
     assert isinstance(e.value.__cause__, httpx2.ConnectError)
     assert cent.retryable(e.value)
 
@@ -236,7 +232,7 @@ def test_timeout_error(new_api: Callable[..., Api], kind: str, fake: Fake) -> No
 
     a = new_api(http_client=_http(kind, slow))
     with pytest.raises(cent.CentTimeoutError) as e:
-        a.publish(cent.PublishRequest(channel="x", data=1))
+        a.publish(channel="x", data=1)
     assert isinstance(e.value, TimeoutError)
     assert cent.retryable(e.value)
 
@@ -264,26 +260,30 @@ def test_timeout_bounds_the_call(new_api: Callable[..., Api], kind: str, fake: F
     a = new_api(http_client=_http(kind, lambda r: httpx2.Response(200, stream=Trickle())))
     start = time.monotonic()
     with pytest.raises(cent.CentTimeoutError):
-        a.publish(cent.PublishRequest(channel="x", data=1), timeout=0.2)
+        a.publish(channel="x", data=1, timeout=0.2)
     assert time.monotonic() - start < 0.5
 
 
 def test_validation(api: Api, fake: Fake) -> None:
-    cases: list[tuple[cent.PublishRequest | cent.BroadcastRequest, str]] = [
-        (cent.PublishRequest(data=1), "channel is required"),
-        (cent.PublishRequest(channel="x"), "data or b64data is required"),
-        (cent.BroadcastRequest(data=1), "channels is required"),
-        (cent.BroadcastRequest(channels=["a", ""], data=1), "channels[1] is empty"),
+    cases: list[tuple[str, dict[str, Any], str]] = [
+        ("publish", {"data": 1}, "channel is required"),
+        ("publish", {"channel": "x"}, "data or b64data is required"),
+        ("broadcast", {"data": 1}, "channels is required"),
+        ("broadcast", {"channels": ["a", ""], "data": 1}, "channels[1] is empty"),
     ]
-    for req, msg in cases:
+    for method, fields, msg in cases:
         with pytest.raises(cent.InvalidRequestError, match=re.escape(msg)):
-            getattr(api, req.api_method)(req)
+            getattr(api, method)(**fields)
     assert fake.requests == []
 
 
-def test_not_a_request(api: Api) -> None:
+def test_fields_are_keyword_only(api: Api) -> None:
+    # A request object or a positional value is no keyword argument: refused
+    # by Python itself, naming the method.
     with pytest.raises(TypeError):
         api.publish({"channel": "x"})
+    with pytest.raises(TypeError, match="chanel"):
+        api.publish(chanel="x", data=1)
 
 
 # Payloads.
@@ -306,8 +306,7 @@ def test_not_a_request(api: Api) -> None:
     ],
 )
 def test_payload_encoding(api: Api, fake: Fake, data: Any, wire: str | None) -> None:
-    req = cent.PublishRequest(channel="ch", data=data, b64data="" if data is not None else "Zm9v")
-    api.publish(req)
+    api.publish(channel="ch", data=data, b64data="" if data is not None else "Zm9v")
     raw = fake.requests[0].content.decode()
     if wire is None:
         assert '"data"' not in raw
@@ -329,7 +328,7 @@ def test_payload_encoding(api: Api, fake: Fake, data: Any, wire: str | None) -> 
 )
 def test_payload_refused_before_sending(api: Api, fake: Fake, data: Any, msg: str) -> None:
     with pytest.raises(cent.InvalidRequestError, match=msg):
-        api.publish(cent.PublishRequest(channel="ch", data=data))
+        api.publish(channel="ch", data=data)
     assert fake.requests == []
 
 
@@ -348,22 +347,18 @@ def test_payload_round_trip(api: Api, fake: Fake) -> None:
             200, content=b'{"result":{"publications":[{"data":' + original.encode() + b',"offset":7}],"offset":7}}'
         ),
     )
-    hist = api.history(cent.HistoryRequest(channel="ch", limit=1))
+    hist = api.history(channel="ch", limit=1)
     pub = hist.publications[0]
     assert pub.offset == 7
-    api.publish(cent.PublishRequest(channel="ch", data=pub.data))
+    api.publish(channel="ch", data=pub.data)
     sent = json.loads(fake.requests[-1].content)["data"]
     assert json.dumps(sent, separators=(",", ":")) == original
     assert '"d":1.0' in fake.requests[-1].content.decode()
 
 
 def test_bool_value_fields(api: Api, fake: Fake) -> None:
-    api.subscribe(
-        cent.SubscribeRequest(
-            channel="ch", user="u", override=cent.SubscribeOptionOverride(presence=False, join_leave=None)
-        )
-    )
-    api.subscribe(cent.SubscribeRequest(channel="ch", user="u", override=cent.SubscribeOptionOverride()))
+    api.subscribe(channel="ch", user="u", override=cent.SubscribeOptionOverride(presence=False, join_leave=None))
+    api.subscribe(channel="ch", user="u", override=cent.SubscribeOptionOverride())
     first, second = fake.bodies("subscribe")
     assert first["override"] == {"presence": {"value": False}}
     # An override with nothing set is not sent.
@@ -374,7 +369,7 @@ def test_bool_value_fields(api: Api, fake: Fake) -> None:
 
 
 def test_broadcast(api: Api) -> None:
-    res = api.broadcast(cent.BroadcastRequest(channels=["a", "b"], data={"x": 1}, idempotency_key="k"))
+    res = api.broadcast(channels=["a", "b"], data={"x": 1}, idempotency_key="k")
     assert res.replied
     assert res.attempts == 1
     assert res.idempotency_key == "k"
@@ -385,7 +380,7 @@ def test_broadcast(api: Api) -> None:
 
 def test_broadcast_partial_failure(api: Api) -> None:
     with pytest.raises(cent.BroadcastFailedChannelsError) as e:
-        api.broadcast(cent.BroadcastRequest(channels=["a", "bad:1", "b", "full:1"], data=1))
+        api.broadcast(channels=["a", "bad:1", "b", "full:1"], data=1)
     err = e.value
     assert err.total == 4
     assert [f.channel for f in err.failed] == ["bad:1", "full:1"]
@@ -405,13 +400,13 @@ def test_broadcast_partial_failure(api: Api) -> None:
 
 def test_broadcast_into_one_unknown_channel_is_a_partial_error(api: Api) -> None:
     with pytest.raises(cent.BroadcastFailedChannelsError) as e:
-        api.broadcast(cent.BroadcastRequest(channels=["bad:1"], data=1))
+        api.broadcast(channels=["bad:1"], data=1)
     assert e.value.total == 1
 
 
 def test_broadcast_retryable_channels(api: Api) -> None:
     with pytest.raises(cent.BroadcastFailedChannelsError) as e:
-        api.broadcast(cent.BroadcastRequest(channels=["a", "flaky:1", "bad:1"], data=1))
+        api.broadcast(channels=["a", "flaky:1", "bad:1"], data=1)
     assert e.value.retryable_channels() == ["flaky:1"]
     assert cent.retryable(e.value)
     assert str(e.value).endswith("(retry only retryable_channels(), with the same idempotency_key)")
@@ -419,7 +414,7 @@ def test_broadcast_retryable_channels(api: Api) -> None:
 
 def test_broadcast_failure_message_is_bounded(api: Api) -> None:
     with pytest.raises(cent.BroadcastFailedChannelsError) as e:
-        api.broadcast(cent.BroadcastRequest(channels=[f"bad:{i}" for i in range(100)], data=1))
+        api.broadcast(channels=[f"bad:{i}" for i in range(100)], data=1)
     assert "100 of 100 channels failed" in str(e.value)
     assert str(e.value).endswith("and 97 more")
 
@@ -427,7 +422,7 @@ def test_broadcast_failure_message_is_bounded(api: Api) -> None:
 def test_broadcast_reply_count_mismatch(api: Api, fake: Fake) -> None:
     fake.on("broadcast", {"responses": [{"result": {}}]})
     with pytest.raises(cent.DecodeError):
-        api.broadcast(cent.BroadcastRequest(channels=["a", "b"], data=1))
+        api.broadcast(channels=["a", "b"], data=1)
 
 
 def test_broadcast_with_retry(api: Api, fake: Fake) -> None:
@@ -450,7 +445,7 @@ def test_broadcast_with_retry(api: Api, fake: Fake) -> None:
         seen.append(a)
         return 0.0
 
-    res = api.broadcast_with_retry(cent.BroadcastRequest(channels=["a", "flaky", "b"], data=1), on_attempt_error=on_err)
+    res = api.broadcast_with_retry(channels=["a", "flaky", "b"], data=1, on_attempt_error=on_err)
     assert calls == [["a", "flaky", "b"], ["flaky"]]
     assert res.attempts == 2
     assert [c.attempts for c in res.channels] == [1, 2, 1]
@@ -465,16 +460,14 @@ def test_broadcast_with_retry(api: Api, fake: Fake) -> None:
 
 def test_broadcast_with_retry_stops_on_permanent_failure(api: Api, fake: Fake) -> None:
     with pytest.raises(cent.BroadcastFailedChannelsError) as e:
-        api.broadcast_with_retry(cent.BroadcastRequest(channels=["a", "bad:1"], data=1))
+        api.broadcast_with_retry(channels=["a", "bad:1"], data=1)
     assert len(fake.requests) == 1
     assert e.value.result.attempts == 1
 
 
 def test_broadcast_with_retry_gives_up(api: Api, fake: Fake) -> None:
     with pytest.raises(cent.BroadcastFailedChannelsError) as e:
-        api.broadcast_with_retry(
-            cent.BroadcastRequest(channels=["a", "flaky:1"], data=1), max_attempts=3, on_attempt_error=lambda a: 0.0
-        )
+        api.broadcast_with_retry(channels=["a", "flaky:1"], data=1, max_attempts=3, on_attempt_error=lambda a: 0.0)
     assert len(fake.requests) == 3
     assert [f.channel for f in e.value.failed] == ["flaky:1"]
     assert e.value.result.channels[1].attempts == 3
@@ -489,7 +482,7 @@ def test_broadcast_with_retry_stopped_by_callback(api: Api) -> None:
         raise Stop
 
     with pytest.raises(Stop) as e:
-        api.broadcast_with_retry(cent.BroadcastRequest(channels=["a", "flaky:1"], data=1), on_attempt_error=stop)
+        api.broadcast_with_retry(channels=["a", "flaky:1"], data=1, on_attempt_error=stop)
     cause = e.value.__cause__
     assert isinstance(cause, cent.BroadcastFailedChannelsError)
     assert cause.result.channels[0].error is None
@@ -498,14 +491,14 @@ def test_broadcast_with_retry_stopped_by_callback(api: Api) -> None:
 def test_broadcast_with_retry_whole_failure(api: Api, fake: Fake) -> None:
     fake.on("broadcast", httpx2.Response(503))
     with pytest.raises(cent.HTTPError):
-        api.broadcast_with_retry(cent.BroadcastRequest(channels=["a"], data=1), on_attempt_error=lambda a: 0.0)
+        api.broadcast_with_retry(channels=["a"], data=1, on_attempt_error=lambda a: 0.0)
     assert len(fake.requests) == 2
 
 
 @pytest.mark.parametrize("opts", [{"max_attempts": 0}, {"attempt_timeout": -1}])
 def test_broadcast_with_retry_options(api: Api, fake: Fake, opts: dict[str, Any]) -> None:
     with pytest.raises(cent.InvalidRequestError):
-        api.broadcast_with_retry(cent.BroadcastRequest(channels=["a"], data=1), **opts)
+        api.broadcast_with_retry(channels=["a"], data=1, **opts)
     assert fake.requests == []
 
 
@@ -524,9 +517,9 @@ def test_exponential_backoff() -> None:
 
 def test_batch(api: Api, fake: Fake) -> None:
     b = api.client.new_batch()
-    pub = b.publish(cent.PublishRequest(channel="a", data=1))
-    stats = b.presence_stats(cent.PresenceStatsRequest(channel="a"))
-    bc = b.broadcast(cent.BroadcastRequest(channels=["x", "y"], data=2))
+    pub = b.publish(channel="a", data=1)
+    stats = b.presence_stats(channel="a")
+    bc = b.broadcast(channels=["x", "y"], data=2)
     with pytest.raises(cent.BatchNotSentError):
         pub.result()
     res = api.send(b)
@@ -546,12 +539,12 @@ def test_batch(api: Api, fake: Fake) -> None:
     with pytest.raises(cent.BatchSentError):
         api.send(b)
     with pytest.raises(RuntimeError):
-        b.publish(cent.PublishRequest(channel="a", data=1))
+        b.publish(channel="a", data=1)
 
 
 def test_batch_parallel(api: Api, fake: Fake) -> None:
     b = api.client.new_batch(parallel=True)
-    b.publish(cent.PublishRequest(channel="a", data=1))
+    b.publish(channel="a", data=1)
     api.send(b)
     assert fake.bodies("batch")[0]["parallel"] is True
 
@@ -559,9 +552,9 @@ def test_batch_parallel(api: Api, fake: Fake) -> None:
 def test_batch_partial_failure(api: Api, fake: Fake) -> None:
     fake.on("presence", cent.ApiError(108, "not available"))
     b = api.client.new_batch()
-    pub = b.publish(cent.PublishRequest(channel="a", data=1))
-    pres = b.presence(cent.PresenceRequest(channel="a"))
-    bc = b.broadcast(cent.BroadcastRequest(channels=["x", "bad:1"], data=2))
+    pub = b.publish(channel="a", data=1)
+    pres = b.presence(channel="a")
+    bc = b.broadcast(channels=["x", "bad:1"], data=2)
     with pytest.raises(cent.BatchFailedCommandsError) as e:
         api.send(b)
     err = e.value
@@ -581,8 +574,8 @@ def test_batch_pro_method_on_oss_hints(api: Api, fake: Fake) -> None:
     fake.on("connections", cent.ApiError(104, "not found"))
     fake.on("history", cent.ApiError(104, "not found"))
     b = api.client.new_batch()
-    conns = b.connections(cent.ConnectionsRequest(user="u"))
-    hist = b.history(cent.HistoryRequest(channel="x"))
+    conns = b.connections(user="u")
+    hist = b.history(channel="x")
     with pytest.raises(cent.BatchFailedCommandsError):
         api.send(b)
     with pytest.raises(cent.NotFoundError, match="connections is a Centrifugo PRO method"):
@@ -595,7 +588,7 @@ def test_batch_pro_method_on_oss_hints(api: Api, fake: Fake) -> None:
 def test_batch_whole_failure(api: Api, fake: Fake) -> None:
     fake.on("batch", httpx2.Response(500))
     b = api.client.new_batch()
-    pub = b.publish(cent.PublishRequest(channel="a", data=1))
+    pub = b.publish(channel="a", data=1)
     with pytest.raises(cent.HTTPError):
         api.send(b)
     with pytest.raises(cent.HTTPError):
@@ -604,8 +597,8 @@ def test_batch_whole_failure(api: Api, fake: Fake) -> None:
 
 def test_batch_invalid_command_fails_before_sending(api: Api, fake: Fake) -> None:
     b = api.client.new_batch()
-    b.publish(cent.PublishRequest(channel="a", data=1))
-    p = b.publish(cent.PublishRequest(channel="a", data=float("nan")))
+    b.publish(channel="a", data=1)
+    p = b.publish(channel="a", data=float("nan"))
     with pytest.raises(cent.InvalidRequestError, match="batch command #1"):
         api.send(b)
     with pytest.raises(cent.InvalidRequestError):
@@ -616,8 +609,8 @@ def test_batch_invalid_command_fails_before_sending(api: Api, fake: Fake) -> Non
 def test_batch_reply_count_mismatch(api: Api, fake: Fake) -> None:
     fake.on("batch", httpx2.Response(200, json={"replies": [{}]}))
     b = api.client.new_batch()
-    b.publish(cent.PublishRequest(channel="a", data=1))
-    b.publish(cent.PublishRequest(channel="b", data=1))
+    b.publish(channel="a", data=1)
+    b.publish(channel="b", data=1)
     with pytest.raises(cent.DecodeError):
         api.send(b)
 
@@ -634,12 +627,12 @@ def test_empty_batch(api: Api, fake: Fake) -> None:
 
 
 def test_new_command() -> None:
-    cmd = cent.new_command(cent.PublishRequest(channel="news", data=cent.RawJSON('{"n": 1.0}')))
+    cmd = cent.command.publish(channel="news", data=cent.RawJSON('{"n": 1.0}'))
     assert cmd.method == "publish"
     assert cmd.payload == '{"channel":"news","data":{"n": 1.0}}'
     assert json.loads(cmd.to_json()) == {"method": "publish", "payload": {"channel": "news", "data": {"n": 1.0}}}
     with pytest.raises(cent.InvalidRequestError):
-        cent.new_command(cent.PublishRequest(data=1))
+        cent.command.publish(data=1)
 
 
 # Configuration.
@@ -688,13 +681,13 @@ def test_httpx_client_refused_with_the_fix() -> None:
 
 def test_trailing_slash_dropped(fake: Fake) -> None:
     c = cent.Client(ENDPOINT + "/", http_client=httpx2.Client(transport=httpx2.MockTransport(fake)))
-    c.publish(cent.PublishRequest(channel="x", data=1))
+    c.publish(channel="x", data=1)
     assert str(fake.requests[0].url) == ENDPOINT + "/publish"
 
 
 def test_headers_and_user_agent(new_api: Callable[..., Api], fake: Fake) -> None:
     a = new_api(headers={"X-Tenant": "t1", "User-Agent": "mine/1"})
-    a.publish(cent.PublishRequest(channel="x", data=1))
+    a.publish(channel="x", data=1)
     h = fake.requests[0].headers
     assert h["X-Tenant"] == "t1"
     assert h["User-Agent"] == "mine/1"
@@ -705,7 +698,7 @@ def test_callers_http_client_is_not_changed(new_api: Callable[..., Api], kind: s
     http = _http(kind, fake)
     before = dict(http.headers)
     a = new_api(http_client=http, api_key="secret")
-    a.publish(cent.PublishRequest(channel="x", data=1))
+    a.publish(channel="x", data=1)
     assert dict(http.headers) == before
     assert fake.requests[0].headers["X-API-Key"] == "secret"
 
@@ -724,8 +717,8 @@ def test_endpoint_and_token_funcs(new_api: Callable[..., Api], kind: str, fake: 
         a = new_api(api_endpoint=None, api_endpoint_func=endpoint, bearer_token_func=token)
     else:
         a = new_api(api_endpoint=None, api_endpoint_func=lambda: ENDPOINT, bearer_token_func=lambda: next(tokens))
-    a.publish(cent.PublishRequest(channel="x", data=1))
-    a.publish(cent.PublishRequest(channel="x", data=1))
+    a.publish(channel="x", data=1)
+    a.publish(channel="x", data=1)
     assert [r.headers["Authorization"] for r in fake.requests] == ["Bearer t1", "Bearer t2"]
 
 
@@ -733,14 +726,14 @@ def test_endpoint_and_token_funcs(new_api: Callable[..., Api], kind: str, fake: 
 def test_bad_token_fails_before_sending(new_api: Callable[..., Api], kind: str, fake: Fake, token: str) -> None:
     a = new_api(bearer_token_func=lambda: token)
     with pytest.raises(cent.InvalidConfigError):
-        a.publish(cent.PublishRequest(channel="x", data=1))
+        a.publish(channel="x", data=1)
     assert fake.requests == []
 
 
 def test_bad_endpoint_from_func(new_api: Callable[..., Api], kind: str, fake: Fake) -> None:
     a = new_api(api_endpoint=None, api_endpoint_func=lambda: "http://x/api/publish")
     with pytest.raises(cent.InvalidConfigError, match="api_endpoint_func"):
-        a.publish(cent.PublishRequest(channel="x", data=1))
+        a.publish(channel="x", data=1)
 
 
 def test_endpoint_func_error_propagates(new_api: Callable[..., Api], kind: str, fake: Fake) -> None:
@@ -749,7 +742,7 @@ def test_endpoint_func_error_propagates(new_api: Callable[..., Api], kind: str, 
 
     a = new_api(api_endpoint=None, api_endpoint_func=down)
     with pytest.raises(ConnectionRefusedError):
-        a.publish(cent.PublishRequest(channel="x", data=1))
+        a.publish(channel="x", data=1)
 
 
 # Observability.
@@ -758,20 +751,20 @@ def test_endpoint_func_error_propagates(new_api: Callable[..., Api], kind: str, 
 def test_on_request(new_api: Callable[..., Api], kind: str, fake: Fake) -> None:
     infos: list[cent.RequestInfo] = []
     a = new_api(on_request=infos.append)
-    a.publish(cent.PublishRequest(channel="x", data=1))
+    a.publish(channel="x", data=1)
     fake.on("presence", cent.ApiError(108, "nope"))
     with pytest.raises(cent.NotAvailableError):
-        a.presence(cent.PresenceRequest(channel="x"))
+        a.presence(channel="x")
     with pytest.raises(cent.BroadcastFailedChannelsError):
-        a.broadcast(cent.BroadcastRequest(channels=["bad:1"], data=1))
+        a.broadcast(channels=["bad:1"], data=1)
     fake.on("history", httpx2.Response(502))
     with pytest.raises(cent.HTTPError):
-        a.history(cent.HistoryRequest(channel="x"))
+        a.history(channel="x")
     with pytest.raises(cent.InvalidRequestError):
-        a.publish(cent.PublishRequest(channel="x", data=float("nan")))
+        a.publish(channel="x", data=float("nan"))
     b = a.client.new_batch()
-    b.publish(cent.PublishRequest(channel="x", data=1))
-    b.presence(cent.PresenceRequest(channel="x"))
+    b.publish(channel="x", data=1)
+    b.presence(channel="x")
     with pytest.raises(cent.BatchFailedCommandsError):
         a.send(b)
 
@@ -794,7 +787,7 @@ def test_on_request_transport_error_mode(new_api: Callable[..., Api], kind: str,
     a = new_api(on_request=infos.append)
     fake.on("publish", httpx2.Response(400, json={"code": 107, "message": "bad request"}))
     with pytest.raises(cent.BadRequestError):
-        a.publish(cent.PublishRequest(channel="x", data=1))
+        a.publish(channel="x", data=1)
     assert isinstance(infos[0].error, cent.BadRequestError)
     assert infos[0].failed == 0
 
@@ -803,10 +796,10 @@ def test_on_request_transport_error_mode(new_api: Callable[..., Api], kind: str,
 
 
 def test_close(api: Api, fake: Fake) -> None:
-    api.publish(cent.PublishRequest(channel="x", data=1))
+    api.publish(channel="x", data=1)
     api.close()
     with pytest.raises(cent.ClosedError):
-        api.publish(cent.PublishRequest(channel="x", data=1))
+        api.publish(channel="x", data=1)
     api.close()  # again
 
 
@@ -821,7 +814,7 @@ def test_close_waits_for_calls_in_progress() -> None:
         return httpx2.Response(200, json={"result": {}})
 
     c = cent.Client(ENDPOINT, http_client=httpx2.Client(transport=httpx2.MockTransport(slow)))
-    t = threading.Thread(target=lambda: c.publish(cent.PublishRequest(channel="x", data=1)))
+    t = threading.Thread(target=lambda: c.publish(channel="x", data=1))
     t.start()
     assert started.wait(5)
     with pytest.raises(cent.CentTimeoutError):
@@ -839,7 +832,7 @@ async def test_aclose_waits_for_calls_in_progress() -> None:
         return httpx2.Response(200, json={"result": {}})
 
     c = cent.AsyncClient(ENDPOINT, http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(slow)))
-    task = asyncio.create_task(c.publish(cent.PublishRequest(channel="x", data=1)))
+    task = asyncio.create_task(c.publish(channel="x", data=1))
     await asyncio.sleep(0.01)
     with pytest.raises(cent.CentTimeoutError):
         await c.aclose(timeout=0.05)
@@ -854,7 +847,7 @@ async def test_cancelled_call_is_not_retryable() -> None:
         raise AssertionError
 
     c = cent.AsyncClient(ENDPOINT, http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(hang)))
-    task = asyncio.create_task(c.publish(cent.PublishRequest(channel="x", data=1)))
+    task = asyncio.create_task(c.publish(channel="x", data=1))
     await asyncio.sleep(0.01)
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
@@ -871,21 +864,21 @@ async def test_outer_asyncio_timeout_ends_a_call_sooner() -> None:
     start = time.monotonic()
     with pytest.raises(TimeoutError):
         async with asyncio.timeout(0.05):
-            await c.publish(cent.PublishRequest(channel="x", data=1))
+            await c.publish(channel="x", data=1)
     assert time.monotonic() - start < 1
 
 
 def test_context_managers(fake: Fake) -> None:
     with cent.Client(ENDPOINT, http_client=httpx2.Client(transport=httpx2.MockTransport(fake))) as c:
-        c.publish(cent.PublishRequest(channel="x", data=1))
+        c.publish(channel="x", data=1)
     with pytest.raises(cent.ClosedError):
-        c.publish(cent.PublishRequest(channel="x", data=1))
+        c.publish(channel="x", data=1)
 
     async def main() -> None:
         async with cent.AsyncClient(
             ENDPOINT, http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(fake))
         ) as c:
-            await c.publish(cent.PublishRequest(channel="x", data=1))
+            await c.publish(channel="x", data=1)
 
     asyncio.run(main())
 
@@ -925,6 +918,6 @@ def test_broadcast_with_retry_retries_a_hung_attempt() -> None:
         return httpx2.Response(200, json={"result": {"responses": [{"result": {"offset": 1}}]}})
 
     c = cent.Client(ENDPOINT, request_timeout=0.2, http_client=httpx2.Client(transport=httpx2.MockTransport(handler)))
-    res = c.broadcast_with_retry(cent.BroadcastRequest(channels=["a"], data=1), on_attempt_error=lambda a: 0.0)
+    res = c.broadcast_with_retry(channels=["a"], data=1, on_attempt_error=lambda a: 0.0)
     assert calls[0] == 2
     assert res.attempts == 2

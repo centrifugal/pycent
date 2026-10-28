@@ -99,8 +99,12 @@ which Centrifugo reaches as `host.docker.internal`.
 - **httpx2, not httpx.** httpx stopped releasing in 2024; httpx2 is its
   maintained fork, the same API, which the ecosystem moved to. An httpx client
   passed in is refused with the fix in the message.
-- **Methods take request objects**, as gocent's do, not keyword arguments: one
-  argument per method, the same objects for batches and `new_command`.
+- **Keyword arguments, a method per API method**, as the spec says for Python
+  (3.3): `client.publish(channel=..., data=...)`, `batch.publish(...)`,
+  `cent.command.publish(...)`, keyword-only so that a field added to the protos
+  cannot shift a call. The request dataclasses are internal: the generated
+  methods build them, and the transport, automatic batching and retries take
+  them.
 - **Dataclasses, not pydantic models.** A pydantic type in the API would tie
   applications to one major version of it (spec 3.4, Stable).
 - **A `timeout` parameter on async methods** (ruff's ASYNC109 is off): asyncio

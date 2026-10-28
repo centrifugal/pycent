@@ -96,7 +96,7 @@ def test_async_batch_runs_in_a_context_of_its_own() -> None:
 
         async def call(name: str) -> None:
             var.set(name)
-            await c.publish(cent.PublishRequest(channel=name, data=1))
+            await c.publish(channel=name, data=1)
 
         tasks = [asyncio.create_task(call(f"caller{i}")) for i in range(4)]
         await asyncio.sleep(0.02)
@@ -146,7 +146,7 @@ def test_sync_batch_context_gets_the_callers() -> None:
 
     def call(name: str) -> None:
         var.set(name)
-        c.publish(cent.PublishRequest(channel=name, data=1))
+        c.publish(channel=name, data=1)
 
     threads = [threading.Thread(target=call, args=(f"caller{i}",)) for i in range(4)]
     threads[0].start()
@@ -178,7 +178,7 @@ def test_each_caller_gets_its_own_batch_error() -> None:
 
     def call() -> None:
         try:
-            c.publish(cent.PublishRequest(channel="x", data=1))
+            c.publish(channel="x", data=1)
         except cent.HTTPError as e:
             errors.append(e)
 
@@ -207,9 +207,9 @@ def test_cancelled_async_batch_resolves_its_callers() -> None:
             http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(hang)),
             auto_batch=cent.AutoBatch(max_in_flight=1),
         )
-        first = asyncio.create_task(c.publish(cent.PublishRequest(channel="a", data=1)))
+        first = asyncio.create_task(c.publish(channel="a", data=1))
         await asyncio.sleep(0.01)
-        queued = [asyncio.create_task(c.publish(cent.PublishRequest(channel="b", data=1))) for _ in range(2)]
+        queued = [asyncio.create_task(c.publish(channel="b", data=1)) for _ in range(2)]
         await asyncio.sleep(0.01)
         first.cancel()  # frees the slot: the queued calls go out as a batch
         await asyncio.sleep(0.01)
@@ -228,7 +228,7 @@ def test_non_ascii_token_fails_as_config() -> None:
         ENDPOINT, bearer_token_func=lambda: "tök", http_client=httpx2.Client(transport=httpx2.MockTransport(Fake()))
     )
     with pytest.raises(cent.InvalidConfigError, match="printable ASCII"):
-        c.publish(cent.PublishRequest(channel="x", data=1))
+        c.publish(channel="x", data=1)
 
 
 def test_undecodable_reply_is_a_decode_error() -> None:
@@ -237,7 +237,7 @@ def test_undecodable_reply_is_a_decode_error() -> None:
 
     c = cent.Client(ENDPOINT, http_client=httpx2.Client(transport=httpx2.MockTransport(corrupt)))
     with pytest.raises(cent.DecodeError):
-        c.publish(cent.PublishRequest(channel="x", data=1))
+        c.publish(channel="x", data=1)
     assert gzip  # the Content-Encoding the reply claims
 
 
@@ -247,7 +247,7 @@ def test_deeply_nested_reply_is_a_decode_error() -> None:
 
     c = cent.Client(ENDPOINT, http_client=httpx2.Client(transport=httpx2.MockTransport(deep)))
     with pytest.raises(cent.DecodeError):
-        c.publish(cent.PublishRequest(channel="x", data=1))
+        c.publish(channel="x", data=1)
 
 
 def test_deeply_nested_request_is_a_400() -> None:
@@ -264,4 +264,4 @@ def test_bad_call_timeout_is_an_invalid_request() -> None:
     c = cent.Client(ENDPOINT, http_client=httpx2.Client(transport=httpx2.MockTransport(Fake())))
     for bad in (-1, "5", True):
         with pytest.raises(cent.InvalidRequestError, match="timeout"):
-            c.publish(cent.PublishRequest(channel="x", data=1), timeout=bad)  # type: ignore[arg-type]
+            c.publish(channel="x", data=1, timeout=bad)  # type: ignore[arg-type]

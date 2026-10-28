@@ -80,8 +80,8 @@ class Gate:
                 self.in_flight -= 1
 
 
-def pub(i: int | str) -> cent.PublishRequest:
-    return cent.PublishRequest(channel=f"ch:{i}" if isinstance(i, int) else i, data=1)
+def pub(i: int | str) -> dict[str, Any]:
+    return {"channel": f"ch:{i}" if isinstance(i, int) else i, "data": 1}
 
 
 def sync_client(gate: Gate, **kw: Any) -> cent.Client:
@@ -98,8 +98,8 @@ def test_below_the_cap_calls_go_alone() -> None:
     gate = Gate()
     gate.open.set()
     c = sync_client(gate)
-    assert c.publish(pub(1)).offset == 1
-    assert c.publish(pub(2)).offset == 2
+    assert c.publish(**pub(1)).offset == 1
+    assert c.publish(**pub(2)).offset == 2
     assert gate.paths == ["publish", "publish"]
 
 
@@ -111,7 +111,7 @@ def test_at_the_cap_calls_batch() -> None:
 
     def run(i: int) -> None:
         try:
-            results[i] = c.publish(pub(i) if i != 5 else pub("bad"))
+            results[i] = c.publish(**(pub(i) if i != 5 else pub("bad")))
         except Exception as e:
             results[i] = e
 
@@ -144,7 +144,7 @@ def test_batch_failing_as_a_whole_fails_its_calls() -> None:
 
     def run(i: int) -> None:
         try:
-            c.publish(pub(i))
+            c.publish(**pub(i))
         except Exception as e:
             errors.append(e)
 
@@ -162,12 +162,12 @@ def test_batch_failing_as_a_whole_fails_its_calls() -> None:
 def test_queued_call_timing_out_is_not_sent() -> None:
     gate = Gate()
     c = sync_client(gate)
-    holders = [threading.Thread(target=c.publish, args=(pub(i),)) for i in (1, 2)]
+    holders = [threading.Thread(target=c.publish, kwargs=pub(i)) for i in (1, 2)]
     for t in holders:
         t.start()
     time.sleep(0.05)
     with pytest.raises(cent.CentTimeoutError, match="before it was sent"):
-        c.publish(pub(3), timeout=0.05)
+        c.publish(**pub(3), timeout=0.05)
     gate.open.set()
     for t in holders:
         t.join(5)
@@ -179,7 +179,7 @@ def test_queued_call_timing_out_is_not_sent() -> None:
 def test_close_waits_for_batches() -> None:
     gate = Gate()
     c = sync_client(gate)
-    threads = [threading.Thread(target=c.publish, args=(pub(i),)) for i in range(5)]
+    threads = [threading.Thread(target=c.publish, kwargs=pub(i)) for i in range(5)]
     for t in threads:
         t.start()
     time.sleep(0.05)
@@ -214,7 +214,7 @@ def test_stress_sync() -> None:
             i = worker * 1000 + n
             if random.random() < 0.2:
                 time.sleep(0.001)
-            res = c.publish(pub(i))
+            res = c.publish(**pub(i))
             if res.offset != i:
                 bad.append(f"{i}: {res.offset}")
 
@@ -234,7 +234,7 @@ async def test_async_batches() -> None:
     gate = Gate()
     infos: list[cent.RequestInfo] = []
     c = async_client(gate, on_request=infos.append)
-    tasks = [asyncio.create_task(c.publish(pub(i) if i != 4 else pub("bad"))) for i in range(1, 9)]
+    tasks = [asyncio.create_task(c.publish(**(pub(i) if i != 4 else pub("bad")))) for i in range(1, 9)]
     await asyncio.sleep(0.05)
     gate.open.set()
     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -252,15 +252,15 @@ async def test_async_batches() -> None:
 async def test_async_queued_call_cancelled_is_not_sent() -> None:
     gate = Gate()
     c = async_client(gate)
-    holders = [asyncio.create_task(c.publish(pub(i))) for i in (1, 2)]
+    holders = [asyncio.create_task(c.publish(**pub(i))) for i in (1, 2)]
     await asyncio.sleep(0.02)
-    queued = asyncio.create_task(c.publish(pub(3)))
+    queued = asyncio.create_task(c.publish(**pub(3)))
     await asyncio.sleep(0.02)
     queued.cancel()
     with pytest.raises(asyncio.CancelledError):
         await queued
     with pytest.raises(cent.CentTimeoutError, match="before it was sent"):
-        await c.publish(pub(4), timeout=0.02)
+        await c.publish(**pub(4), timeout=0.02)
     gate.open.set()
     await asyncio.gather(*holders)
     await c.aclose(timeout=5)
@@ -281,7 +281,7 @@ async def test_stress_async() -> None:
             i = worker * 1000 + n
             if random.random() < 0.3:
                 await asyncio.sleep(0)
-            res = await c.publish(pub(i))
+            res = await c.publish(**pub(i))
             if res.offset != i:
                 bad.append(f"{i}: {res.offset}")
 

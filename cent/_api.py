@@ -11,87 +11,62 @@ from cent._payload import JSON
 
 if TYPE_CHECKING:
     from cent._batch import Pending
+    from cent._broadcast import BroadcastResult
+    from cent._client import BroadcastAttemptCallback
 
 _R = TypeVar("_R")
 
 __all__ = [
     "ApnsPushNotification",
-    "BlockUserRequest",
     "BlockUserResult",
-    "BroadcastRequest",
-    "CancelPushRequest",
     "CancelPushResult",
     "ChannelContext",
     "ChannelInfo",
-    "ChannelsRequest",
     "ChannelsResult",
     "ClientInfo",
     "ConnectionInfo",
     "ConnectionState",
     "ConnectionTokenInfo",
-    "ConnectionsRequest",
     "ConnectionsResult",
-    "DeleteUserStatusRequest",
     "DeleteUserStatusResult",
     "Device",
     "DeviceFilter",
-    "DeviceListRequest",
     "DeviceListResult",
     "DeviceLocaleUpdate",
     "DeviceMetaUpdate",
-    "DeviceRegisterRequest",
     "DeviceRegisterResult",
-    "DeviceRemoveRequest",
     "DeviceRemoveResult",
     "DeviceTimezoneUpdate",
     "DeviceTopic",
     "DeviceTopicFilter",
-    "DeviceTopicListRequest",
     "DeviceTopicListResult",
-    "DeviceTopicUpdateRequest",
     "DeviceTopicUpdateResult",
     "DeviceTopicsUpdate",
-    "DeviceUpdateRequest",
     "DeviceUpdateResult",
     "DeviceUserUpdate",
     "Disconnect",
-    "DisconnectRequest",
     "DisconnectResult",
     "FcmPushNotification",
     "FilterNode",
-    "GetUserStatusRequest",
     "GetUserStatusResult",
-    "HistoryRemoveRequest",
     "HistoryRemoveResult",
-    "HistoryRequest",
     "HistoryResult",
     "HmsPushNotification",
-    "InfoRequest",
     "InfoResult",
-    "InvalidateUserTokensRequest",
     "InvalidateUserTokensResult",
-    "MapClearRequest",
     "MapClearResult",
     "MapEntry",
-    "MapPublishRequest",
     "MapPublishResult",
-    "MapReadStateRequest",
     "MapReadStateResult",
-    "MapReadStreamRequest",
     "MapReadStreamResult",
-    "MapRemoveRequest",
     "MapRemoveResult",
-    "MapStatsRequest",
     "MapStatsResult",
     "Metrics",
     "NodeResult",
-    "PresenceRequest",
     "PresenceResult",
-    "PresenceStatsRequest",
     "PresenceStatsResult",
     "Process",
     "Publication",
-    "PublishRequest",
     "PublishResult",
     "PushLimitStrategy",
     "PushLocalization",
@@ -100,34 +75,22 @@ __all__ = [
     "PushRecipient",
     "PushTimeLimitStrategy",
     "RateLimitPolicy",
-    "RefreshRequest",
     "RefreshResult",
-    "Request",
-    "RevokeTokenRequest",
     "RevokeTokenResult",
-    "SendPushNotificationRequest",
     "SendPushNotificationResult",
-    "SharedPollPublishRequest",
     "SharedPollPublishResult",
     "StreamPosition",
     "SubscribeOptionOverride",
-    "SubscribeRequest",
     "SubscribeResult",
     "SubscriptionTokenInfo",
-    "UnblockUserRequest",
     "UnblockUserResult",
-    "UnsubscribeRequest",
     "UnsubscribeResult",
-    "UpdatePushStatusRequest",
     "UpdatePushStatusResult",
-    "UpdateUserStatusRequest",
     "UpdateUserStatusResult",
     "UserStatus",
     "UserTopic",
     "UserTopicFilter",
-    "UserTopicListRequest",
     "UserTopicListResult",
-    "UserTopicUpdateRequest",
     "UserTopicUpdateResult",
     "WebPushPushNotification",
 ]
@@ -4467,7 +4430,7 @@ Request = (
     | MapClearRequest
     | SharedPollPublishRequest
 )
-"""Any request of the server API: what Client methods and new_command take."""
+"""Any request of the server API."""
 
 # Every API method, batch included, and whether only Centrifugo PRO has it.
 METHODS: dict[str, bool] = {
@@ -4563,231 +4526,1162 @@ class _ClientAPI:
     if TYPE_CHECKING:
 
         def _invoke(self, request: Any, result: type[_R], timeout: float | None) -> _R: ...
+        def _broadcast(self, request: BroadcastRequest, timeout: float | None) -> BroadcastResult: ...
+        def _broadcast_with_retry(
+            self,
+            request: BroadcastRequest,
+            max_attempts: int,
+            attempt_timeout: float | None,
+            on_attempt_error: BroadcastAttemptCallback | None,
+            timeout: float | None,
+        ) -> BroadcastResult: ...
 
-    def publish(self, request: PublishRequest, *, timeout: float | None = None) -> PublishResult:
-        """Publishes data into a channel."""
-        return self._invoke(request, PublishResult, timeout)
+    def publish(
+        self,
+        *,
+        channel: str = "",
+        data: JSON = None,
+        b64data: str = "",
+        skip_history: bool = False,
+        tags: dict[str, str] | None = None,
+        idempotency_key: str = "",
+        delta: bool = False,
+        version: int = 0,
+        version_epoch: str = "",
+        timeout: float | None = None,
+    ) -> PublishResult:
+        """Publishes data into a channel.
 
-    def subscribe(self, request: SubscribeRequest, *, timeout: float | None = None) -> SubscribeResult:
+        Args:
+            channel: The name of the channel to publish into. Required.
+            data: The payload to publish. Required unless b64data is set. In the
+                HTTP API it is any JSON value; over GRPC it may be binary.
+            b64data: A base64-encoded binary payload, an alternative to `data` to
+                send binary over the HTTP API. Centrifugo decodes it before publishing.
+            skip_history: Skips adding this publication to the channel history.
+            tags: A map of arbitrary string keys and values attached to the
+                publication and delivered to clients.
+            idempotency_key: Drops duplicate publications upon retries: a
+                publication with a key already used in the channel is not published
+                again, and the first one's result is returned. It acts per channel;
+                results are kept for 5 minutes by default. The memory, Redis and
+                PostgreSQL brokers keep keys; the NATS broker ignores them.
+            delta: Tells Centrifugo to construct a delta update, if possible, when
+                broadcasting the publication to subscribers.
+            version: When > 0, the version of the document being sent:
+                publications with a version less than or equal to one already seen are
+                ignored. Only works in channels with history enabled.
+            version_epoch: The epoch of version. When it changes, Centrifugo
+                accepts the publication even if its version is lower than before.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(
+            PublishRequest(
+                channel=channel,
+                data=data,
+                b64data=b64data,
+                skip_history=skip_history,
+                tags=tags if tags is not None else {},
+                idempotency_key=idempotency_key,
+                delta=delta,
+                version=version,
+                version_epoch=version_epoch,
+            ),
+            PublishResult,
+            timeout,
+        )
+
+    def broadcast(
+        self,
+        *,
+        channels: list[str] | None = None,
+        data: JSON = None,
+        b64data: str = "",
+        skip_history: bool = False,
+        tags: dict[str, str] | None = None,
+        idempotency_key: str = "",
+        delta: bool = False,
+        version: int = 0,
+        version_epoch: str = "",
+        timeout: float | None = None,
+    ) -> BroadcastResult:
+        """Publishes the same data into many channels.
+
+        Channels succeed or fail on their own. It returns when every channel
+        got the publication. When Centrifugo carried the broadcast out and one
+        or more channels failed - up to all of them - it raises
+        BroadcastFailedChannelsError, whose ``result`` holds every channel's
+        outcome. Any other exception means it failed as a whole: no channel got
+        a reply. After a timeout or a network error Centrifugo may still have
+        published it. Retry it with broadcast_with_retry, which sends again only
+        the channels which may still succeed, with one idempotency_key.
+
+        Args:
+            channels: The list of channels to publish into. Required.
+            data: The payload to publish into each channel. Required unless
+                b64data is set. In the HTTP API it is any JSON value; over GRPC it may
+                be binary.
+            b64data: A base64-encoded binary payload, an alternative to `data` to
+                send binary over the HTTP API. Centrifugo decodes it before publishing.
+            skip_history: Skips adding the publications to the channels' history.
+            tags: A map of arbitrary string keys and values attached to each
+                publication and delivered to clients.
+            idempotency_key: Drops duplicate publications upon retries. It acts per
+                channel: a broadcast retried with the same key is not published again
+                into the channels which already have it. Results are kept for 5 minutes
+                by default. The memory, Redis and PostgreSQL brokers keep keys; the
+                NATS broker ignores them.
+            delta: Tells Centrifugo to construct a delta update, if possible, when
+                broadcasting the publications to subscribers.
+            version: When > 0, the version of the document being sent:
+                publications with a version less than or equal to one already seen are
+                ignored. Only works in channels with history enabled.
+            version_epoch: The epoch of version. When it changes, Centrifugo
+                accepts the publication even if its version is lower than before.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._broadcast(
+            BroadcastRequest(
+                channels=channels if channels is not None else [],
+                data=data,
+                b64data=b64data,
+                skip_history=skip_history,
+                tags=tags if tags is not None else {},
+                idempotency_key=idempotency_key,
+                delta=delta,
+                version=version,
+                version_epoch=version_epoch,
+            ),
+            timeout,
+        )
+
+    def broadcast_with_retry(
+        self,
+        *,
+        channels: list[str] | None = None,
+        data: JSON = None,
+        b64data: str = "",
+        skip_history: bool = False,
+        tags: dict[str, str] | None = None,
+        idempotency_key: str = "",
+        delta: bool = False,
+        version: int = 0,
+        version_epoch: str = "",
+        max_attempts: int = 2,
+        attempt_timeout: float | None = None,
+        on_attempt_error: BroadcastAttemptCallback | None = None,
+        timeout: float | None = None,
+    ) -> BroadcastResult:
+        """Broadcasts as broadcast does, and retries the channels which failed for
+        a temporary reason - see retryable - up to max_attempts (2 by default:
+        one retry).
+
+        - Only the channels which may still succeed are sent again; when only
+          channels which failed for good are left, it stops.
+        - Every attempt carries the same idempotency_key - made for the call
+          when none is given - so that a channel which got the publication in
+          an earlier attempt does not get it again. The memory, Redis and
+          PostgreSQL brokers keep keys; the NATS broker ignores them, and a
+          retry may publish again.
+        - The result holds every channel's last outcome, and the key: retrying
+          later with it publishes only into the channels which did not get it.
+
+        timeout, when set, bounds the whole call, waits included;
+        attempt_timeout - request_timeout by default - bounds each attempt.
+        on_attempt_error decides the wait between attempts, and may stop them:
+        see BroadcastAttemptCallback. It raises as broadcast does.
+        """
+        return self._broadcast_with_retry(
+            BroadcastRequest(
+                channels=channels if channels is not None else [],
+                data=data,
+                b64data=b64data,
+                skip_history=skip_history,
+                tags=tags if tags is not None else {},
+                idempotency_key=idempotency_key,
+                delta=delta,
+                version=version,
+                version_epoch=version_epoch,
+            ),
+            max_attempts,
+            attempt_timeout,
+            on_attempt_error,
+            timeout,
+        )
+
+    def subscribe(
+        self,
+        *,
+        channel: str = "",
+        user: str = "",
+        expire_at: int = 0,
+        info: JSON = None,
+        b64info: str = "",
+        client: str = "",
+        data: JSON = None,
+        b64data: str = "",
+        recover_since: StreamPosition | None = None,
+        override: SubscribeOptionOverride | None = None,
+        session: str = "",
+        label_filter: FilterNode | None = None,
+        all_users: bool = False,
+        timeout: float | None = None,
+    ) -> SubscribeResult:
         """Subscribes active sessions of a user to a channel
         (server-side subscription). It does not create a streaming subscription
         for the caller.
+
+        Args:
+            channel: The name of the channel to subscribe to. Required.
+            user: The ID of the user to subscribe. Required, unless all_users is
+                used in Centrifugo PRO.
+            expire_at: The Unix time in seconds when the subscription expires.
+            info: Custom channel info attached to the subscription, used in
+                presence and join/leave messages.
+            b64info: Info as base64, for binary. Centrifugo decodes it.
+            client: Limits the call to the connection with this client ID. user is
+                still required.
+            data: Custom subscription data sent to the client in the Subscribe
+                push.
+            b64data: Data as base64, for binary. Centrifugo decodes it.
+            recover_since: The stream position to recover publications from.
+            override: Dynamically overrides some channel options set in the
+                Centrifugo configuration.
+            session: Limits the call to the connection with this session ID. user
+                is still required.
+            label_filter: Restricts the call to clients whose labels match this
+                filter. Centrifugo PRO only.
+            all_users: When user is empty, targets every connection on every node
+                instead of the anonymous-only bucket. No effect when user is non-empty.
+                Without label_filter it acts on every connection. Centrifugo PRO only.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return self._invoke(request, SubscribeResult, timeout)
+        return self._invoke(
+            SubscribeRequest(
+                channel=channel,
+                user=user,
+                expire_at=expire_at,
+                info=info,
+                b64info=b64info,
+                client=client,
+                data=data,
+                b64data=b64data,
+                recover_since=recover_since,
+                override=override,
+                session=session,
+                label_filter=label_filter,
+                all_users=all_users,
+            ),
+            SubscribeResult,
+            timeout,
+        )
 
-    def unsubscribe(self, request: UnsubscribeRequest, *, timeout: float | None = None) -> UnsubscribeResult:
-        """Unsubscribes a user from a channel."""
-        return self._invoke(request, UnsubscribeResult, timeout)
+    def unsubscribe(
+        self,
+        *,
+        channel: str = "",
+        user: str = "",
+        client: str = "",
+        session: str = "",
+        label_filter: FilterNode | None = None,
+        all_users: bool = False,
+        timeout: float | None = None,
+    ) -> UnsubscribeResult:
+        """Unsubscribes a user from a channel.
 
-    def disconnect(self, request: DisconnectRequest, *, timeout: float | None = None) -> DisconnectResult:
-        """Disconnects a user's connections."""
-        return self._invoke(request, DisconnectResult, timeout)
+        Args:
+            channel: The name of the channel to unsubscribe from. Required.
+            user: The ID of the user to unsubscribe. Required, unless all_users
+                is used in Centrifugo PRO.
+            client: Limits the call to the connection with this client ID. user is
+                still required.
+            session: Limits the call to the connection with this session ID. user
+                is still required.
+            label_filter: Restricts the call to clients whose labels match this
+                filter. Centrifugo PRO only.
+            all_users: Works as SubscribeRequest.all_users. Centrifugo PRO only.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(
+            UnsubscribeRequest(
+                channel=channel,
+                user=user,
+                client=client,
+                session=session,
+                label_filter=label_filter,
+                all_users=all_users,
+            ),
+            UnsubscribeResult,
+            timeout,
+        )
 
-    def presence(self, request: PresenceRequest, *, timeout: float | None = None) -> PresenceResult:
+    def disconnect(
+        self,
+        *,
+        user: str = "",
+        disconnect: Disconnect | None = None,
+        client: str = "",
+        whitelist: list[str] | None = None,
+        session: str = "",
+        label_filter: FilterNode | None = None,
+        all_users: bool = False,
+        timeout: float | None = None,
+    ) -> DisconnectResult:
+        """Disconnects a user's connections.
+
+        Args:
+            user: The ID of the user to disconnect. Required, unless all_users is
+                used in Centrifugo PRO.
+            disconnect: A custom disconnect code and reason. If not set, clients
+                are disconnected with a force no-reconnect disconnect.
+            client: Limits the call to the connection with this client ID. user is
+                still required.
+            whitelist: A list of client IDs to keep connected.
+            session: Limits the call to the connection with this session ID. user
+                is still required.
+            label_filter: Restricts the call to clients whose labels match this
+                filter. Centrifugo PRO only.
+            all_users: Works as SubscribeRequest.all_users. Centrifugo PRO only.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(
+            DisconnectRequest(
+                user=user,
+                disconnect=disconnect,
+                client=client,
+                whitelist=whitelist if whitelist is not None else [],
+                session=session,
+                label_filter=label_filter,
+                all_users=all_users,
+            ),
+            DisconnectResult,
+            timeout,
+        )
+
+    def presence(self, *, channel: str = "", timeout: float | None = None) -> PresenceResult:
         """Returns the online presence of a channel: all clients
         currently subscribed to it. Presence must be enabled for the channel.
-        """
-        return self._invoke(request, PresenceResult, timeout)
 
-    def presence_stats(self, request: PresenceStatsRequest, *, timeout: float | None = None) -> PresenceStatsResult:
+        Args:
+            channel: The name of the channel. Required.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(PresenceRequest(channel=channel), PresenceResult, timeout)
+
+    def presence_stats(self, *, channel: str = "", timeout: float | None = None) -> PresenceStatsResult:
         """Returns short presence information of a channel: the
         number of clients and of unique users. Presence must be enabled for the
         channel.
-        """
-        return self._invoke(request, PresenceStatsResult, timeout)
 
-    def history(self, request: HistoryRequest, *, timeout: float | None = None) -> HistoryResult:
+        Args:
+            channel: The name of the channel. Required.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(PresenceStatsRequest(channel=channel), PresenceStatsResult, timeout)
+
+    def history(
+        self,
+        *,
+        channel: str = "",
+        limit: int = 0,
+        since: StreamPosition | None = None,
+        reverse: bool = False,
+        timeout: float | None = None,
+    ) -> HistoryResult:
         """Returns publications from the history of a channel.
         History must be enabled for the channel.
-        """
-        return self._invoke(request, HistoryResult, timeout)
 
-    def history_remove(self, request: HistoryRemoveRequest, *, timeout: float | None = None) -> HistoryRemoveResult:
+        Args:
+            channel: The name of the channel. Required.
+            limit: The maximum number of publications to return; -1 returns all
+                the channel keeps. If not set, only the current stream position is
+                returned, without publications.
+            since: Returns publications after this stream position.
+            reverse: Iterates in reverse order, from latest to earliest.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(
+            HistoryRequest(channel=channel, limit=limit, since=since, reverse=reverse), HistoryResult, timeout
+        )
+
+    def history_remove(self, *, channel: str = "", timeout: float | None = None) -> HistoryRemoveResult:
         """Removes publications from the history of a channel.
         The current top stream position is kept, so clients do not get
         disconnected because of insufficient state.
+
+        Args:
+            channel: The name of the channel. Required.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return self._invoke(request, HistoryRemoveResult, timeout)
+        return self._invoke(HistoryRemoveRequest(channel=channel), HistoryRemoveResult, timeout)
 
-    def info(self, request: InfoRequest | None = None, *, timeout: float | None = None) -> InfoResult:
-        """Returns information about the running Centrifugo nodes."""
-        return self._invoke(request or InfoRequest(), InfoResult, timeout)
+    def info(self, *, timeout: float | None = None) -> InfoResult:
+        """Returns information about the running Centrifugo nodes.
 
-    def refresh(self, request: RefreshRequest, *, timeout: float | None = None) -> RefreshResult:
+        Args:
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(InfoRequest(), InfoResult, timeout)
+
+    def refresh(
+        self,
+        *,
+        user: str = "",
+        client: str = "",
+        expired: bool = False,
+        expire_at: int = 0,
+        info: JSON = None,
+        session: str = "",
+        label_filter: FilterNode | None = None,
+        all_users: bool = False,
+        timeout: float | None = None,
+    ) -> RefreshResult:
         """Refreshes a user's connections, mostly useful with
         unidirectional transports. Without expire_at the connections become
         non-expiring.
-        """
-        return self._invoke(request, RefreshResult, timeout)
 
-    def channels(self, request: ChannelsRequest, *, timeout: float | None = None) -> ChannelsResult:
+        Args:
+            user: The ID of the user to refresh. Required, unless all_users is
+                used in Centrifugo PRO.
+            client: Limits the call to the connection with this client ID. user is
+                still required.
+            expired: Marks the connections as expired and closes them with an
+                expired disconnect reason.
+            expire_at: The Unix time in seconds when the connections expire.
+            info: Attaches or replaces the connection info.
+            session: Limits the call to the connection with this session ID. user
+                is still required.
+            label_filter: Restricts the call to clients whose labels match this
+                filter. Centrifugo PRO only.
+            all_users: Works as SubscribeRequest.all_users. Centrifugo PRO only.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(
+            RefreshRequest(
+                user=user,
+                client=client,
+                expired=expired,
+                expire_at=expire_at,
+                info=info,
+                session=session,
+                label_filter=label_filter,
+                all_users=all_users,
+            ),
+            RefreshResult,
+            timeout,
+        )
+
+    def channels(self, *, pattern: str = "", timeout: float | None = None) -> ChannelsResult:
         """Returns active channels (with one or more subscribers).
         It can be heavy on large deployments: there is no pagination.
-        """
-        return self._invoke(request, ChannelsResult, timeout)
 
-    def connections(self, request: ConnectionsRequest, *, timeout: float | None = None) -> ConnectionsResult:
+        Args:
+            pattern: Filters channels by name, using gobwas/glob syntax.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(ChannelsRequest(pattern=pattern), ChannelsResult, timeout)
+
+    def connections(
+        self,
+        *,
+        user: str = "",
+        expression: str = "",
+        label_filter: FilterNode | None = None,
+        timeout: float | None = None,
+    ) -> ConnectionsResult:
         """Returns information about active connections, without
         the need to enable presence. At least one of user, expression or
         label_filter must be set. Centrifugo PRO only.
+
+        Args:
+            user: Returns only the connections of this user ID.
+            expression: A CEL expression to filter connections.
+            label_filter: Restricts the listing to clients whose labels match this
+                filter. Centrifugo PRO only.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return self._invoke(request, ConnectionsResult, timeout)
+        return self._invoke(
+            ConnectionsRequest(user=user, expression=expression, label_filter=label_filter), ConnectionsResult, timeout
+        )
 
     def update_user_status(
-        self, request: UpdateUserStatusRequest, *, timeout: float | None = None
+        self, *, users: list[str] | None = None, state: str = "", timeout: float | None = None
     ) -> UpdateUserStatusResult:
         """Marks users as active and online now, and sets
         their state when one is given. Centrifugo PRO only.
-        """
-        return self._invoke(request, UpdateUserStatusResult, timeout)
 
-    def get_user_status(self, request: GetUserStatusRequest, *, timeout: float | None = None) -> GetUserStatusResult:
-        """Returns the status of users. Centrifugo PRO only."""
-        return self._invoke(request, GetUserStatusResult, timeout)
+        Args:
+            users: The list of user IDs to update the status for. Required.
+            state: An optional custom state to store in the user status. It can
+                be restricted by the user_status.state_regex option.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(
+            UpdateUserStatusRequest(users=users if users is not None else [], state=state),
+            UpdateUserStatusResult,
+            timeout,
+        )
+
+    def get_user_status(self, *, users: list[str] | None = None, timeout: float | None = None) -> GetUserStatusResult:
+        """Returns the status of users. Centrifugo PRO only.
+
+        Args:
+            users: The list of user IDs to get the status for. Required.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(
+            GetUserStatusRequest(users=users if users is not None else []), GetUserStatusResult, timeout
+        )
 
     def delete_user_status(
-        self, request: DeleteUserStatusRequest, *, timeout: float | None = None
+        self, *, users: list[str] | None = None, timeout: float | None = None
     ) -> DeleteUserStatusResult:
-        """Deletes the status of users. Centrifugo PRO only."""
-        return self._invoke(request, DeleteUserStatusResult, timeout)
+        """Deletes the status of users. Centrifugo PRO only.
 
-    def block_user(self, request: BlockUserRequest, *, timeout: float | None = None) -> BlockUserResult:
+        Args:
+            users: The list of user IDs to delete the status for. Required.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(
+            DeleteUserStatusRequest(users=users if users is not None else []), DeleteUserStatusResult, timeout
+        )
+
+    def block_user(self, *, expire_at: int = 0, user: str = "", timeout: float | None = None) -> BlockUserResult:
         """Blocks a user: the user is disconnected and can not
         connect again until unblocked or the block expires. Centrifugo PRO only.
+
+        Args:
+            expire_at: The Unix time in seconds when the block expires. Optional,
+                but a reasonably small value is recommended to keep the set of blocked
+                users small.
+            user: The ID of the user to block. Required.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return self._invoke(request, BlockUserResult, timeout)
+        return self._invoke(BlockUserRequest(expire_at=expire_at, user=user), BlockUserResult, timeout)
 
-    def unblock_user(self, request: UnblockUserRequest, *, timeout: float | None = None) -> UnblockUserResult:
-        """Unblocks a user. Centrifugo PRO only."""
-        return self._invoke(request, UnblockUserResult, timeout)
+    def unblock_user(self, *, user: str = "", timeout: float | None = None) -> UnblockUserResult:
+        """Unblocks a user. Centrifugo PRO only.
 
-    def revoke_token(self, request: RevokeTokenRequest, *, timeout: float | None = None) -> RevokeTokenResult:
+        Args:
+            user: The ID of the user to unblock. Required.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(UnblockUserRequest(user=user), UnblockUserResult, timeout)
+
+    def revoke_token(self, *, expire_at: int = 0, uid: str = "", timeout: float | None = None) -> RevokeTokenResult:
         """Revokes a token by its unique ID (jti claim of a JWT).
         Clients using the token are disconnected shortly, and can not connect
         with it again. Centrifugo PRO only.
+
+        Args:
+            expire_at: The Unix time in seconds when the revocation expires.
+                Optional, but a value matching the token expiration is recommended.
+            uid: The unique ID of the token to revoke (jti claim). Required.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return self._invoke(request, RevokeTokenResult, timeout)
+        return self._invoke(RevokeTokenRequest(expire_at=expire_at, uid=uid), RevokeTokenResult, timeout)
 
     def invalidate_user_tokens(
-        self, request: InvalidateUserTokensRequest, *, timeout: float | None = None
+        self,
+        *,
+        expire_at: int = 0,
+        user: str = "",
+        issued_before: int = 0,
+        channel: str = "",
+        timeout: float | None = None,
     ) -> InvalidateUserTokensResult:
         """Revokes all tokens of a user issued before a
         certain time (based on the iat claim of a JWT). Centrifugo PRO only.
-        """
-        return self._invoke(request, InvalidateUserTokensResult, timeout)
 
-    def device_register(self, request: DeviceRegisterRequest, *, timeout: float | None = None) -> DeviceRegisterResult:
+        Args:
+            expire_at: The Unix time in seconds when the invalidation expires.
+                Optional, but a value matching the token expiration is recommended.
+            user: The ID of the user whose tokens to invalidate. Required.
+            issued_before: The Unix time in seconds: tokens issued before it are
+                considered revoked. If not set, the current time is used.
+            channel: Limits the invalidation to subscription tokens for this
+                channel.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(
+            InvalidateUserTokensRequest(expire_at=expire_at, user=user, issued_before=issued_before, channel=channel),
+            InvalidateUserTokensResult,
+            timeout,
+        )
+
+    def device_register(
+        self,
+        *,
+        id: str = "",
+        provider: str = "",
+        token: str = "",
+        platform: str = "",
+        user: str = "",
+        meta: dict[str, str] | None = None,
+        topics: list[str] | None = None,
+        timezone: str = "",
+        locale: str = "",
+        timeout: float | None = None,
+    ) -> DeviceRegisterResult:
         """Registers a device for push notifications, or
         updates a registered one. Centrifugo PRO only.
-        """
-        return self._invoke(request, DeviceRegisterResult, timeout)
 
-    def device_update(self, request: DeviceUpdateRequest, *, timeout: float | None = None) -> DeviceUpdateResult:
+        Args:
+            id: The device ID. Omit it on first registration: Centrifugo
+                generates one and returns it. Pass the stored value to update the
+                device.
+            provider: The provider of the device token: fcm, hms, apns or
+                webpush. Required.
+            token: The push token of the device. For webpush, it is the browser
+                PushSubscription serialized as a JSON string. Required.
+            platform: The device platform: ios, android or web. Required.
+            user: The user associated with the device.
+            meta: Additional custom metadata of the device.
+            topics: The full list of the device's topic subscriptions, replacing
+                the previous one. The user's topics are attached automatically.
+            timezone: The IANA time zone of the device user, for example
+                Europe/Nicosia.
+            locale: The locale of the device user as an IETF BCP 47 language
+                tag, for example en-US.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(
+            DeviceRegisterRequest(
+                id=id,
+                provider=provider,
+                token=token,
+                platform=platform,
+                user=user,
+                meta=meta if meta is not None else {},
+                topics=topics if topics is not None else [],
+                timezone=timezone,
+                locale=locale,
+            ),
+            DeviceRegisterResult,
+            timeout,
+        )
+
+    def device_update(
+        self,
+        *,
+        ids: list[str] | None = None,
+        users: list[str] | None = None,
+        user_update: DeviceUserUpdate | None = None,
+        meta_update: DeviceMetaUpdate | None = None,
+        topics_update: DeviceTopicsUpdate | None = None,
+        timezone_update: DeviceTimezoneUpdate | None = None,
+        locale_update: DeviceLocaleUpdate | None = None,
+        timeout: float | None = None,
+    ) -> DeviceUpdateResult:
         """Updates registered devices, selected by ids and/or
         users. Centrifugo PRO only.
-        """
-        return self._invoke(request, DeviceUpdateResult, timeout)
 
-    def device_remove(self, request: DeviceRemoveRequest, *, timeout: float | None = None) -> DeviceRemoveResult:
+        Args:
+            ids: Selects devices by ID.
+            users: Selects devices by user.
+            user_update: Changes the user ID of the devices. It does not re-sync
+                user-bound topics; use DeviceRegisterRequest to assign a device to
+                another user.
+            meta_update: Updates the device meta.
+            topics_update: Updates the device topics.
+            timezone_update: Updates the device timezone.
+            locale_update: Updates the device locale.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(
+            DeviceUpdateRequest(
+                ids=ids if ids is not None else [],
+                users=users if users is not None else [],
+                user_update=user_update,
+                meta_update=meta_update,
+                topics_update=topics_update,
+                timezone_update=timezone_update,
+                locale_update=locale_update,
+            ),
+            DeviceUpdateResult,
+            timeout,
+        )
+
+    def device_remove(
+        self, *, ids: list[str] | None = None, users: list[str] | None = None, timeout: float | None = None
+    ) -> DeviceRemoveResult:
         """Removes devices, selected by ids and/or users.
         Centrifugo PRO only.
-        """
-        return self._invoke(request, DeviceRemoveResult, timeout)
 
-    def device_list(self, request: DeviceListRequest, *, timeout: float | None = None) -> DeviceListResult:
+        Args:
+            ids: Selects devices to remove by ID.
+            users: Selects devices to remove by user.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(
+            DeviceRemoveRequest(ids=ids if ids is not None else [], users=users if users is not None else []),
+            DeviceRemoveResult,
+            timeout,
+        )
+
+    def device_list(
+        self,
+        *,
+        filter: DeviceFilter | None = None,
+        include_total_count: bool = False,
+        include_meta: bool = False,
+        include_topics: bool = False,
+        include_webpush_keys: bool = False,
+        cursor: str = "",
+        limit: int = 0,
+        timeout: float | None = None,
+    ) -> DeviceListResult:
         """Returns a paginated list of registered devices.
         Centrifugo PRO only.
+
+        Args:
+            filter: Selects the devices to list. Required.
+            include_total_count: Includes the total count for the filter in the
+                result.
+            include_meta: Includes meta of each device.
+            include_topics: Includes topics of each device.
+            include_webpush_keys: Includes webpush_keys of each device (webpush
+                only).
+            cursor: The pagination cursor: next_cursor of the previous page,
+                empty for the first page.
+            limit: The maximum number of devices to return.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return self._invoke(request, DeviceListResult, timeout)
+        return self._invoke(
+            DeviceListRequest(
+                filter=filter,
+                include_total_count=include_total_count,
+                include_meta=include_meta,
+                include_topics=include_topics,
+                include_webpush_keys=include_webpush_keys,
+                cursor=cursor,
+                limit=limit,
+            ),
+            DeviceListResult,
+            timeout,
+        )
 
     def device_topic_list(
-        self, request: DeviceTopicListRequest, *, timeout: float | None = None
+        self,
+        *,
+        filter: DeviceTopicFilter | None = None,
+        include_total_count: bool = False,
+        include_device: bool = False,
+        cursor: str = "",
+        limit: int = 0,
+        timeout: float | None = None,
     ) -> DeviceTopicListResult:
         """Returns a paginated list of device topic
         subscriptions. Centrifugo PRO only.
+
+        Args:
+            filter: Selects the device topics to list.
+            include_total_count: Includes the total count for the filter in the
+                result.
+            include_device: Includes the Device of each item.
+            cursor: The pagination cursor: next_cursor of the previous page,
+                empty for the first page.
+            limit: The maximum number of items to return.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return self._invoke(request, DeviceTopicListResult, timeout)
+        return self._invoke(
+            DeviceTopicListRequest(
+                filter=filter,
+                include_total_count=include_total_count,
+                include_device=include_device,
+                cursor=cursor,
+                limit=limit,
+            ),
+            DeviceTopicListResult,
+            timeout,
+        )
 
     def device_topic_update(
-        self, request: DeviceTopicUpdateRequest, *, timeout: float | None = None
+        self,
+        *,
+        device_id: str = "",
+        op: str = "",
+        topics: list[str] | None = None,
+        user: str = "",
+        timeout: float | None = None,
     ) -> DeviceTopicUpdateResult:
         """Changes the topics of a device. The device topic
         list is what decides who gets a push sent to a topic.
         Centrifugo PRO only.
-        """
-        return self._invoke(request, DeviceTopicUpdateResult, timeout)
 
-    def user_topic_list(self, request: UserTopicListRequest, *, timeout: float | None = None) -> UserTopicListResult:
+        Args:
+            device_id: The ID of the device. Required.
+            op: The operation: add, remove or set. Required.
+            topics: The topics for the operation.
+            user: An optional ownership guard: the update is applied only if the
+                device currently belongs to this user. Otherwise the call fails with a
+                conflict error (or not found if there is no such device).
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(
+            DeviceTopicUpdateRequest(
+                device_id=device_id, op=op, topics=topics if topics is not None else [], user=user
+            ),
+            DeviceTopicUpdateResult,
+            timeout,
+        )
+
+    def user_topic_list(
+        self,
+        *,
+        filter: UserTopicFilter | None = None,
+        include_total_count: bool = False,
+        cursor: str = "",
+        limit: int = 0,
+        timeout: float | None = None,
+    ) -> UserTopicListResult:
         """Returns a paginated list of user topic
         subscriptions. Centrifugo PRO only.
+
+        Args:
+            filter: Selects the user topics to list.
+            include_total_count: Includes the total count for the filter in the
+                result.
+            cursor: The pagination cursor: next_cursor of the previous page,
+                empty for the first page.
+            limit: The maximum number of items to return.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return self._invoke(request, UserTopicListResult, timeout)
+        return self._invoke(
+            UserTopicListRequest(filter=filter, include_total_count=include_total_count, cursor=cursor, limit=limit),
+            UserTopicListResult,
+            timeout,
+        )
 
     def user_topic_update(
-        self, request: UserTopicUpdateRequest, *, timeout: float | None = None
+        self, *, user: str = "", op: str = "", topics: list[str] | None = None, timeout: float | None = None
     ) -> UserTopicUpdateResult:
         """Changes the topics of a user. The change is also
         applied to the user's registered devices. Centrifugo PRO only.
+
+        Args:
+            user: The user ID. Required.
+            op: The operation: add, remove or set. Required.
+            topics: The topics for the operation.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return self._invoke(request, UserTopicUpdateResult, timeout)
+        return self._invoke(
+            UserTopicUpdateRequest(user=user, op=op, topics=topics if topics is not None else []),
+            UserTopicUpdateResult,
+            timeout,
+        )
 
     def send_push_notification(
-        self, request: SendPushNotificationRequest, *, timeout: float | None = None
+        self,
+        *,
+        recipient: PushRecipient | None = None,
+        notification: PushNotification | None = None,
+        uid: str = "",
+        send_at: int = 0,
+        optimize_for_reliability: bool = False,
+        limit_strategy: PushLimitStrategy | None = None,
+        analytics_uid: str = "",
+        localizations: dict[str, PushLocalization] | None = None,
+        use_templating: bool = False,
+        use_meta: bool = False,
+        timeout: float | None = None,
     ) -> SendPushNotificationResult:
         """Sends a push notification. The request is
         queued and sent to the provider by Centrifugo workers.
         Centrifugo PRO only.
+
+        Args:
+            recipient: Who receives the notification. Required.
+            notification: The notification to send. Required.
+            uid: A unique identifier of the request, can be used to cancel the
+                push. UUID v4 is recommended; different requests must use different
+                uids.
+            send_at: The Unix time in seconds when to send the notification. If
+                not set, the notification is sent immediately.
+            optimize_for_reliability: Makes processing heavier, but tolerates edge
+                cases, like not losing inflight pushes when the queue is briefly
+                unavailable.
+            limit_strategy: Sets time constraints and rate limits. Only applies
+                with a filter recipient; devices are then processed one by one
+                instead of in batches.
+            analytics_uid: The identifier for push notification analytics. If
+                not set, uid is used.
+            localizations: Optional per language/locale localizations. Setting
+                them enables templating.
+            use_templating: Enables templating of the notification. Only works
+                with a filter recipient.
+            use_meta: Additionally loads device meta while sending, making it
+                available in templating.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return self._invoke(request, SendPushNotificationResult, timeout)
+        return self._invoke(
+            SendPushNotificationRequest(
+                recipient=recipient,
+                notification=notification,
+                uid=uid,
+                send_at=send_at,
+                optimize_for_reliability=optimize_for_reliability,
+                limit_strategy=limit_strategy,
+                analytics_uid=analytics_uid,
+                localizations=localizations if localizations is not None else {},
+                use_templating=use_templating,
+                use_meta=use_meta,
+            ),
+            SendPushNotificationResult,
+            timeout,
+        )
 
     def update_push_status(
-        self, request: UpdatePushStatusRequest, *, timeout: float | None = None
+        self,
+        *,
+        analytics_uid: str = "",
+        status: str = "",
+        device_id: str = "",
+        msg_id: str = "",
+        timeout: float | None = None,
     ) -> UpdatePushStatusResult:
         """Saves the delivery or interaction status of a
         push notification to analytics. Experimental. Centrifugo PRO only.
-        """
-        return self._invoke(request, UpdatePushStatusResult, timeout)
 
-    def cancel_push(self, request: CancelPushRequest, *, timeout: float | None = None) -> CancelPushResult:
+        Args:
+            analytics_uid: The analytics_uid of the push notification (as in
+                SendPushNotificationRequest). Required.
+            status: The status of the push notification: delivered or
+                interacted. Required.
+            device_id: The Centrifugo device ID. Required.
+            msg_id: The message ID issued by the provider.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(
+            UpdatePushStatusRequest(analytics_uid=analytics_uid, status=status, device_id=device_id, msg_id=msg_id),
+            UpdatePushStatusResult,
+            timeout,
+        )
+
+    def cancel_push(self, *, uid: str = "", timeout: float | None = None) -> CancelPushResult:
         """Cancels a delayed push notification (sent with
         send_at). Centrifugo PRO only.
+
+        Args:
+            uid: The uid of the push notification to cancel. Required.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return self._invoke(request, CancelPushResult, timeout)
+        return self._invoke(CancelPushRequest(uid=uid), CancelPushResult, timeout)
 
-    def map_publish(self, request: MapPublishRequest, *, timeout: float | None = None) -> MapPublishResult:
-        """Publishes or updates a key in a map channel."""
-        return self._invoke(request, MapPublishResult, timeout)
+    def map_publish(
+        self,
+        *,
+        channel: str = "",
+        key: str = "",
+        data: JSON = None,
+        b64data: str = "",
+        stream_data: JSON = None,
+        b64stream_data: str = "",
+        tags: dict[str, str] | None = None,
+        idempotency_key: str = "",
+        delta: bool = False,
+        version: int = 0,
+        version_epoch: str = "",
+        score: int = 0,
+        key_mode: str = "",
+        timeout: float | None = None,
+    ) -> MapPublishResult:
+        """Publishes or updates a key in a map channel.
 
-    def map_remove(self, request: MapRemoveRequest, *, timeout: float | None = None) -> MapRemoveResult:
-        """Removes a key from a map channel."""
-        return self._invoke(request, MapRemoveResult, timeout)
+        Args:
+            channel: The name of the map channel. Required.
+            key: The entry key. Required.
+            data: The entry data. In the HTTP API it is any JSON value; over GRPC
+                it may be binary.
+            b64data: Data as base64, for binary over the HTTP API. Centrifugo
+                decodes it.
+            stream_data: Currently not used by the server API.
+            b64stream_data: Currently not used by the server API.
+            tags: Key-value metadata attached to the publication.
+            idempotency_key: Drops duplicate publications upon retries: a
+                publication with a key already used in the channel is not applied
+                again, and its result has the first one's position, with suppressed
+                set and suppress_reason "idempotency". It acts per channel; keys are
+                kept for 5 minutes by default. Every map broker - memory, Redis and
+                PostgreSQL - keeps keys.
+            delta: Enables delta compression for this publication.
+            version: A per-key version: publications with a version not higher
+                than the key's current one are suppressed.
+            version_epoch: Scopes version. A different epoch resets version
+                comparison.
+            score: Currently not used by the server API.
+            key_mode: Makes the publish conditional: "if_new" writes only if the
+                key does not exist, "if_exists" only if it exists. Empty always
+                writes.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(
+            MapPublishRequest(
+                channel=channel,
+                key=key,
+                data=data,
+                b64data=b64data,
+                stream_data=stream_data,
+                b64stream_data=b64stream_data,
+                tags=tags if tags is not None else {},
+                idempotency_key=idempotency_key,
+                delta=delta,
+                version=version,
+                version_epoch=version_epoch,
+                score=score,
+                key_mode=key_mode,
+            ),
+            MapPublishResult,
+            timeout,
+        )
 
-    def map_read_state(self, request: MapReadStateRequest, *, timeout: float | None = None) -> MapReadStateResult:
+    def map_remove(
+        self, *, channel: str = "", key: str = "", idempotency_key: str = "", timeout: float | None = None
+    ) -> MapRemoveResult:
+        """Removes a key from a map channel.
+
+        Args:
+            channel: The name of the map channel. Required.
+            key: The key to remove. Required.
+            idempotency_key: Drops duplicate removals upon retries, as it does for
+                MapPublishRequest: a removal with a key already used in the channel is
+                not applied again, and its result is suppressed with suppress_reason
+                "idempotency". Keys are kept for 5 minutes by default.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(
+            MapRemoveRequest(channel=channel, key=key, idempotency_key=idempotency_key), MapRemoveResult, timeout
+        )
+
+    def map_read_state(
+        self,
+        *,
+        channel: str = "",
+        cursor: str = "",
+        limit: int = 0,
+        key: str = "",
+        asc: bool = False,
+        revision_offset: int = 0,
+        revision_epoch: str = "",
+        timeout: float | None = None,
+    ) -> MapReadStateResult:
         """Reads the current state of a map channel, with
         optional pagination.
+
+        Args:
+            channel: The name of the map channel. Required.
+            cursor: The pagination cursor from the previous page. Empty starts
+                from the beginning.
+            limit: The maximum number of entries per page: -1 means no limit, 0
+                returns only the stream position. Page sizes may exceed it with the
+                Redis map broker.
+            key: Reads a single entry by exact key. cursor and limit are ignored
+                when it is set.
+            asc: Sorts ordered state by score ascending instead of descending.
+                Ignored for unordered channels.
+            revision_offset: The offset of the position from a previous state
+                read, used with revision_epoch.
+            revision_epoch: The epoch of the position from a previous state
+                read. If the epoch changed, the call fails with an unrecoverable
+                position error.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return self._invoke(request, MapReadStateResult, timeout)
+        return self._invoke(
+            MapReadStateRequest(
+                channel=channel,
+                cursor=cursor,
+                limit=limit,
+                key=key,
+                asc=asc,
+                revision_offset=revision_offset,
+                revision_epoch=revision_epoch,
+            ),
+            MapReadStateResult,
+            timeout,
+        )
 
-    def map_read_stream(self, request: MapReadStreamRequest, *, timeout: float | None = None) -> MapReadStreamResult:
-        """Reads the change stream of a map channel."""
-        return self._invoke(request, MapReadStreamResult, timeout)
+    def map_read_stream(
+        self,
+        *,
+        channel: str = "",
+        since_offset: int = 0,
+        since_epoch: str = "",
+        limit: int = 0,
+        reverse: bool = False,
+        timeout: float | None = None,
+    ) -> MapReadStreamResult:
+        """Reads the change stream of a map channel.
 
-    def map_stats(self, request: MapStatsRequest, *, timeout: float | None = None) -> MapStatsResult:
-        """Returns statistics about a map channel."""
-        return self._invoke(request, MapStatsResult, timeout)
+        Args:
+            channel: The name of the map channel. Required.
+            since_offset: Returns entries after this offset, used with
+                since_epoch.
+            since_epoch: The epoch of the since position. It must match the
+                current stream epoch.
+            limit: The maximum number of entries: -1 means no limit, 0 returns
+                only the stream position.
+            reverse: Returns entries newest first.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(
+            MapReadStreamRequest(
+                channel=channel, since_offset=since_offset, since_epoch=since_epoch, limit=limit, reverse=reverse
+            ),
+            MapReadStreamResult,
+            timeout,
+        )
 
-    def map_clear(self, request: MapClearRequest, *, timeout: float | None = None) -> MapClearResult:
-        """Removes all state and stream data of a map channel."""
-        return self._invoke(request, MapClearResult, timeout)
+    def map_stats(self, *, channel: str = "", timeout: float | None = None) -> MapStatsResult:
+        """Returns statistics about a map channel.
+
+        Args:
+            channel: The name of the map channel. Required.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(MapStatsRequest(channel=channel), MapStatsResult, timeout)
+
+    def map_clear(self, *, channel: str = "", timeout: float | None = None) -> MapClearResult:
+        """Removes all state and stream data of a map channel.
+
+        Args:
+            channel: The name of the map channel. Required.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return self._invoke(MapClearRequest(channel=channel), MapClearResult, timeout)
 
     def shared_poll_publish(
-        self, request: SharedPollPublishRequest, *, timeout: float | None = None
+        self,
+        *,
+        channel: str = "",
+        key: str = "",
+        data: JSON = None,
+        b64data: str = "",
+        version: int = 0,
+        epoch: str = "",
+        timeout: float | None = None,
     ) -> SharedPollPublishResult:
         """Pushes data for a key directly to clients of a
         shared poll channel, without waiting for the next poll cycle. Requires
         versioned mode and publish_enabled on the namespace.
+
+        Args:
+            channel: The name of the shared poll channel. Required.
+            key: The item key. Required.
+            data: The item data, delivered to clients as is.
+            b64data: Data as base64, for binary payloads. Centrifugo decodes it.
+            version: The item version, must be >= 1. Required. A version not
+                higher than the current one within the same epoch is silently dropped.
+            epoch: The channel-level publisher epoch. A change resets per-key
+                versions and unsubscribes current subscribers with insufficient state.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return self._invoke(request, SharedPollPublishResult, timeout)
+        return self._invoke(
+            SharedPollPublishRequest(
+                channel=channel, key=key, data=data, b64data=b64data, version=version, epoch=epoch
+            ),
+            SharedPollPublishResult,
+            timeout,
+        )
 
 
 class _AsyncClientAPI:
@@ -4796,243 +5690,1166 @@ class _AsyncClientAPI:
     if TYPE_CHECKING:
 
         async def _invoke(self, request: Any, result: type[_R], timeout: float | None) -> _R: ...
+        async def _broadcast(self, request: BroadcastRequest, timeout: float | None) -> BroadcastResult: ...
+        async def _broadcast_with_retry(
+            self,
+            request: BroadcastRequest,
+            max_attempts: int,
+            attempt_timeout: float | None,
+            on_attempt_error: BroadcastAttemptCallback | None,
+            timeout: float | None,
+        ) -> BroadcastResult: ...
 
-    async def publish(self, request: PublishRequest, *, timeout: float | None = None) -> PublishResult:
-        """Publishes data into a channel."""
-        return await self._invoke(request, PublishResult, timeout)
+    async def publish(
+        self,
+        *,
+        channel: str = "",
+        data: JSON = None,
+        b64data: str = "",
+        skip_history: bool = False,
+        tags: dict[str, str] | None = None,
+        idempotency_key: str = "",
+        delta: bool = False,
+        version: int = 0,
+        version_epoch: str = "",
+        timeout: float | None = None,
+    ) -> PublishResult:
+        """Publishes data into a channel.
 
-    async def subscribe(self, request: SubscribeRequest, *, timeout: float | None = None) -> SubscribeResult:
+        Args:
+            channel: The name of the channel to publish into. Required.
+            data: The payload to publish. Required unless b64data is set. In the
+                HTTP API it is any JSON value; over GRPC it may be binary.
+            b64data: A base64-encoded binary payload, an alternative to `data` to
+                send binary over the HTTP API. Centrifugo decodes it before publishing.
+            skip_history: Skips adding this publication to the channel history.
+            tags: A map of arbitrary string keys and values attached to the
+                publication and delivered to clients.
+            idempotency_key: Drops duplicate publications upon retries: a
+                publication with a key already used in the channel is not published
+                again, and the first one's result is returned. It acts per channel;
+                results are kept for 5 minutes by default. The memory, Redis and
+                PostgreSQL brokers keep keys; the NATS broker ignores them.
+            delta: Tells Centrifugo to construct a delta update, if possible, when
+                broadcasting the publication to subscribers.
+            version: When > 0, the version of the document being sent:
+                publications with a version less than or equal to one already seen are
+                ignored. Only works in channels with history enabled.
+            version_epoch: The epoch of version. When it changes, Centrifugo
+                accepts the publication even if its version is lower than before.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return await self._invoke(
+            PublishRequest(
+                channel=channel,
+                data=data,
+                b64data=b64data,
+                skip_history=skip_history,
+                tags=tags if tags is not None else {},
+                idempotency_key=idempotency_key,
+                delta=delta,
+                version=version,
+                version_epoch=version_epoch,
+            ),
+            PublishResult,
+            timeout,
+        )
+
+    async def broadcast(
+        self,
+        *,
+        channels: list[str] | None = None,
+        data: JSON = None,
+        b64data: str = "",
+        skip_history: bool = False,
+        tags: dict[str, str] | None = None,
+        idempotency_key: str = "",
+        delta: bool = False,
+        version: int = 0,
+        version_epoch: str = "",
+        timeout: float | None = None,
+    ) -> BroadcastResult:
+        """Publishes the same data into many channels.
+
+        Channels succeed or fail on their own. It returns when every channel
+        got the publication. When Centrifugo carried the broadcast out and one
+        or more channels failed - up to all of them - it raises
+        BroadcastFailedChannelsError, whose ``result`` holds every channel's
+        outcome. Any other exception means it failed as a whole: no channel got
+        a reply. After a timeout or a network error Centrifugo may still have
+        published it. Retry it with broadcast_with_retry, which sends again only
+        the channels which may still succeed, with one idempotency_key.
+
+        Args:
+            channels: The list of channels to publish into. Required.
+            data: The payload to publish into each channel. Required unless
+                b64data is set. In the HTTP API it is any JSON value; over GRPC it may
+                be binary.
+            b64data: A base64-encoded binary payload, an alternative to `data` to
+                send binary over the HTTP API. Centrifugo decodes it before publishing.
+            skip_history: Skips adding the publications to the channels' history.
+            tags: A map of arbitrary string keys and values attached to each
+                publication and delivered to clients.
+            idempotency_key: Drops duplicate publications upon retries. It acts per
+                channel: a broadcast retried with the same key is not published again
+                into the channels which already have it. Results are kept for 5 minutes
+                by default. The memory, Redis and PostgreSQL brokers keep keys; the
+                NATS broker ignores them.
+            delta: Tells Centrifugo to construct a delta update, if possible, when
+                broadcasting the publications to subscribers.
+            version: When > 0, the version of the document being sent:
+                publications with a version less than or equal to one already seen are
+                ignored. Only works in channels with history enabled.
+            version_epoch: The epoch of version. When it changes, Centrifugo
+                accepts the publication even if its version is lower than before.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return await self._broadcast(
+            BroadcastRequest(
+                channels=channels if channels is not None else [],
+                data=data,
+                b64data=b64data,
+                skip_history=skip_history,
+                tags=tags if tags is not None else {},
+                idempotency_key=idempotency_key,
+                delta=delta,
+                version=version,
+                version_epoch=version_epoch,
+            ),
+            timeout,
+        )
+
+    async def broadcast_with_retry(
+        self,
+        *,
+        channels: list[str] | None = None,
+        data: JSON = None,
+        b64data: str = "",
+        skip_history: bool = False,
+        tags: dict[str, str] | None = None,
+        idempotency_key: str = "",
+        delta: bool = False,
+        version: int = 0,
+        version_epoch: str = "",
+        max_attempts: int = 2,
+        attempt_timeout: float | None = None,
+        on_attempt_error: BroadcastAttemptCallback | None = None,
+        timeout: float | None = None,
+    ) -> BroadcastResult:
+        """Broadcasts as broadcast does, and retries the channels which failed for
+        a temporary reason - see retryable - up to max_attempts (2 by default:
+        one retry).
+
+        - Only the channels which may still succeed are sent again; when only
+          channels which failed for good are left, it stops.
+        - Every attempt carries the same idempotency_key - made for the call
+          when none is given - so that a channel which got the publication in
+          an earlier attempt does not get it again. The memory, Redis and
+          PostgreSQL brokers keep keys; the NATS broker ignores them, and a
+          retry may publish again.
+        - The result holds every channel's last outcome, and the key: retrying
+          later with it publishes only into the channels which did not get it.
+
+        timeout, when set, bounds the whole call, waits included;
+        attempt_timeout - request_timeout by default - bounds each attempt.
+        on_attempt_error decides the wait between attempts, and may stop them:
+        see BroadcastAttemptCallback. It raises as broadcast does.
+        """
+        return await self._broadcast_with_retry(
+            BroadcastRequest(
+                channels=channels if channels is not None else [],
+                data=data,
+                b64data=b64data,
+                skip_history=skip_history,
+                tags=tags if tags is not None else {},
+                idempotency_key=idempotency_key,
+                delta=delta,
+                version=version,
+                version_epoch=version_epoch,
+            ),
+            max_attempts,
+            attempt_timeout,
+            on_attempt_error,
+            timeout,
+        )
+
+    async def subscribe(
+        self,
+        *,
+        channel: str = "",
+        user: str = "",
+        expire_at: int = 0,
+        info: JSON = None,
+        b64info: str = "",
+        client: str = "",
+        data: JSON = None,
+        b64data: str = "",
+        recover_since: StreamPosition | None = None,
+        override: SubscribeOptionOverride | None = None,
+        session: str = "",
+        label_filter: FilterNode | None = None,
+        all_users: bool = False,
+        timeout: float | None = None,
+    ) -> SubscribeResult:
         """Subscribes active sessions of a user to a channel
         (server-side subscription). It does not create a streaming subscription
         for the caller.
+
+        Args:
+            channel: The name of the channel to subscribe to. Required.
+            user: The ID of the user to subscribe. Required, unless all_users is
+                used in Centrifugo PRO.
+            expire_at: The Unix time in seconds when the subscription expires.
+            info: Custom channel info attached to the subscription, used in
+                presence and join/leave messages.
+            b64info: Info as base64, for binary. Centrifugo decodes it.
+            client: Limits the call to the connection with this client ID. user is
+                still required.
+            data: Custom subscription data sent to the client in the Subscribe
+                push.
+            b64data: Data as base64, for binary. Centrifugo decodes it.
+            recover_since: The stream position to recover publications from.
+            override: Dynamically overrides some channel options set in the
+                Centrifugo configuration.
+            session: Limits the call to the connection with this session ID. user
+                is still required.
+            label_filter: Restricts the call to clients whose labels match this
+                filter. Centrifugo PRO only.
+            all_users: When user is empty, targets every connection on every node
+                instead of the anonymous-only bucket. No effect when user is non-empty.
+                Without label_filter it acts on every connection. Centrifugo PRO only.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return await self._invoke(request, SubscribeResult, timeout)
+        return await self._invoke(
+            SubscribeRequest(
+                channel=channel,
+                user=user,
+                expire_at=expire_at,
+                info=info,
+                b64info=b64info,
+                client=client,
+                data=data,
+                b64data=b64data,
+                recover_since=recover_since,
+                override=override,
+                session=session,
+                label_filter=label_filter,
+                all_users=all_users,
+            ),
+            SubscribeResult,
+            timeout,
+        )
 
-    async def unsubscribe(self, request: UnsubscribeRequest, *, timeout: float | None = None) -> UnsubscribeResult:
-        """Unsubscribes a user from a channel."""
-        return await self._invoke(request, UnsubscribeResult, timeout)
+    async def unsubscribe(
+        self,
+        *,
+        channel: str = "",
+        user: str = "",
+        client: str = "",
+        session: str = "",
+        label_filter: FilterNode | None = None,
+        all_users: bool = False,
+        timeout: float | None = None,
+    ) -> UnsubscribeResult:
+        """Unsubscribes a user from a channel.
 
-    async def disconnect(self, request: DisconnectRequest, *, timeout: float | None = None) -> DisconnectResult:
-        """Disconnects a user's connections."""
-        return await self._invoke(request, DisconnectResult, timeout)
+        Args:
+            channel: The name of the channel to unsubscribe from. Required.
+            user: The ID of the user to unsubscribe. Required, unless all_users
+                is used in Centrifugo PRO.
+            client: Limits the call to the connection with this client ID. user is
+                still required.
+            session: Limits the call to the connection with this session ID. user
+                is still required.
+            label_filter: Restricts the call to clients whose labels match this
+                filter. Centrifugo PRO only.
+            all_users: Works as SubscribeRequest.all_users. Centrifugo PRO only.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return await self._invoke(
+            UnsubscribeRequest(
+                channel=channel,
+                user=user,
+                client=client,
+                session=session,
+                label_filter=label_filter,
+                all_users=all_users,
+            ),
+            UnsubscribeResult,
+            timeout,
+        )
 
-    async def presence(self, request: PresenceRequest, *, timeout: float | None = None) -> PresenceResult:
+    async def disconnect(
+        self,
+        *,
+        user: str = "",
+        disconnect: Disconnect | None = None,
+        client: str = "",
+        whitelist: list[str] | None = None,
+        session: str = "",
+        label_filter: FilterNode | None = None,
+        all_users: bool = False,
+        timeout: float | None = None,
+    ) -> DisconnectResult:
+        """Disconnects a user's connections.
+
+        Args:
+            user: The ID of the user to disconnect. Required, unless all_users is
+                used in Centrifugo PRO.
+            disconnect: A custom disconnect code and reason. If not set, clients
+                are disconnected with a force no-reconnect disconnect.
+            client: Limits the call to the connection with this client ID. user is
+                still required.
+            whitelist: A list of client IDs to keep connected.
+            session: Limits the call to the connection with this session ID. user
+                is still required.
+            label_filter: Restricts the call to clients whose labels match this
+                filter. Centrifugo PRO only.
+            all_users: Works as SubscribeRequest.all_users. Centrifugo PRO only.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return await self._invoke(
+            DisconnectRequest(
+                user=user,
+                disconnect=disconnect,
+                client=client,
+                whitelist=whitelist if whitelist is not None else [],
+                session=session,
+                label_filter=label_filter,
+                all_users=all_users,
+            ),
+            DisconnectResult,
+            timeout,
+        )
+
+    async def presence(self, *, channel: str = "", timeout: float | None = None) -> PresenceResult:
         """Returns the online presence of a channel: all clients
         currently subscribed to it. Presence must be enabled for the channel.
-        """
-        return await self._invoke(request, PresenceResult, timeout)
 
-    async def presence_stats(
-        self, request: PresenceStatsRequest, *, timeout: float | None = None
-    ) -> PresenceStatsResult:
+        Args:
+            channel: The name of the channel. Required.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return await self._invoke(PresenceRequest(channel=channel), PresenceResult, timeout)
+
+    async def presence_stats(self, *, channel: str = "", timeout: float | None = None) -> PresenceStatsResult:
         """Returns short presence information of a channel: the
         number of clients and of unique users. Presence must be enabled for the
         channel.
-        """
-        return await self._invoke(request, PresenceStatsResult, timeout)
 
-    async def history(self, request: HistoryRequest, *, timeout: float | None = None) -> HistoryResult:
+        Args:
+            channel: The name of the channel. Required.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return await self._invoke(PresenceStatsRequest(channel=channel), PresenceStatsResult, timeout)
+
+    async def history(
+        self,
+        *,
+        channel: str = "",
+        limit: int = 0,
+        since: StreamPosition | None = None,
+        reverse: bool = False,
+        timeout: float | None = None,
+    ) -> HistoryResult:
         """Returns publications from the history of a channel.
         History must be enabled for the channel.
-        """
-        return await self._invoke(request, HistoryResult, timeout)
 
-    async def history_remove(
-        self, request: HistoryRemoveRequest, *, timeout: float | None = None
-    ) -> HistoryRemoveResult:
+        Args:
+            channel: The name of the channel. Required.
+            limit: The maximum number of publications to return; -1 returns all
+                the channel keeps. If not set, only the current stream position is
+                returned, without publications.
+            since: Returns publications after this stream position.
+            reverse: Iterates in reverse order, from latest to earliest.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return await self._invoke(
+            HistoryRequest(channel=channel, limit=limit, since=since, reverse=reverse), HistoryResult, timeout
+        )
+
+    async def history_remove(self, *, channel: str = "", timeout: float | None = None) -> HistoryRemoveResult:
         """Removes publications from the history of a channel.
         The current top stream position is kept, so clients do not get
         disconnected because of insufficient state.
+
+        Args:
+            channel: The name of the channel. Required.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return await self._invoke(request, HistoryRemoveResult, timeout)
+        return await self._invoke(HistoryRemoveRequest(channel=channel), HistoryRemoveResult, timeout)
 
-    async def info(self, request: InfoRequest | None = None, *, timeout: float | None = None) -> InfoResult:
-        """Returns information about the running Centrifugo nodes."""
-        return await self._invoke(request or InfoRequest(), InfoResult, timeout)
+    async def info(self, *, timeout: float | None = None) -> InfoResult:
+        """Returns information about the running Centrifugo nodes.
 
-    async def refresh(self, request: RefreshRequest, *, timeout: float | None = None) -> RefreshResult:
+        Args:
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return await self._invoke(InfoRequest(), InfoResult, timeout)
+
+    async def refresh(
+        self,
+        *,
+        user: str = "",
+        client: str = "",
+        expired: bool = False,
+        expire_at: int = 0,
+        info: JSON = None,
+        session: str = "",
+        label_filter: FilterNode | None = None,
+        all_users: bool = False,
+        timeout: float | None = None,
+    ) -> RefreshResult:
         """Refreshes a user's connections, mostly useful with
         unidirectional transports. Without expire_at the connections become
         non-expiring.
-        """
-        return await self._invoke(request, RefreshResult, timeout)
 
-    async def channels(self, request: ChannelsRequest, *, timeout: float | None = None) -> ChannelsResult:
+        Args:
+            user: The ID of the user to refresh. Required, unless all_users is
+                used in Centrifugo PRO.
+            client: Limits the call to the connection with this client ID. user is
+                still required.
+            expired: Marks the connections as expired and closes them with an
+                expired disconnect reason.
+            expire_at: The Unix time in seconds when the connections expire.
+            info: Attaches or replaces the connection info.
+            session: Limits the call to the connection with this session ID. user
+                is still required.
+            label_filter: Restricts the call to clients whose labels match this
+                filter. Centrifugo PRO only.
+            all_users: Works as SubscribeRequest.all_users. Centrifugo PRO only.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return await self._invoke(
+            RefreshRequest(
+                user=user,
+                client=client,
+                expired=expired,
+                expire_at=expire_at,
+                info=info,
+                session=session,
+                label_filter=label_filter,
+                all_users=all_users,
+            ),
+            RefreshResult,
+            timeout,
+        )
+
+    async def channels(self, *, pattern: str = "", timeout: float | None = None) -> ChannelsResult:
         """Returns active channels (with one or more subscribers).
         It can be heavy on large deployments: there is no pagination.
-        """
-        return await self._invoke(request, ChannelsResult, timeout)
 
-    async def connections(self, request: ConnectionsRequest, *, timeout: float | None = None) -> ConnectionsResult:
+        Args:
+            pattern: Filters channels by name, using gobwas/glob syntax.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return await self._invoke(ChannelsRequest(pattern=pattern), ChannelsResult, timeout)
+
+    async def connections(
+        self,
+        *,
+        user: str = "",
+        expression: str = "",
+        label_filter: FilterNode | None = None,
+        timeout: float | None = None,
+    ) -> ConnectionsResult:
         """Returns information about active connections, without
         the need to enable presence. At least one of user, expression or
         label_filter must be set. Centrifugo PRO only.
+
+        Args:
+            user: Returns only the connections of this user ID.
+            expression: A CEL expression to filter connections.
+            label_filter: Restricts the listing to clients whose labels match this
+                filter. Centrifugo PRO only.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return await self._invoke(request, ConnectionsResult, timeout)
+        return await self._invoke(
+            ConnectionsRequest(user=user, expression=expression, label_filter=label_filter), ConnectionsResult, timeout
+        )
 
     async def update_user_status(
-        self, request: UpdateUserStatusRequest, *, timeout: float | None = None
+        self, *, users: list[str] | None = None, state: str = "", timeout: float | None = None
     ) -> UpdateUserStatusResult:
         """Marks users as active and online now, and sets
         their state when one is given. Centrifugo PRO only.
+
+        Args:
+            users: The list of user IDs to update the status for. Required.
+            state: An optional custom state to store in the user status. It can
+                be restricted by the user_status.state_regex option.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return await self._invoke(request, UpdateUserStatusResult, timeout)
+        return await self._invoke(
+            UpdateUserStatusRequest(users=users if users is not None else [], state=state),
+            UpdateUserStatusResult,
+            timeout,
+        )
 
     async def get_user_status(
-        self, request: GetUserStatusRequest, *, timeout: float | None = None
+        self, *, users: list[str] | None = None, timeout: float | None = None
     ) -> GetUserStatusResult:
-        """Returns the status of users. Centrifugo PRO only."""
-        return await self._invoke(request, GetUserStatusResult, timeout)
+        """Returns the status of users. Centrifugo PRO only.
+
+        Args:
+            users: The list of user IDs to get the status for. Required.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return await self._invoke(
+            GetUserStatusRequest(users=users if users is not None else []), GetUserStatusResult, timeout
+        )
 
     async def delete_user_status(
-        self, request: DeleteUserStatusRequest, *, timeout: float | None = None
+        self, *, users: list[str] | None = None, timeout: float | None = None
     ) -> DeleteUserStatusResult:
-        """Deletes the status of users. Centrifugo PRO only."""
-        return await self._invoke(request, DeleteUserStatusResult, timeout)
+        """Deletes the status of users. Centrifugo PRO only.
 
-    async def block_user(self, request: BlockUserRequest, *, timeout: float | None = None) -> BlockUserResult:
+        Args:
+            users: The list of user IDs to delete the status for. Required.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return await self._invoke(
+            DeleteUserStatusRequest(users=users if users is not None else []), DeleteUserStatusResult, timeout
+        )
+
+    async def block_user(self, *, expire_at: int = 0, user: str = "", timeout: float | None = None) -> BlockUserResult:
         """Blocks a user: the user is disconnected and can not
         connect again until unblocked or the block expires. Centrifugo PRO only.
+
+        Args:
+            expire_at: The Unix time in seconds when the block expires. Optional,
+                but a reasonably small value is recommended to keep the set of blocked
+                users small.
+            user: The ID of the user to block. Required.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return await self._invoke(request, BlockUserResult, timeout)
+        return await self._invoke(BlockUserRequest(expire_at=expire_at, user=user), BlockUserResult, timeout)
 
-    async def unblock_user(self, request: UnblockUserRequest, *, timeout: float | None = None) -> UnblockUserResult:
-        """Unblocks a user. Centrifugo PRO only."""
-        return await self._invoke(request, UnblockUserResult, timeout)
+    async def unblock_user(self, *, user: str = "", timeout: float | None = None) -> UnblockUserResult:
+        """Unblocks a user. Centrifugo PRO only.
 
-    async def revoke_token(self, request: RevokeTokenRequest, *, timeout: float | None = None) -> RevokeTokenResult:
+        Args:
+            user: The ID of the user to unblock. Required.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return await self._invoke(UnblockUserRequest(user=user), UnblockUserResult, timeout)
+
+    async def revoke_token(
+        self, *, expire_at: int = 0, uid: str = "", timeout: float | None = None
+    ) -> RevokeTokenResult:
         """Revokes a token by its unique ID (jti claim of a JWT).
         Clients using the token are disconnected shortly, and can not connect
         with it again. Centrifugo PRO only.
+
+        Args:
+            expire_at: The Unix time in seconds when the revocation expires.
+                Optional, but a value matching the token expiration is recommended.
+            uid: The unique ID of the token to revoke (jti claim). Required.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return await self._invoke(request, RevokeTokenResult, timeout)
+        return await self._invoke(RevokeTokenRequest(expire_at=expire_at, uid=uid), RevokeTokenResult, timeout)
 
     async def invalidate_user_tokens(
-        self, request: InvalidateUserTokensRequest, *, timeout: float | None = None
+        self,
+        *,
+        expire_at: int = 0,
+        user: str = "",
+        issued_before: int = 0,
+        channel: str = "",
+        timeout: float | None = None,
     ) -> InvalidateUserTokensResult:
         """Revokes all tokens of a user issued before a
         certain time (based on the iat claim of a JWT). Centrifugo PRO only.
+
+        Args:
+            expire_at: The Unix time in seconds when the invalidation expires.
+                Optional, but a value matching the token expiration is recommended.
+            user: The ID of the user whose tokens to invalidate. Required.
+            issued_before: The Unix time in seconds: tokens issued before it are
+                considered revoked. If not set, the current time is used.
+            channel: Limits the invalidation to subscription tokens for this
+                channel.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return await self._invoke(request, InvalidateUserTokensResult, timeout)
+        return await self._invoke(
+            InvalidateUserTokensRequest(expire_at=expire_at, user=user, issued_before=issued_before, channel=channel),
+            InvalidateUserTokensResult,
+            timeout,
+        )
 
     async def device_register(
-        self, request: DeviceRegisterRequest, *, timeout: float | None = None
+        self,
+        *,
+        id: str = "",
+        provider: str = "",
+        token: str = "",
+        platform: str = "",
+        user: str = "",
+        meta: dict[str, str] | None = None,
+        topics: list[str] | None = None,
+        timezone: str = "",
+        locale: str = "",
+        timeout: float | None = None,
     ) -> DeviceRegisterResult:
         """Registers a device for push notifications, or
         updates a registered one. Centrifugo PRO only.
-        """
-        return await self._invoke(request, DeviceRegisterResult, timeout)
 
-    async def device_update(self, request: DeviceUpdateRequest, *, timeout: float | None = None) -> DeviceUpdateResult:
+        Args:
+            id: The device ID. Omit it on first registration: Centrifugo
+                generates one and returns it. Pass the stored value to update the
+                device.
+            provider: The provider of the device token: fcm, hms, apns or
+                webpush. Required.
+            token: The push token of the device. For webpush, it is the browser
+                PushSubscription serialized as a JSON string. Required.
+            platform: The device platform: ios, android or web. Required.
+            user: The user associated with the device.
+            meta: Additional custom metadata of the device.
+            topics: The full list of the device's topic subscriptions, replacing
+                the previous one. The user's topics are attached automatically.
+            timezone: The IANA time zone of the device user, for example
+                Europe/Nicosia.
+            locale: The locale of the device user as an IETF BCP 47 language
+                tag, for example en-US.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return await self._invoke(
+            DeviceRegisterRequest(
+                id=id,
+                provider=provider,
+                token=token,
+                platform=platform,
+                user=user,
+                meta=meta if meta is not None else {},
+                topics=topics if topics is not None else [],
+                timezone=timezone,
+                locale=locale,
+            ),
+            DeviceRegisterResult,
+            timeout,
+        )
+
+    async def device_update(
+        self,
+        *,
+        ids: list[str] | None = None,
+        users: list[str] | None = None,
+        user_update: DeviceUserUpdate | None = None,
+        meta_update: DeviceMetaUpdate | None = None,
+        topics_update: DeviceTopicsUpdate | None = None,
+        timezone_update: DeviceTimezoneUpdate | None = None,
+        locale_update: DeviceLocaleUpdate | None = None,
+        timeout: float | None = None,
+    ) -> DeviceUpdateResult:
         """Updates registered devices, selected by ids and/or
         users. Centrifugo PRO only.
-        """
-        return await self._invoke(request, DeviceUpdateResult, timeout)
 
-    async def device_remove(self, request: DeviceRemoveRequest, *, timeout: float | None = None) -> DeviceRemoveResult:
+        Args:
+            ids: Selects devices by ID.
+            users: Selects devices by user.
+            user_update: Changes the user ID of the devices. It does not re-sync
+                user-bound topics; use DeviceRegisterRequest to assign a device to
+                another user.
+            meta_update: Updates the device meta.
+            topics_update: Updates the device topics.
+            timezone_update: Updates the device timezone.
+            locale_update: Updates the device locale.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return await self._invoke(
+            DeviceUpdateRequest(
+                ids=ids if ids is not None else [],
+                users=users if users is not None else [],
+                user_update=user_update,
+                meta_update=meta_update,
+                topics_update=topics_update,
+                timezone_update=timezone_update,
+                locale_update=locale_update,
+            ),
+            DeviceUpdateResult,
+            timeout,
+        )
+
+    async def device_remove(
+        self, *, ids: list[str] | None = None, users: list[str] | None = None, timeout: float | None = None
+    ) -> DeviceRemoveResult:
         """Removes devices, selected by ids and/or users.
         Centrifugo PRO only.
-        """
-        return await self._invoke(request, DeviceRemoveResult, timeout)
 
-    async def device_list(self, request: DeviceListRequest, *, timeout: float | None = None) -> DeviceListResult:
+        Args:
+            ids: Selects devices to remove by ID.
+            users: Selects devices to remove by user.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return await self._invoke(
+            DeviceRemoveRequest(ids=ids if ids is not None else [], users=users if users is not None else []),
+            DeviceRemoveResult,
+            timeout,
+        )
+
+    async def device_list(
+        self,
+        *,
+        filter: DeviceFilter | None = None,
+        include_total_count: bool = False,
+        include_meta: bool = False,
+        include_topics: bool = False,
+        include_webpush_keys: bool = False,
+        cursor: str = "",
+        limit: int = 0,
+        timeout: float | None = None,
+    ) -> DeviceListResult:
         """Returns a paginated list of registered devices.
         Centrifugo PRO only.
+
+        Args:
+            filter: Selects the devices to list. Required.
+            include_total_count: Includes the total count for the filter in the
+                result.
+            include_meta: Includes meta of each device.
+            include_topics: Includes topics of each device.
+            include_webpush_keys: Includes webpush_keys of each device (webpush
+                only).
+            cursor: The pagination cursor: next_cursor of the previous page,
+                empty for the first page.
+            limit: The maximum number of devices to return.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return await self._invoke(request, DeviceListResult, timeout)
+        return await self._invoke(
+            DeviceListRequest(
+                filter=filter,
+                include_total_count=include_total_count,
+                include_meta=include_meta,
+                include_topics=include_topics,
+                include_webpush_keys=include_webpush_keys,
+                cursor=cursor,
+                limit=limit,
+            ),
+            DeviceListResult,
+            timeout,
+        )
 
     async def device_topic_list(
-        self, request: DeviceTopicListRequest, *, timeout: float | None = None
+        self,
+        *,
+        filter: DeviceTopicFilter | None = None,
+        include_total_count: bool = False,
+        include_device: bool = False,
+        cursor: str = "",
+        limit: int = 0,
+        timeout: float | None = None,
     ) -> DeviceTopicListResult:
         """Returns a paginated list of device topic
         subscriptions. Centrifugo PRO only.
+
+        Args:
+            filter: Selects the device topics to list.
+            include_total_count: Includes the total count for the filter in the
+                result.
+            include_device: Includes the Device of each item.
+            cursor: The pagination cursor: next_cursor of the previous page,
+                empty for the first page.
+            limit: The maximum number of items to return.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return await self._invoke(request, DeviceTopicListResult, timeout)
+        return await self._invoke(
+            DeviceTopicListRequest(
+                filter=filter,
+                include_total_count=include_total_count,
+                include_device=include_device,
+                cursor=cursor,
+                limit=limit,
+            ),
+            DeviceTopicListResult,
+            timeout,
+        )
 
     async def device_topic_update(
-        self, request: DeviceTopicUpdateRequest, *, timeout: float | None = None
+        self,
+        *,
+        device_id: str = "",
+        op: str = "",
+        topics: list[str] | None = None,
+        user: str = "",
+        timeout: float | None = None,
     ) -> DeviceTopicUpdateResult:
         """Changes the topics of a device. The device topic
         list is what decides who gets a push sent to a topic.
         Centrifugo PRO only.
+
+        Args:
+            device_id: The ID of the device. Required.
+            op: The operation: add, remove or set. Required.
+            topics: The topics for the operation.
+            user: An optional ownership guard: the update is applied only if the
+                device currently belongs to this user. Otherwise the call fails with a
+                conflict error (or not found if there is no such device).
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return await self._invoke(request, DeviceTopicUpdateResult, timeout)
+        return await self._invoke(
+            DeviceTopicUpdateRequest(
+                device_id=device_id, op=op, topics=topics if topics is not None else [], user=user
+            ),
+            DeviceTopicUpdateResult,
+            timeout,
+        )
 
     async def user_topic_list(
-        self, request: UserTopicListRequest, *, timeout: float | None = None
+        self,
+        *,
+        filter: UserTopicFilter | None = None,
+        include_total_count: bool = False,
+        cursor: str = "",
+        limit: int = 0,
+        timeout: float | None = None,
     ) -> UserTopicListResult:
         """Returns a paginated list of user topic
         subscriptions. Centrifugo PRO only.
+
+        Args:
+            filter: Selects the user topics to list.
+            include_total_count: Includes the total count for the filter in the
+                result.
+            cursor: The pagination cursor: next_cursor of the previous page,
+                empty for the first page.
+            limit: The maximum number of items to return.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return await self._invoke(request, UserTopicListResult, timeout)
+        return await self._invoke(
+            UserTopicListRequest(filter=filter, include_total_count=include_total_count, cursor=cursor, limit=limit),
+            UserTopicListResult,
+            timeout,
+        )
 
     async def user_topic_update(
-        self, request: UserTopicUpdateRequest, *, timeout: float | None = None
+        self, *, user: str = "", op: str = "", topics: list[str] | None = None, timeout: float | None = None
     ) -> UserTopicUpdateResult:
         """Changes the topics of a user. The change is also
         applied to the user's registered devices. Centrifugo PRO only.
+
+        Args:
+            user: The user ID. Required.
+            op: The operation: add, remove or set. Required.
+            topics: The topics for the operation.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return await self._invoke(request, UserTopicUpdateResult, timeout)
+        return await self._invoke(
+            UserTopicUpdateRequest(user=user, op=op, topics=topics if topics is not None else []),
+            UserTopicUpdateResult,
+            timeout,
+        )
 
     async def send_push_notification(
-        self, request: SendPushNotificationRequest, *, timeout: float | None = None
+        self,
+        *,
+        recipient: PushRecipient | None = None,
+        notification: PushNotification | None = None,
+        uid: str = "",
+        send_at: int = 0,
+        optimize_for_reliability: bool = False,
+        limit_strategy: PushLimitStrategy | None = None,
+        analytics_uid: str = "",
+        localizations: dict[str, PushLocalization] | None = None,
+        use_templating: bool = False,
+        use_meta: bool = False,
+        timeout: float | None = None,
     ) -> SendPushNotificationResult:
         """Sends a push notification. The request is
         queued and sent to the provider by Centrifugo workers.
         Centrifugo PRO only.
+
+        Args:
+            recipient: Who receives the notification. Required.
+            notification: The notification to send. Required.
+            uid: A unique identifier of the request, can be used to cancel the
+                push. UUID v4 is recommended; different requests must use different
+                uids.
+            send_at: The Unix time in seconds when to send the notification. If
+                not set, the notification is sent immediately.
+            optimize_for_reliability: Makes processing heavier, but tolerates edge
+                cases, like not losing inflight pushes when the queue is briefly
+                unavailable.
+            limit_strategy: Sets time constraints and rate limits. Only applies
+                with a filter recipient; devices are then processed one by one
+                instead of in batches.
+            analytics_uid: The identifier for push notification analytics. If
+                not set, uid is used.
+            localizations: Optional per language/locale localizations. Setting
+                them enables templating.
+            use_templating: Enables templating of the notification. Only works
+                with a filter recipient.
+            use_meta: Additionally loads device meta while sending, making it
+                available in templating.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return await self._invoke(request, SendPushNotificationResult, timeout)
+        return await self._invoke(
+            SendPushNotificationRequest(
+                recipient=recipient,
+                notification=notification,
+                uid=uid,
+                send_at=send_at,
+                optimize_for_reliability=optimize_for_reliability,
+                limit_strategy=limit_strategy,
+                analytics_uid=analytics_uid,
+                localizations=localizations if localizations is not None else {},
+                use_templating=use_templating,
+                use_meta=use_meta,
+            ),
+            SendPushNotificationResult,
+            timeout,
+        )
 
     async def update_push_status(
-        self, request: UpdatePushStatusRequest, *, timeout: float | None = None
+        self,
+        *,
+        analytics_uid: str = "",
+        status: str = "",
+        device_id: str = "",
+        msg_id: str = "",
+        timeout: float | None = None,
     ) -> UpdatePushStatusResult:
         """Saves the delivery or interaction status of a
         push notification to analytics. Experimental. Centrifugo PRO only.
-        """
-        return await self._invoke(request, UpdatePushStatusResult, timeout)
 
-    async def cancel_push(self, request: CancelPushRequest, *, timeout: float | None = None) -> CancelPushResult:
+        Args:
+            analytics_uid: The analytics_uid of the push notification (as in
+                SendPushNotificationRequest). Required.
+            status: The status of the push notification: delivered or
+                interacted. Required.
+            device_id: The Centrifugo device ID. Required.
+            msg_id: The message ID issued by the provider.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return await self._invoke(
+            UpdatePushStatusRequest(analytics_uid=analytics_uid, status=status, device_id=device_id, msg_id=msg_id),
+            UpdatePushStatusResult,
+            timeout,
+        )
+
+    async def cancel_push(self, *, uid: str = "", timeout: float | None = None) -> CancelPushResult:
         """Cancels a delayed push notification (sent with
         send_at). Centrifugo PRO only.
+
+        Args:
+            uid: The uid of the push notification to cancel. Required.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return await self._invoke(request, CancelPushResult, timeout)
+        return await self._invoke(CancelPushRequest(uid=uid), CancelPushResult, timeout)
 
-    async def map_publish(self, request: MapPublishRequest, *, timeout: float | None = None) -> MapPublishResult:
-        """Publishes or updates a key in a map channel."""
-        return await self._invoke(request, MapPublishResult, timeout)
+    async def map_publish(
+        self,
+        *,
+        channel: str = "",
+        key: str = "",
+        data: JSON = None,
+        b64data: str = "",
+        stream_data: JSON = None,
+        b64stream_data: str = "",
+        tags: dict[str, str] | None = None,
+        idempotency_key: str = "",
+        delta: bool = False,
+        version: int = 0,
+        version_epoch: str = "",
+        score: int = 0,
+        key_mode: str = "",
+        timeout: float | None = None,
+    ) -> MapPublishResult:
+        """Publishes or updates a key in a map channel.
 
-    async def map_remove(self, request: MapRemoveRequest, *, timeout: float | None = None) -> MapRemoveResult:
-        """Removes a key from a map channel."""
-        return await self._invoke(request, MapRemoveResult, timeout)
+        Args:
+            channel: The name of the map channel. Required.
+            key: The entry key. Required.
+            data: The entry data. In the HTTP API it is any JSON value; over GRPC
+                it may be binary.
+            b64data: Data as base64, for binary over the HTTP API. Centrifugo
+                decodes it.
+            stream_data: Currently not used by the server API.
+            b64stream_data: Currently not used by the server API.
+            tags: Key-value metadata attached to the publication.
+            idempotency_key: Drops duplicate publications upon retries: a
+                publication with a key already used in the channel is not applied
+                again, and its result has the first one's position, with suppressed
+                set and suppress_reason "idempotency". It acts per channel; keys are
+                kept for 5 minutes by default. Every map broker - memory, Redis and
+                PostgreSQL - keeps keys.
+            delta: Enables delta compression for this publication.
+            version: A per-key version: publications with a version not higher
+                than the key's current one are suppressed.
+            version_epoch: Scopes version. A different epoch resets version
+                comparison.
+            score: Currently not used by the server API.
+            key_mode: Makes the publish conditional: "if_new" writes only if the
+                key does not exist, "if_exists" only if it exists. Empty always
+                writes.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return await self._invoke(
+            MapPublishRequest(
+                channel=channel,
+                key=key,
+                data=data,
+                b64data=b64data,
+                stream_data=stream_data,
+                b64stream_data=b64stream_data,
+                tags=tags if tags is not None else {},
+                idempotency_key=idempotency_key,
+                delta=delta,
+                version=version,
+                version_epoch=version_epoch,
+                score=score,
+                key_mode=key_mode,
+            ),
+            MapPublishResult,
+            timeout,
+        )
 
-    async def map_read_state(self, request: MapReadStateRequest, *, timeout: float | None = None) -> MapReadStateResult:
+    async def map_remove(
+        self, *, channel: str = "", key: str = "", idempotency_key: str = "", timeout: float | None = None
+    ) -> MapRemoveResult:
+        """Removes a key from a map channel.
+
+        Args:
+            channel: The name of the map channel. Required.
+            key: The key to remove. Required.
+            idempotency_key: Drops duplicate removals upon retries, as it does for
+                MapPublishRequest: a removal with a key already used in the channel is
+                not applied again, and its result is suppressed with suppress_reason
+                "idempotency". Keys are kept for 5 minutes by default.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return await self._invoke(
+            MapRemoveRequest(channel=channel, key=key, idempotency_key=idempotency_key), MapRemoveResult, timeout
+        )
+
+    async def map_read_state(
+        self,
+        *,
+        channel: str = "",
+        cursor: str = "",
+        limit: int = 0,
+        key: str = "",
+        asc: bool = False,
+        revision_offset: int = 0,
+        revision_epoch: str = "",
+        timeout: float | None = None,
+    ) -> MapReadStateResult:
         """Reads the current state of a map channel, with
         optional pagination.
+
+        Args:
+            channel: The name of the map channel. Required.
+            cursor: The pagination cursor from the previous page. Empty starts
+                from the beginning.
+            limit: The maximum number of entries per page: -1 means no limit, 0
+                returns only the stream position. Page sizes may exceed it with the
+                Redis map broker.
+            key: Reads a single entry by exact key. cursor and limit are ignored
+                when it is set.
+            asc: Sorts ordered state by score ascending instead of descending.
+                Ignored for unordered channels.
+            revision_offset: The offset of the position from a previous state
+                read, used with revision_epoch.
+            revision_epoch: The epoch of the position from a previous state
+                read. If the epoch changed, the call fails with an unrecoverable
+                position error.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return await self._invoke(request, MapReadStateResult, timeout)
+        return await self._invoke(
+            MapReadStateRequest(
+                channel=channel,
+                cursor=cursor,
+                limit=limit,
+                key=key,
+                asc=asc,
+                revision_offset=revision_offset,
+                revision_epoch=revision_epoch,
+            ),
+            MapReadStateResult,
+            timeout,
+        )
 
     async def map_read_stream(
-        self, request: MapReadStreamRequest, *, timeout: float | None = None
+        self,
+        *,
+        channel: str = "",
+        since_offset: int = 0,
+        since_epoch: str = "",
+        limit: int = 0,
+        reverse: bool = False,
+        timeout: float | None = None,
     ) -> MapReadStreamResult:
-        """Reads the change stream of a map channel."""
-        return await self._invoke(request, MapReadStreamResult, timeout)
+        """Reads the change stream of a map channel.
 
-    async def map_stats(self, request: MapStatsRequest, *, timeout: float | None = None) -> MapStatsResult:
-        """Returns statistics about a map channel."""
-        return await self._invoke(request, MapStatsResult, timeout)
+        Args:
+            channel: The name of the map channel. Required.
+            since_offset: Returns entries after this offset, used with
+                since_epoch.
+            since_epoch: The epoch of the since position. It must match the
+                current stream epoch.
+            limit: The maximum number of entries: -1 means no limit, 0 returns
+                only the stream position.
+            reverse: Returns entries newest first.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return await self._invoke(
+            MapReadStreamRequest(
+                channel=channel, since_offset=since_offset, since_epoch=since_epoch, limit=limit, reverse=reverse
+            ),
+            MapReadStreamResult,
+            timeout,
+        )
 
-    async def map_clear(self, request: MapClearRequest, *, timeout: float | None = None) -> MapClearResult:
-        """Removes all state and stream data of a map channel."""
-        return await self._invoke(request, MapClearResult, timeout)
+    async def map_stats(self, *, channel: str = "", timeout: float | None = None) -> MapStatsResult:
+        """Returns statistics about a map channel.
+
+        Args:
+            channel: The name of the map channel. Required.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return await self._invoke(MapStatsRequest(channel=channel), MapStatsResult, timeout)
+
+    async def map_clear(self, *, channel: str = "", timeout: float | None = None) -> MapClearResult:
+        """Removes all state and stream data of a map channel.
+
+        Args:
+            channel: The name of the map channel. Required.
+            timeout: Seconds bounding the call: request_timeout when None.
+        """
+        return await self._invoke(MapClearRequest(channel=channel), MapClearResult, timeout)
 
     async def shared_poll_publish(
-        self, request: SharedPollPublishRequest, *, timeout: float | None = None
+        self,
+        *,
+        channel: str = "",
+        key: str = "",
+        data: JSON = None,
+        b64data: str = "",
+        version: int = 0,
+        epoch: str = "",
+        timeout: float | None = None,
     ) -> SharedPollPublishResult:
         """Pushes data for a key directly to clients of a
         shared poll channel, without waiting for the next poll cycle. Requires
         versioned mode and publish_enabled on the namespace.
+
+        Args:
+            channel: The name of the shared poll channel. Required.
+            key: The item key. Required.
+            data: The item data, delivered to clients as is.
+            b64data: Data as base64, for binary payloads. Centrifugo decodes it.
+            version: The item version, must be >= 1. Required. A version not
+                higher than the current one within the same epoch is silently dropped.
+            epoch: The channel-level publisher epoch. A change resets per-key
+                versions and unsubscribes current subscribers with insufficient state.
+            timeout: Seconds bounding the call: request_timeout when None.
         """
-        return await self._invoke(request, SharedPollPublishResult, timeout)
+        return await self._invoke(
+            SharedPollPublishRequest(
+                channel=channel, key=key, data=data, b64data=b64data, version=version, epoch=epoch
+            ),
+            SharedPollPublishResult,
+            timeout,
+        )
 
 
 class _BatchAPI:
@@ -5041,151 +6858,924 @@ class _BatchAPI:
     if TYPE_CHECKING:
 
         def _add(self, request: Any, result: type[_R]) -> Pending[_R]: ...
+        def _add_broadcast(self, request: BroadcastRequest) -> Pending[BroadcastResult]: ...
 
-    def publish(self, request: PublishRequest) -> Pending[PublishResult]:
-        """Adds a publish command; its outcome is what Client.publish would return."""
-        return self._add(request, PublishResult)
+    def publish(
+        self,
+        *,
+        channel: str = "",
+        data: JSON = None,
+        b64data: str = "",
+        skip_history: bool = False,
+        tags: dict[str, str] | None = None,
+        idempotency_key: str = "",
+        delta: bool = False,
+        version: int = 0,
+        version_epoch: str = "",
+    ) -> Pending[PublishResult]:
+        """Adds a publish command; its outcome is what Client.publish would return.
 
-    def subscribe(self, request: SubscribeRequest) -> Pending[SubscribeResult]:
-        """Adds a subscribe command; its outcome is what Client.subscribe would return."""
-        return self._add(request, SubscribeResult)
+        Args:
+            channel: The name of the channel to publish into. Required.
+            data: The payload to publish. Required unless b64data is set. In the
+                HTTP API it is any JSON value; over GRPC it may be binary.
+            b64data: A base64-encoded binary payload, an alternative to `data` to
+                send binary over the HTTP API. Centrifugo decodes it before publishing.
+            skip_history: Skips adding this publication to the channel history.
+            tags: A map of arbitrary string keys and values attached to the
+                publication and delivered to clients.
+            idempotency_key: Drops duplicate publications upon retries: a
+                publication with a key already used in the channel is not published
+                again, and the first one's result is returned. It acts per channel;
+                results are kept for 5 minutes by default. The memory, Redis and
+                PostgreSQL brokers keep keys; the NATS broker ignores them.
+            delta: Tells Centrifugo to construct a delta update, if possible, when
+                broadcasting the publication to subscribers.
+            version: When > 0, the version of the document being sent:
+                publications with a version less than or equal to one already seen are
+                ignored. Only works in channels with history enabled.
+            version_epoch: The epoch of version. When it changes, Centrifugo
+                accepts the publication even if its version is lower than before.
+        """
+        return self._add(
+            PublishRequest(
+                channel=channel,
+                data=data,
+                b64data=b64data,
+                skip_history=skip_history,
+                tags=tags if tags is not None else {},
+                idempotency_key=idempotency_key,
+                delta=delta,
+                version=version,
+                version_epoch=version_epoch,
+            ),
+            PublishResult,
+        )
 
-    def unsubscribe(self, request: UnsubscribeRequest) -> Pending[UnsubscribeResult]:
-        """Adds a unsubscribe command; its outcome is what Client.unsubscribe would return."""
-        return self._add(request, UnsubscribeResult)
+    def broadcast(
+        self,
+        *,
+        channels: list[str] | None = None,
+        data: JSON = None,
+        b64data: str = "",
+        skip_history: bool = False,
+        tags: dict[str, str] | None = None,
+        idempotency_key: str = "",
+        delta: bool = False,
+        version: int = 0,
+        version_epoch: str = "",
+    ) -> Pending[BroadcastResult]:
+        """Adds a broadcast command; its outcome is what Client.broadcast would return.
 
-    def disconnect(self, request: DisconnectRequest) -> Pending[DisconnectResult]:
-        """Adds a disconnect command; its outcome is what Client.disconnect would return."""
-        return self._add(request, DisconnectResult)
+        Args:
+            channels: The list of channels to publish into. Required.
+            data: The payload to publish into each channel. Required unless
+                b64data is set. In the HTTP API it is any JSON value; over GRPC it may
+                be binary.
+            b64data: A base64-encoded binary payload, an alternative to `data` to
+                send binary over the HTTP API. Centrifugo decodes it before publishing.
+            skip_history: Skips adding the publications to the channels' history.
+            tags: A map of arbitrary string keys and values attached to each
+                publication and delivered to clients.
+            idempotency_key: Drops duplicate publications upon retries. It acts per
+                channel: a broadcast retried with the same key is not published again
+                into the channels which already have it. Results are kept for 5 minutes
+                by default. The memory, Redis and PostgreSQL brokers keep keys; the
+                NATS broker ignores them.
+            delta: Tells Centrifugo to construct a delta update, if possible, when
+                broadcasting the publications to subscribers.
+            version: When > 0, the version of the document being sent:
+                publications with a version less than or equal to one already seen are
+                ignored. Only works in channels with history enabled.
+            version_epoch: The epoch of version. When it changes, Centrifugo
+                accepts the publication even if its version is lower than before.
+        """
+        return self._add_broadcast(
+            BroadcastRequest(
+                channels=channels if channels is not None else [],
+                data=data,
+                b64data=b64data,
+                skip_history=skip_history,
+                tags=tags if tags is not None else {},
+                idempotency_key=idempotency_key,
+                delta=delta,
+                version=version,
+                version_epoch=version_epoch,
+            )
+        )
 
-    def presence(self, request: PresenceRequest) -> Pending[PresenceResult]:
-        """Adds a presence command; its outcome is what Client.presence would return."""
-        return self._add(request, PresenceResult)
+    def subscribe(
+        self,
+        *,
+        channel: str = "",
+        user: str = "",
+        expire_at: int = 0,
+        info: JSON = None,
+        b64info: str = "",
+        client: str = "",
+        data: JSON = None,
+        b64data: str = "",
+        recover_since: StreamPosition | None = None,
+        override: SubscribeOptionOverride | None = None,
+        session: str = "",
+        label_filter: FilterNode | None = None,
+        all_users: bool = False,
+    ) -> Pending[SubscribeResult]:
+        """Adds a subscribe command; its outcome is what Client.subscribe would return.
 
-    def presence_stats(self, request: PresenceStatsRequest) -> Pending[PresenceStatsResult]:
-        """Adds a presence_stats command; its outcome is what Client.presence_stats would return."""
-        return self._add(request, PresenceStatsResult)
+        Args:
+            channel: The name of the channel to subscribe to. Required.
+            user: The ID of the user to subscribe. Required, unless all_users is
+                used in Centrifugo PRO.
+            expire_at: The Unix time in seconds when the subscription expires.
+            info: Custom channel info attached to the subscription, used in
+                presence and join/leave messages.
+            b64info: Info as base64, for binary. Centrifugo decodes it.
+            client: Limits the call to the connection with this client ID. user is
+                still required.
+            data: Custom subscription data sent to the client in the Subscribe
+                push.
+            b64data: Data as base64, for binary. Centrifugo decodes it.
+            recover_since: The stream position to recover publications from.
+            override: Dynamically overrides some channel options set in the
+                Centrifugo configuration.
+            session: Limits the call to the connection with this session ID. user
+                is still required.
+            label_filter: Restricts the call to clients whose labels match this
+                filter. Centrifugo PRO only.
+            all_users: When user is empty, targets every connection on every node
+                instead of the anonymous-only bucket. No effect when user is non-empty.
+                Without label_filter it acts on every connection. Centrifugo PRO only.
+        """
+        return self._add(
+            SubscribeRequest(
+                channel=channel,
+                user=user,
+                expire_at=expire_at,
+                info=info,
+                b64info=b64info,
+                client=client,
+                data=data,
+                b64data=b64data,
+                recover_since=recover_since,
+                override=override,
+                session=session,
+                label_filter=label_filter,
+                all_users=all_users,
+            ),
+            SubscribeResult,
+        )
 
-    def history(self, request: HistoryRequest) -> Pending[HistoryResult]:
-        """Adds a history command; its outcome is what Client.history would return."""
-        return self._add(request, HistoryResult)
+    def unsubscribe(
+        self,
+        *,
+        channel: str = "",
+        user: str = "",
+        client: str = "",
+        session: str = "",
+        label_filter: FilterNode | None = None,
+        all_users: bool = False,
+    ) -> Pending[UnsubscribeResult]:
+        """Adds a unsubscribe command; its outcome is what Client.unsubscribe would return.
 
-    def history_remove(self, request: HistoryRemoveRequest) -> Pending[HistoryRemoveResult]:
-        """Adds a history_remove command; its outcome is what Client.history_remove would return."""
-        return self._add(request, HistoryRemoveResult)
+        Args:
+            channel: The name of the channel to unsubscribe from. Required.
+            user: The ID of the user to unsubscribe. Required, unless all_users
+                is used in Centrifugo PRO.
+            client: Limits the call to the connection with this client ID. user is
+                still required.
+            session: Limits the call to the connection with this session ID. user
+                is still required.
+            label_filter: Restricts the call to clients whose labels match this
+                filter. Centrifugo PRO only.
+            all_users: Works as SubscribeRequest.all_users. Centrifugo PRO only.
+        """
+        return self._add(
+            UnsubscribeRequest(
+                channel=channel,
+                user=user,
+                client=client,
+                session=session,
+                label_filter=label_filter,
+                all_users=all_users,
+            ),
+            UnsubscribeResult,
+        )
 
-    def info(self, request: InfoRequest | None = None) -> Pending[InfoResult]:
+    def disconnect(
+        self,
+        *,
+        user: str = "",
+        disconnect: Disconnect | None = None,
+        client: str = "",
+        whitelist: list[str] | None = None,
+        session: str = "",
+        label_filter: FilterNode | None = None,
+        all_users: bool = False,
+    ) -> Pending[DisconnectResult]:
+        """Adds a disconnect command; its outcome is what Client.disconnect would return.
+
+        Args:
+            user: The ID of the user to disconnect. Required, unless all_users is
+                used in Centrifugo PRO.
+            disconnect: A custom disconnect code and reason. If not set, clients
+                are disconnected with a force no-reconnect disconnect.
+            client: Limits the call to the connection with this client ID. user is
+                still required.
+            whitelist: A list of client IDs to keep connected.
+            session: Limits the call to the connection with this session ID. user
+                is still required.
+            label_filter: Restricts the call to clients whose labels match this
+                filter. Centrifugo PRO only.
+            all_users: Works as SubscribeRequest.all_users. Centrifugo PRO only.
+        """
+        return self._add(
+            DisconnectRequest(
+                user=user,
+                disconnect=disconnect,
+                client=client,
+                whitelist=whitelist if whitelist is not None else [],
+                session=session,
+                label_filter=label_filter,
+                all_users=all_users,
+            ),
+            DisconnectResult,
+        )
+
+    def presence(self, *, channel: str = "") -> Pending[PresenceResult]:
+        """Adds a presence command; its outcome is what Client.presence would return.
+
+        Args:
+            channel: The name of the channel. Required.
+        """
+        return self._add(PresenceRequest(channel=channel), PresenceResult)
+
+    def presence_stats(self, *, channel: str = "") -> Pending[PresenceStatsResult]:
+        """Adds a presence_stats command; its outcome is what Client.presence_stats would return.
+
+        Args:
+            channel: The name of the channel. Required.
+        """
+        return self._add(PresenceStatsRequest(channel=channel), PresenceStatsResult)
+
+    def history(
+        self, *, channel: str = "", limit: int = 0, since: StreamPosition | None = None, reverse: bool = False
+    ) -> Pending[HistoryResult]:
+        """Adds a history command; its outcome is what Client.history would return.
+
+        Args:
+            channel: The name of the channel. Required.
+            limit: The maximum number of publications to return; -1 returns all
+                the channel keeps. If not set, only the current stream position is
+                returned, without publications.
+            since: Returns publications after this stream position.
+            reverse: Iterates in reverse order, from latest to earliest.
+        """
+        return self._add(HistoryRequest(channel=channel, limit=limit, since=since, reverse=reverse), HistoryResult)
+
+    def history_remove(self, *, channel: str = "") -> Pending[HistoryRemoveResult]:
+        """Adds a history_remove command; its outcome is what Client.history_remove would return.
+
+        Args:
+            channel: The name of the channel. Required.
+        """
+        return self._add(HistoryRemoveRequest(channel=channel), HistoryRemoveResult)
+
+    def info(self) -> Pending[InfoResult]:
         """Adds a info command; its outcome is what Client.info would return."""
-        return self._add(request or InfoRequest(), InfoResult)
+        return self._add(InfoRequest(), InfoResult)
 
-    def refresh(self, request: RefreshRequest) -> Pending[RefreshResult]:
-        """Adds a refresh command; its outcome is what Client.refresh would return."""
-        return self._add(request, RefreshResult)
+    def refresh(
+        self,
+        *,
+        user: str = "",
+        client: str = "",
+        expired: bool = False,
+        expire_at: int = 0,
+        info: JSON = None,
+        session: str = "",
+        label_filter: FilterNode | None = None,
+        all_users: bool = False,
+    ) -> Pending[RefreshResult]:
+        """Adds a refresh command; its outcome is what Client.refresh would return.
 
-    def channels(self, request: ChannelsRequest) -> Pending[ChannelsResult]:
-        """Adds a channels command; its outcome is what Client.channels would return."""
-        return self._add(request, ChannelsResult)
+        Args:
+            user: The ID of the user to refresh. Required, unless all_users is
+                used in Centrifugo PRO.
+            client: Limits the call to the connection with this client ID. user is
+                still required.
+            expired: Marks the connections as expired and closes them with an
+                expired disconnect reason.
+            expire_at: The Unix time in seconds when the connections expire.
+            info: Attaches or replaces the connection info.
+            session: Limits the call to the connection with this session ID. user
+                is still required.
+            label_filter: Restricts the call to clients whose labels match this
+                filter. Centrifugo PRO only.
+            all_users: Works as SubscribeRequest.all_users. Centrifugo PRO only.
+        """
+        return self._add(
+            RefreshRequest(
+                user=user,
+                client=client,
+                expired=expired,
+                expire_at=expire_at,
+                info=info,
+                session=session,
+                label_filter=label_filter,
+                all_users=all_users,
+            ),
+            RefreshResult,
+        )
 
-    def connections(self, request: ConnectionsRequest) -> Pending[ConnectionsResult]:
-        """Adds a connections command; its outcome is what Client.connections would return."""
-        return self._add(request, ConnectionsResult)
+    def channels(self, *, pattern: str = "") -> Pending[ChannelsResult]:
+        """Adds a channels command; its outcome is what Client.channels would return.
 
-    def update_user_status(self, request: UpdateUserStatusRequest) -> Pending[UpdateUserStatusResult]:
-        """Adds a update_user_status command; its outcome is what Client.update_user_status would return."""
-        return self._add(request, UpdateUserStatusResult)
+        Args:
+            pattern: Filters channels by name, using gobwas/glob syntax.
+        """
+        return self._add(ChannelsRequest(pattern=pattern), ChannelsResult)
 
-    def get_user_status(self, request: GetUserStatusRequest) -> Pending[GetUserStatusResult]:
-        """Adds a get_user_status command; its outcome is what Client.get_user_status would return."""
-        return self._add(request, GetUserStatusResult)
+    def connections(
+        self, *, user: str = "", expression: str = "", label_filter: FilterNode | None = None
+    ) -> Pending[ConnectionsResult]:
+        """Adds a connections command; its outcome is what Client.connections would return.
 
-    def delete_user_status(self, request: DeleteUserStatusRequest) -> Pending[DeleteUserStatusResult]:
-        """Adds a delete_user_status command; its outcome is what Client.delete_user_status would return."""
-        return self._add(request, DeleteUserStatusResult)
+        Args:
+            user: Returns only the connections of this user ID.
+            expression: A CEL expression to filter connections.
+            label_filter: Restricts the listing to clients whose labels match this
+                filter. Centrifugo PRO only.
+        """
+        return self._add(
+            ConnectionsRequest(user=user, expression=expression, label_filter=label_filter), ConnectionsResult
+        )
 
-    def block_user(self, request: BlockUserRequest) -> Pending[BlockUserResult]:
-        """Adds a block_user command; its outcome is what Client.block_user would return."""
-        return self._add(request, BlockUserResult)
+    def update_user_status(self, *, users: list[str] | None = None, state: str = "") -> Pending[UpdateUserStatusResult]:
+        """Adds a update_user_status command; its outcome is what Client.update_user_status would return.
 
-    def unblock_user(self, request: UnblockUserRequest) -> Pending[UnblockUserResult]:
-        """Adds a unblock_user command; its outcome is what Client.unblock_user would return."""
-        return self._add(request, UnblockUserResult)
+        Args:
+            users: The list of user IDs to update the status for. Required.
+            state: An optional custom state to store in the user status. It can
+                be restricted by the user_status.state_regex option.
+        """
+        return self._add(
+            UpdateUserStatusRequest(users=users if users is not None else [], state=state), UpdateUserStatusResult
+        )
 
-    def revoke_token(self, request: RevokeTokenRequest) -> Pending[RevokeTokenResult]:
-        """Adds a revoke_token command; its outcome is what Client.revoke_token would return."""
-        return self._add(request, RevokeTokenResult)
+    def get_user_status(self, *, users: list[str] | None = None) -> Pending[GetUserStatusResult]:
+        """Adds a get_user_status command; its outcome is what Client.get_user_status would return.
 
-    def invalidate_user_tokens(self, request: InvalidateUserTokensRequest) -> Pending[InvalidateUserTokensResult]:
-        """Adds a invalidate_user_tokens command; its outcome is what Client.invalidate_user_tokens would return."""
-        return self._add(request, InvalidateUserTokensResult)
+        Args:
+            users: The list of user IDs to get the status for. Required.
+        """
+        return self._add(GetUserStatusRequest(users=users if users is not None else []), GetUserStatusResult)
 
-    def device_register(self, request: DeviceRegisterRequest) -> Pending[DeviceRegisterResult]:
-        """Adds a device_register command; its outcome is what Client.device_register would return."""
-        return self._add(request, DeviceRegisterResult)
+    def delete_user_status(self, *, users: list[str] | None = None) -> Pending[DeleteUserStatusResult]:
+        """Adds a delete_user_status command; its outcome is what Client.delete_user_status would return.
 
-    def device_update(self, request: DeviceUpdateRequest) -> Pending[DeviceUpdateResult]:
-        """Adds a device_update command; its outcome is what Client.device_update would return."""
-        return self._add(request, DeviceUpdateResult)
+        Args:
+            users: The list of user IDs to delete the status for. Required.
+        """
+        return self._add(DeleteUserStatusRequest(users=users if users is not None else []), DeleteUserStatusResult)
 
-    def device_remove(self, request: DeviceRemoveRequest) -> Pending[DeviceRemoveResult]:
-        """Adds a device_remove command; its outcome is what Client.device_remove would return."""
-        return self._add(request, DeviceRemoveResult)
+    def block_user(self, *, expire_at: int = 0, user: str = "") -> Pending[BlockUserResult]:
+        """Adds a block_user command; its outcome is what Client.block_user would return.
 
-    def device_list(self, request: DeviceListRequest) -> Pending[DeviceListResult]:
-        """Adds a device_list command; its outcome is what Client.device_list would return."""
-        return self._add(request, DeviceListResult)
+        Args:
+            expire_at: The Unix time in seconds when the block expires. Optional,
+                but a reasonably small value is recommended to keep the set of blocked
+                users small.
+            user: The ID of the user to block. Required.
+        """
+        return self._add(BlockUserRequest(expire_at=expire_at, user=user), BlockUserResult)
 
-    def device_topic_list(self, request: DeviceTopicListRequest) -> Pending[DeviceTopicListResult]:
-        """Adds a device_topic_list command; its outcome is what Client.device_topic_list would return."""
-        return self._add(request, DeviceTopicListResult)
+    def unblock_user(self, *, user: str = "") -> Pending[UnblockUserResult]:
+        """Adds a unblock_user command; its outcome is what Client.unblock_user would return.
 
-    def device_topic_update(self, request: DeviceTopicUpdateRequest) -> Pending[DeviceTopicUpdateResult]:
-        """Adds a device_topic_update command; its outcome is what Client.device_topic_update would return."""
-        return self._add(request, DeviceTopicUpdateResult)
+        Args:
+            user: The ID of the user to unblock. Required.
+        """
+        return self._add(UnblockUserRequest(user=user), UnblockUserResult)
 
-    def user_topic_list(self, request: UserTopicListRequest) -> Pending[UserTopicListResult]:
-        """Adds a user_topic_list command; its outcome is what Client.user_topic_list would return."""
-        return self._add(request, UserTopicListResult)
+    def revoke_token(self, *, expire_at: int = 0, uid: str = "") -> Pending[RevokeTokenResult]:
+        """Adds a revoke_token command; its outcome is what Client.revoke_token would return.
 
-    def user_topic_update(self, request: UserTopicUpdateRequest) -> Pending[UserTopicUpdateResult]:
-        """Adds a user_topic_update command; its outcome is what Client.user_topic_update would return."""
-        return self._add(request, UserTopicUpdateResult)
+        Args:
+            expire_at: The Unix time in seconds when the revocation expires.
+                Optional, but a value matching the token expiration is recommended.
+            uid: The unique ID of the token to revoke (jti claim). Required.
+        """
+        return self._add(RevokeTokenRequest(expire_at=expire_at, uid=uid), RevokeTokenResult)
 
-    def send_push_notification(self, request: SendPushNotificationRequest) -> Pending[SendPushNotificationResult]:
-        """Adds a send_push_notification command; its outcome is what Client.send_push_notification would return."""
-        return self._add(request, SendPushNotificationResult)
+    def invalidate_user_tokens(
+        self, *, expire_at: int = 0, user: str = "", issued_before: int = 0, channel: str = ""
+    ) -> Pending[InvalidateUserTokensResult]:
+        """Adds a invalidate_user_tokens command; its outcome is what Client.invalidate_user_tokens would return.
 
-    def update_push_status(self, request: UpdatePushStatusRequest) -> Pending[UpdatePushStatusResult]:
-        """Adds a update_push_status command; its outcome is what Client.update_push_status would return."""
-        return self._add(request, UpdatePushStatusResult)
+        Args:
+            expire_at: The Unix time in seconds when the invalidation expires.
+                Optional, but a value matching the token expiration is recommended.
+            user: The ID of the user whose tokens to invalidate. Required.
+            issued_before: The Unix time in seconds: tokens issued before it are
+                considered revoked. If not set, the current time is used.
+            channel: Limits the invalidation to subscription tokens for this
+                channel.
+        """
+        return self._add(
+            InvalidateUserTokensRequest(expire_at=expire_at, user=user, issued_before=issued_before, channel=channel),
+            InvalidateUserTokensResult,
+        )
 
-    def cancel_push(self, request: CancelPushRequest) -> Pending[CancelPushResult]:
-        """Adds a cancel_push command; its outcome is what Client.cancel_push would return."""
-        return self._add(request, CancelPushResult)
+    def device_register(
+        self,
+        *,
+        id: str = "",
+        provider: str = "",
+        token: str = "",
+        platform: str = "",
+        user: str = "",
+        meta: dict[str, str] | None = None,
+        topics: list[str] | None = None,
+        timezone: str = "",
+        locale: str = "",
+    ) -> Pending[DeviceRegisterResult]:
+        """Adds a device_register command; its outcome is what Client.device_register would return.
 
-    def map_publish(self, request: MapPublishRequest) -> Pending[MapPublishResult]:
-        """Adds a map_publish command; its outcome is what Client.map_publish would return."""
-        return self._add(request, MapPublishResult)
+        Args:
+            id: The device ID. Omit it on first registration: Centrifugo
+                generates one and returns it. Pass the stored value to update the
+                device.
+            provider: The provider of the device token: fcm, hms, apns or
+                webpush. Required.
+            token: The push token of the device. For webpush, it is the browser
+                PushSubscription serialized as a JSON string. Required.
+            platform: The device platform: ios, android or web. Required.
+            user: The user associated with the device.
+            meta: Additional custom metadata of the device.
+            topics: The full list of the device's topic subscriptions, replacing
+                the previous one. The user's topics are attached automatically.
+            timezone: The IANA time zone of the device user, for example
+                Europe/Nicosia.
+            locale: The locale of the device user as an IETF BCP 47 language
+                tag, for example en-US.
+        """
+        return self._add(
+            DeviceRegisterRequest(
+                id=id,
+                provider=provider,
+                token=token,
+                platform=platform,
+                user=user,
+                meta=meta if meta is not None else {},
+                topics=topics if topics is not None else [],
+                timezone=timezone,
+                locale=locale,
+            ),
+            DeviceRegisterResult,
+        )
 
-    def map_remove(self, request: MapRemoveRequest) -> Pending[MapRemoveResult]:
-        """Adds a map_remove command; its outcome is what Client.map_remove would return."""
-        return self._add(request, MapRemoveResult)
+    def device_update(
+        self,
+        *,
+        ids: list[str] | None = None,
+        users: list[str] | None = None,
+        user_update: DeviceUserUpdate | None = None,
+        meta_update: DeviceMetaUpdate | None = None,
+        topics_update: DeviceTopicsUpdate | None = None,
+        timezone_update: DeviceTimezoneUpdate | None = None,
+        locale_update: DeviceLocaleUpdate | None = None,
+    ) -> Pending[DeviceUpdateResult]:
+        """Adds a device_update command; its outcome is what Client.device_update would return.
 
-    def map_read_state(self, request: MapReadStateRequest) -> Pending[MapReadStateResult]:
-        """Adds a map_read_state command; its outcome is what Client.map_read_state would return."""
-        return self._add(request, MapReadStateResult)
+        Args:
+            ids: Selects devices by ID.
+            users: Selects devices by user.
+            user_update: Changes the user ID of the devices. It does not re-sync
+                user-bound topics; use DeviceRegisterRequest to assign a device to
+                another user.
+            meta_update: Updates the device meta.
+            topics_update: Updates the device topics.
+            timezone_update: Updates the device timezone.
+            locale_update: Updates the device locale.
+        """
+        return self._add(
+            DeviceUpdateRequest(
+                ids=ids if ids is not None else [],
+                users=users if users is not None else [],
+                user_update=user_update,
+                meta_update=meta_update,
+                topics_update=topics_update,
+                timezone_update=timezone_update,
+                locale_update=locale_update,
+            ),
+            DeviceUpdateResult,
+        )
 
-    def map_read_stream(self, request: MapReadStreamRequest) -> Pending[MapReadStreamResult]:
-        """Adds a map_read_stream command; its outcome is what Client.map_read_stream would return."""
-        return self._add(request, MapReadStreamResult)
+    def device_remove(
+        self, *, ids: list[str] | None = None, users: list[str] | None = None
+    ) -> Pending[DeviceRemoveResult]:
+        """Adds a device_remove command; its outcome is what Client.device_remove would return.
 
-    def map_stats(self, request: MapStatsRequest) -> Pending[MapStatsResult]:
-        """Adds a map_stats command; its outcome is what Client.map_stats would return."""
-        return self._add(request, MapStatsResult)
+        Args:
+            ids: Selects devices to remove by ID.
+            users: Selects devices to remove by user.
+        """
+        return self._add(
+            DeviceRemoveRequest(ids=ids if ids is not None else [], users=users if users is not None else []),
+            DeviceRemoveResult,
+        )
 
-    def map_clear(self, request: MapClearRequest) -> Pending[MapClearResult]:
-        """Adds a map_clear command; its outcome is what Client.map_clear would return."""
-        return self._add(request, MapClearResult)
+    def device_list(
+        self,
+        *,
+        filter: DeviceFilter | None = None,
+        include_total_count: bool = False,
+        include_meta: bool = False,
+        include_topics: bool = False,
+        include_webpush_keys: bool = False,
+        cursor: str = "",
+        limit: int = 0,
+    ) -> Pending[DeviceListResult]:
+        """Adds a device_list command; its outcome is what Client.device_list would return.
 
-    def shared_poll_publish(self, request: SharedPollPublishRequest) -> Pending[SharedPollPublishResult]:
-        """Adds a shared_poll_publish command; its outcome is what Client.shared_poll_publish would return."""
-        return self._add(request, SharedPollPublishResult)
+        Args:
+            filter: Selects the devices to list. Required.
+            include_total_count: Includes the total count for the filter in the
+                result.
+            include_meta: Includes meta of each device.
+            include_topics: Includes topics of each device.
+            include_webpush_keys: Includes webpush_keys of each device (webpush
+                only).
+            cursor: The pagination cursor: next_cursor of the previous page,
+                empty for the first page.
+            limit: The maximum number of devices to return.
+        """
+        return self._add(
+            DeviceListRequest(
+                filter=filter,
+                include_total_count=include_total_count,
+                include_meta=include_meta,
+                include_topics=include_topics,
+                include_webpush_keys=include_webpush_keys,
+                cursor=cursor,
+                limit=limit,
+            ),
+            DeviceListResult,
+        )
+
+    def device_topic_list(
+        self,
+        *,
+        filter: DeviceTopicFilter | None = None,
+        include_total_count: bool = False,
+        include_device: bool = False,
+        cursor: str = "",
+        limit: int = 0,
+    ) -> Pending[DeviceTopicListResult]:
+        """Adds a device_topic_list command; its outcome is what Client.device_topic_list would return.
+
+        Args:
+            filter: Selects the device topics to list.
+            include_total_count: Includes the total count for the filter in the
+                result.
+            include_device: Includes the Device of each item.
+            cursor: The pagination cursor: next_cursor of the previous page,
+                empty for the first page.
+            limit: The maximum number of items to return.
+        """
+        return self._add(
+            DeviceTopicListRequest(
+                filter=filter,
+                include_total_count=include_total_count,
+                include_device=include_device,
+                cursor=cursor,
+                limit=limit,
+            ),
+            DeviceTopicListResult,
+        )
+
+    def device_topic_update(
+        self, *, device_id: str = "", op: str = "", topics: list[str] | None = None, user: str = ""
+    ) -> Pending[DeviceTopicUpdateResult]:
+        """Adds a device_topic_update command; its outcome is what Client.device_topic_update would return.
+
+        Args:
+            device_id: The ID of the device. Required.
+            op: The operation: add, remove or set. Required.
+            topics: The topics for the operation.
+            user: An optional ownership guard: the update is applied only if the
+                device currently belongs to this user. Otherwise the call fails with a
+                conflict error (or not found if there is no such device).
+        """
+        return self._add(
+            DeviceTopicUpdateRequest(
+                device_id=device_id, op=op, topics=topics if topics is not None else [], user=user
+            ),
+            DeviceTopicUpdateResult,
+        )
+
+    def user_topic_list(
+        self,
+        *,
+        filter: UserTopicFilter | None = None,
+        include_total_count: bool = False,
+        cursor: str = "",
+        limit: int = 0,
+    ) -> Pending[UserTopicListResult]:
+        """Adds a user_topic_list command; its outcome is what Client.user_topic_list would return.
+
+        Args:
+            filter: Selects the user topics to list.
+            include_total_count: Includes the total count for the filter in the
+                result.
+            cursor: The pagination cursor: next_cursor of the previous page,
+                empty for the first page.
+            limit: The maximum number of items to return.
+        """
+        return self._add(
+            UserTopicListRequest(filter=filter, include_total_count=include_total_count, cursor=cursor, limit=limit),
+            UserTopicListResult,
+        )
+
+    def user_topic_update(
+        self, *, user: str = "", op: str = "", topics: list[str] | None = None
+    ) -> Pending[UserTopicUpdateResult]:
+        """Adds a user_topic_update command; its outcome is what Client.user_topic_update would return.
+
+        Args:
+            user: The user ID. Required.
+            op: The operation: add, remove or set. Required.
+            topics: The topics for the operation.
+        """
+        return self._add(
+            UserTopicUpdateRequest(user=user, op=op, topics=topics if topics is not None else []), UserTopicUpdateResult
+        )
+
+    def send_push_notification(
+        self,
+        *,
+        recipient: PushRecipient | None = None,
+        notification: PushNotification | None = None,
+        uid: str = "",
+        send_at: int = 0,
+        optimize_for_reliability: bool = False,
+        limit_strategy: PushLimitStrategy | None = None,
+        analytics_uid: str = "",
+        localizations: dict[str, PushLocalization] | None = None,
+        use_templating: bool = False,
+        use_meta: bool = False,
+    ) -> Pending[SendPushNotificationResult]:
+        """Adds a send_push_notification command; its outcome is what Client.send_push_notification would return.
+
+        Args:
+            recipient: Who receives the notification. Required.
+            notification: The notification to send. Required.
+            uid: A unique identifier of the request, can be used to cancel the
+                push. UUID v4 is recommended; different requests must use different
+                uids.
+            send_at: The Unix time in seconds when to send the notification. If
+                not set, the notification is sent immediately.
+            optimize_for_reliability: Makes processing heavier, but tolerates edge
+                cases, like not losing inflight pushes when the queue is briefly
+                unavailable.
+            limit_strategy: Sets time constraints and rate limits. Only applies
+                with a filter recipient; devices are then processed one by one
+                instead of in batches.
+            analytics_uid: The identifier for push notification analytics. If
+                not set, uid is used.
+            localizations: Optional per language/locale localizations. Setting
+                them enables templating.
+            use_templating: Enables templating of the notification. Only works
+                with a filter recipient.
+            use_meta: Additionally loads device meta while sending, making it
+                available in templating.
+        """
+        return self._add(
+            SendPushNotificationRequest(
+                recipient=recipient,
+                notification=notification,
+                uid=uid,
+                send_at=send_at,
+                optimize_for_reliability=optimize_for_reliability,
+                limit_strategy=limit_strategy,
+                analytics_uid=analytics_uid,
+                localizations=localizations if localizations is not None else {},
+                use_templating=use_templating,
+                use_meta=use_meta,
+            ),
+            SendPushNotificationResult,
+        )
+
+    def update_push_status(
+        self, *, analytics_uid: str = "", status: str = "", device_id: str = "", msg_id: str = ""
+    ) -> Pending[UpdatePushStatusResult]:
+        """Adds a update_push_status command; its outcome is what Client.update_push_status would return.
+
+        Args:
+            analytics_uid: The analytics_uid of the push notification (as in
+                SendPushNotificationRequest). Required.
+            status: The status of the push notification: delivered or
+                interacted. Required.
+            device_id: The Centrifugo device ID. Required.
+            msg_id: The message ID issued by the provider.
+        """
+        return self._add(
+            UpdatePushStatusRequest(analytics_uid=analytics_uid, status=status, device_id=device_id, msg_id=msg_id),
+            UpdatePushStatusResult,
+        )
+
+    def cancel_push(self, *, uid: str = "") -> Pending[CancelPushResult]:
+        """Adds a cancel_push command; its outcome is what Client.cancel_push would return.
+
+        Args:
+            uid: The uid of the push notification to cancel. Required.
+        """
+        return self._add(CancelPushRequest(uid=uid), CancelPushResult)
+
+    def map_publish(
+        self,
+        *,
+        channel: str = "",
+        key: str = "",
+        data: JSON = None,
+        b64data: str = "",
+        stream_data: JSON = None,
+        b64stream_data: str = "",
+        tags: dict[str, str] | None = None,
+        idempotency_key: str = "",
+        delta: bool = False,
+        version: int = 0,
+        version_epoch: str = "",
+        score: int = 0,
+        key_mode: str = "",
+    ) -> Pending[MapPublishResult]:
+        """Adds a map_publish command; its outcome is what Client.map_publish would return.
+
+        Args:
+            channel: The name of the map channel. Required.
+            key: The entry key. Required.
+            data: The entry data. In the HTTP API it is any JSON value; over GRPC
+                it may be binary.
+            b64data: Data as base64, for binary over the HTTP API. Centrifugo
+                decodes it.
+            stream_data: Currently not used by the server API.
+            b64stream_data: Currently not used by the server API.
+            tags: Key-value metadata attached to the publication.
+            idempotency_key: Drops duplicate publications upon retries: a
+                publication with a key already used in the channel is not applied
+                again, and its result has the first one's position, with suppressed
+                set and suppress_reason "idempotency". It acts per channel; keys are
+                kept for 5 minutes by default. Every map broker - memory, Redis and
+                PostgreSQL - keeps keys.
+            delta: Enables delta compression for this publication.
+            version: A per-key version: publications with a version not higher
+                than the key's current one are suppressed.
+            version_epoch: Scopes version. A different epoch resets version
+                comparison.
+            score: Currently not used by the server API.
+            key_mode: Makes the publish conditional: "if_new" writes only if the
+                key does not exist, "if_exists" only if it exists. Empty always
+                writes.
+        """
+        return self._add(
+            MapPublishRequest(
+                channel=channel,
+                key=key,
+                data=data,
+                b64data=b64data,
+                stream_data=stream_data,
+                b64stream_data=b64stream_data,
+                tags=tags if tags is not None else {},
+                idempotency_key=idempotency_key,
+                delta=delta,
+                version=version,
+                version_epoch=version_epoch,
+                score=score,
+                key_mode=key_mode,
+            ),
+            MapPublishResult,
+        )
+
+    def map_remove(self, *, channel: str = "", key: str = "", idempotency_key: str = "") -> Pending[MapRemoveResult]:
+        """Adds a map_remove command; its outcome is what Client.map_remove would return.
+
+        Args:
+            channel: The name of the map channel. Required.
+            key: The key to remove. Required.
+            idempotency_key: Drops duplicate removals upon retries, as it does for
+                MapPublishRequest: a removal with a key already used in the channel is
+                not applied again, and its result is suppressed with suppress_reason
+                "idempotency". Keys are kept for 5 minutes by default.
+        """
+        return self._add(MapRemoveRequest(channel=channel, key=key, idempotency_key=idempotency_key), MapRemoveResult)
+
+    def map_read_state(
+        self,
+        *,
+        channel: str = "",
+        cursor: str = "",
+        limit: int = 0,
+        key: str = "",
+        asc: bool = False,
+        revision_offset: int = 0,
+        revision_epoch: str = "",
+    ) -> Pending[MapReadStateResult]:
+        """Adds a map_read_state command; its outcome is what Client.map_read_state would return.
+
+        Args:
+            channel: The name of the map channel. Required.
+            cursor: The pagination cursor from the previous page. Empty starts
+                from the beginning.
+            limit: The maximum number of entries per page: -1 means no limit, 0
+                returns only the stream position. Page sizes may exceed it with the
+                Redis map broker.
+            key: Reads a single entry by exact key. cursor and limit are ignored
+                when it is set.
+            asc: Sorts ordered state by score ascending instead of descending.
+                Ignored for unordered channels.
+            revision_offset: The offset of the position from a previous state
+                read, used with revision_epoch.
+            revision_epoch: The epoch of the position from a previous state
+                read. If the epoch changed, the call fails with an unrecoverable
+                position error.
+        """
+        return self._add(
+            MapReadStateRequest(
+                channel=channel,
+                cursor=cursor,
+                limit=limit,
+                key=key,
+                asc=asc,
+                revision_offset=revision_offset,
+                revision_epoch=revision_epoch,
+            ),
+            MapReadStateResult,
+        )
+
+    def map_read_stream(
+        self, *, channel: str = "", since_offset: int = 0, since_epoch: str = "", limit: int = 0, reverse: bool = False
+    ) -> Pending[MapReadStreamResult]:
+        """Adds a map_read_stream command; its outcome is what Client.map_read_stream would return.
+
+        Args:
+            channel: The name of the map channel. Required.
+            since_offset: Returns entries after this offset, used with
+                since_epoch.
+            since_epoch: The epoch of the since position. It must match the
+                current stream epoch.
+            limit: The maximum number of entries: -1 means no limit, 0 returns
+                only the stream position.
+            reverse: Returns entries newest first.
+        """
+        return self._add(
+            MapReadStreamRequest(
+                channel=channel, since_offset=since_offset, since_epoch=since_epoch, limit=limit, reverse=reverse
+            ),
+            MapReadStreamResult,
+        )
+
+    def map_stats(self, *, channel: str = "") -> Pending[MapStatsResult]:
+        """Adds a map_stats command; its outcome is what Client.map_stats would return.
+
+        Args:
+            channel: The name of the map channel. Required.
+        """
+        return self._add(MapStatsRequest(channel=channel), MapStatsResult)
+
+    def map_clear(self, *, channel: str = "") -> Pending[MapClearResult]:
+        """Adds a map_clear command; its outcome is what Client.map_clear would return.
+
+        Args:
+            channel: The name of the map channel. Required.
+        """
+        return self._add(MapClearRequest(channel=channel), MapClearResult)
+
+    def shared_poll_publish(
+        self,
+        *,
+        channel: str = "",
+        key: str = "",
+        data: JSON = None,
+        b64data: str = "",
+        version: int = 0,
+        epoch: str = "",
+    ) -> Pending[SharedPollPublishResult]:
+        """Adds a shared_poll_publish command; its outcome is what Client.shared_poll_publish would return.
+
+        Args:
+            channel: The name of the shared poll channel. Required.
+            key: The item key. Required.
+            data: The item data, delivered to clients as is.
+            b64data: Data as base64, for binary payloads. Centrifugo decodes it.
+            version: The item version, must be >= 1. Required. A version not
+                higher than the current one within the same epoch is silently dropped.
+            epoch: The channel-level publisher epoch. A change resets per-key
+                versions and unsubscribes current subscribers with insufficient state.
+        """
+        return self._add(
+            SharedPollPublishRequest(
+                channel=channel, key=key, data=data, b64data=b64data, version=version, epoch=epoch
+            ),
+            SharedPollPublishResult,
+        )

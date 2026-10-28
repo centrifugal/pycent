@@ -2,7 +2,7 @@
 
 >>> import cent
 >>> client = cent.Client("http://localhost:8000/api", api_key="...")
->>> client.publish(cent.PublishRequest(channel="news", data={"text": "hello"}))
+>>> client.publish(channel="news", data={"text": "hello"})
 
 See https://github.com/centrifugal/pycent for the documentation.
 """
@@ -13,7 +13,8 @@ from cent._autobatch import AutoBatch, BatchContext
 from cent._batch import AsyncBatch, Batch, BatchResult, Pending
 from cent._broadcast import BroadcastResult, ChannelResult
 from cent._client import AsyncClient, BroadcastAttemptCallback, Client
-from cent._command import Command, new_command
+from cent._command import Command
+from cent._commands import Commands, command
 from cent._core import RequestInfo
 from cent._errors import (
     ApiError,
@@ -68,6 +69,7 @@ __all__ = [
     "Client",
     "ClosedError",
     "Command",
+    "Commands",
     "ConflictError",
     "DecodeError",
     "FailedCommand",
@@ -87,8 +89,8 @@ __all__ = [
     "UnauthorizedError",
     "UnknownChannelError",
     "UnrecoverablePositionError",
+    "command",
     "exponential_backoff",
-    "new_command",
     "retryable",
 ]
 __all__ += _api.__all__

@@ -21,36 +21,36 @@ pytestmark = pytest.mark.integration
 def test_publish_and_history(client: cent.Client, unique: Callable[[str], str]) -> None:
     ch = unique("")
     raw = cent.RawJSON('{"n":1.0,"big":18446744073709551617,"empty":{},"keys":{"0":"a"}}')
-    res = client.publish(cent.PublishRequest(channel=ch, data=raw, tags={"k": "v"}))
+    res = client.publish(channel=ch, data=raw, tags={"k": "v"})
     assert res.offset == 1
     assert res.epoch
-    hist = client.history(cent.HistoryRequest(channel=ch, limit=10))
+    hist = client.history(channel=ch, limit=10)
     (pub,) = hist.publications
     assert pub.tags == {"k": "v"}
     assert pub.data == {"n": 1.0, "big": 18446744073709551617, "empty": {}, "keys": {"0": "a"}}
     # Sent back unchanged, the payload is the same JSON value.
-    client.publish(cent.PublishRequest(channel=ch, data=pub.data))
-    again = client.history(cent.HistoryRequest(channel=ch, limit=10, reverse=True)).publications[0]
+    client.publish(channel=ch, data=pub.data)
+    again = client.history(channel=ch, limit=10, reverse=True).publications[0]
     assert again.data == pub.data
     assert isinstance(again.data["n"], float)
-    client.history_remove(cent.HistoryRemoveRequest(channel=ch))
-    assert client.history(cent.HistoryRequest(channel=ch, limit=10)).publications == []
+    client.history_remove(channel=ch)
+    assert client.history(channel=ch, limit=10).publications == []
 
 
 def test_idempotency_key(client: cent.Client, unique: Callable[[str], str]) -> None:
     ch = unique("")
-    first = client.publish(cent.PublishRequest(channel=ch, data=1, idempotency_key="k1"))
-    second = client.publish(cent.PublishRequest(channel=ch, data=2, idempotency_key="k1"))
+    first = client.publish(channel=ch, data=1, idempotency_key="k1")
+    second = client.publish(channel=ch, data=2, idempotency_key="k1")
     assert first.offset == second.offset
-    assert len(client.history(cent.HistoryRequest(channel=ch, limit=10)).publications) == 1
+    assert len(client.history(channel=ch, limit=10).publications) == 1
 
 
 def test_broadcast(client: cent.Client, unique: Callable[[str], str]) -> None:
     a, b = unique("a-"), unique("b-")
-    res = client.broadcast(cent.BroadcastRequest(channels=[a, b], data={"x": 1}))
+    res = client.broadcast(channels=[a, b], data={"x": 1})
     assert [c.result.offset for c in res.channels if c.result] == [1, 1]
     with pytest.raises(cent.BroadcastFailedChannelsError) as e:
-        client.broadcast(cent.BroadcastRequest(channels=[a, "unknown:x"], data={"x": 2}))
+        client.broadcast(channels=[a, "unknown:x"], data={"x": 2})
     assert [f.channel for f in e.value.failed] == ["unknown:x"]
     assert isinstance(e.value.failed[0].error, cent.UnknownChannelError)
     assert e.value.result.channels[0].result is not None
@@ -59,19 +59,19 @@ def test_broadcast(client: cent.Client, unique: Callable[[str], str]) -> None:
 
 def test_broadcast_with_retry(client: cent.Client, unique: Callable[[str], str]) -> None:
     a = unique("")
-    res = client.broadcast_with_retry(cent.BroadcastRequest(channels=[a], data=1))
+    res = client.broadcast_with_retry(channels=[a], data=1)
     assert res.idempotency_key.startswith("pycent-")
     # Retried later with the key, nothing is published again.
-    client.broadcast(cent.BroadcastRequest(channels=[a], data=1, idempotency_key=res.idempotency_key))
-    assert len(client.history(cent.HistoryRequest(channel=a, limit=10)).publications) == 1
+    client.broadcast(channels=[a], data=1, idempotency_key=res.idempotency_key)
+    assert len(client.history(channel=a, limit=10).publications) == 1
 
 
 def test_batch(client: cent.Client, unique: Callable[[str], str]) -> None:
     ch = unique("")
     b = client.new_batch()
-    pub = b.publish(cent.PublishRequest(channel=ch, data=1))
-    hist = b.history(cent.HistoryRequest(channel=ch, limit=1))
-    bad = b.publish(cent.PublishRequest(channel="unknown:x", data=1))
+    pub = b.publish(channel=ch, data=1)
+    hist = b.history(channel=ch, limit=1)
+    bad = b.publish(channel="unknown:x", data=1)
     with pytest.raises(cent.BatchFailedCommandsError) as e:
         b.send()
     assert [f.index for f in e.value.failed] == [2]
@@ -83,7 +83,7 @@ def test_batch(client: cent.Client, unique: Callable[[str], str]) -> None:
 
 def test_refused_request_is_not_retryable(client: cent.Client) -> None:
     with pytest.raises(cent.ApiError) as e:
-        client.history(cent.HistoryRequest(channel="unknown:x"))
+        client.history(channel="unknown:x")
     assert not cent.retryable(e.value)
 
 
@@ -91,7 +91,7 @@ def test_pro_method(client: cent.Client) -> None:
     """A PRO method on Centrifugo OSS: a 404 which says so, and in a batch a 104
     which says so too. Against Centrifugo PRO it succeeds."""
     try:
-        client.connections(cent.ConnectionsRequest(user="nobody"))
+        client.connections(user="nobody")
     except cent.HTTPError as e:
         err: cent.HTTPError | None = e
     else:
@@ -101,7 +101,7 @@ def test_pro_method(client: cent.Client) -> None:
     assert err.status_code == 404
     assert "Centrifugo PRO method" in str(err)
     b = client.new_batch()
-    conns = b.connections(cent.ConnectionsRequest(user="nobody"))
+    conns = b.connections(user="nobody")
     with pytest.raises(cent.BatchFailedCommandsError):
         b.send()
     with pytest.raises(cent.NotFoundError, match="Centrifugo PRO method"):
@@ -116,20 +116,18 @@ def test_info(client: cent.Client) -> None:
 
 def test_map(client: cent.Client, unique: Callable[[str], str]) -> None:
     ch = "map:" + unique("")
-    client.map_publish(cent.MapPublishRequest(channel=ch, key="k1", data={"v": 1}))
-    client.map_publish(cent.MapPublishRequest(channel=ch, key="k2", data={"v": 2}))
-    state = client.map_read_state(cent.MapReadStateRequest(channel=ch, limit=10))
+    client.map_publish(channel=ch, key="k1", data={"v": 1})
+    client.map_publish(channel=ch, key="k2", data={"v": 2})
+    state = client.map_read_state(channel=ch, limit=10)
     assert sorted(e.key for e in state.entries) == ["k1", "k2"]
-    client.map_remove(cent.MapRemoveRequest(channel=ch, key="k1"))
-    stats = client.map_stats(cent.MapStatsRequest(channel=ch))
+    client.map_remove(channel=ch, key="k1")
+    stats = client.map_stats(channel=ch)
     assert stats.num_keys == 1
-    client.map_clear(cent.MapClearRequest(channel=ch))
+    client.map_clear(channel=ch)
 
 
 def test_shared_poll_publish(client: cent.Client, unique: Callable[[str], str]) -> None:
-    client.shared_poll_publish(
-        cent.SharedPollPublishRequest(channel="poll:" + unique(""), key="k", version=1, data={"v": 1})
-    )
+    client.shared_poll_publish(channel="poll:" + unique(""), key="k", version=1, data={"v": 1})
 
 
 def test_auto_batch_under_concurrency(unique: Callable[[str], str]) -> None:
@@ -147,7 +145,7 @@ def test_auto_batch_under_concurrency(unique: Callable[[str], str]) -> None:
     def run(w: int) -> None:
         for n in range(20):
             try:
-                c.publish(cent.PublishRequest(channel=f"{ch}-{w}", data={"n": n}))
+                c.publish(channel=f"{ch}-{w}", data={"n": n})
             except Exception as e:
                 errors.append(e)
 
@@ -166,7 +164,7 @@ def test_auto_batch_under_concurrency(unique: Callable[[str], str]) -> None:
 
 def c_history(ch: str) -> list[cent.Publication]:
     with cent.Client(ADDR, api_key=API_KEY) as c:
-        return c.history(cent.HistoryRequest(channel=ch, limit=100)).publications
+        return c.history(channel=ch, limit=100).publications
 
 
 def test_connection_with_tokens(
@@ -191,16 +189,16 @@ def test_connection_with_tokens(
         assert msg is not None
         assert "connect" in msg, msg
         assert ch in json.dumps(msg)
-        pres = client.presence(cent.PresenceRequest(channel=ch))
+        pres = client.presence(channel=ch)
         assert [(i.user, i.conn_info) for i in pres.presence.values()] == [(user, {"name": "Alice"})]
-        assert client.presence_stats(cent.PresenceStatsRequest(channel=ch)).num_users == 1
-        client.publish(cent.PublishRequest(channel=ch, data={"text": "hello"}))
+        assert client.presence_stats(channel=ch).num_users == 1
+        client.publish(channel=ch, data={"text": "hello"})
         assert "hello" in json.dumps(s.next())
         other = ch + "-2"
-        client.subscribe(cent.SubscribeRequest(user=user, channel=other))
+        client.subscribe(user=user, channel=other)
         assert other in json.dumps(s.next())
-        client.refresh(cent.RefreshRequest(user=user, expire_at=int(exp.timestamp())))
-        client.disconnect(cent.DisconnectRequest(user=user))
+        client.refresh(user=user, expire_at=int(exp.timestamp()))
+        client.disconnect(user=user)
         while s.next() is not None:
             pass
 
@@ -215,13 +213,11 @@ def test_connection_with_tokens(
 async def test_async_client(unique: Callable[[str], str]) -> None:
     async with cent.AsyncClient(ADDR, api_key=API_KEY, auto_batch=cent.AutoBatch(max_in_flight=2)) as c:
         ch = unique("")
-        results = await asyncio.gather(
-            *(c.publish(cent.PublishRequest(channel=f"{ch}-{i}", data=i)) for i in range(20))
-        )
+        results = await asyncio.gather(*(c.publish(channel=f"{ch}-{i}", data=i) for i in range(20)))
         assert all(r.offset == 1 for r in results)
         with pytest.raises(cent.BroadcastFailedChannelsError):
-            await c.broadcast(cent.BroadcastRequest(channels=[ch, "unknown:x"], data=1))
+            await c.broadcast(channels=[ch, "unknown:x"], data=1)
         b = c.new_batch(parallel=True)
-        p = b.publish(cent.PublishRequest(channel=ch, data=1))
+        p = b.publish(channel=ch, data=1)
         await b.send()
         assert p.result().offset >= 1

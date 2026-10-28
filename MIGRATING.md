@@ -58,14 +58,13 @@ import cent
 
 client = cent.Client("http://localhost:8000/api", api_key=os.environ["CENTRIFUGO_API_KEY"], request_timeout=5.0)
 
-request = cent.PublishRequest(
-    channel="news",
-    data={"text": "hello"},
-    tags={"kind": "greeting"},
-    idempotency_key="event-1",
-)
 try:
-    result = client.publish(request)
+    result = client.publish(
+        channel="news",
+        data={"text": "hello"},
+        tags={"kind": "greeting"},
+        idempotency_key="event-1",
+    )
 except cent.UnknownChannelError as e:
     raise SystemExit("no such namespace") from e
 print(f"published at offset {result.offset}")
@@ -110,11 +109,10 @@ import cent
 
 client = cent.Client("http://localhost:8000/api", api_key=os.environ["CENTRIFUGO_API_KEY"], request_timeout=5.0)
 
-request = cent.BroadcastRequest(
-    channels=["user:1", "user:2", "user:3"], data={"text": "hello"}, idempotency_key="notice-1"
-)
 try:
-    result = client.broadcast(request)
+    result = client.broadcast(
+        channels=["user:1", "user:2", "user:3"], data={"text": "hello"}, idempotency_key="notice-1"
+    )
 except cent.BroadcastFailedChannelsError as e:
     # Centrifugo replied, and some channels failed: e.result has every channel.
     # This program reports each failed channel, as the cent 5 one did.
@@ -202,8 +200,8 @@ import cent
 client = cent.Client("http://localhost:8000/api", api_key=os.environ["CENTRIFUGO_API_KEY"], request_timeout=5.0)
 
 batch = client.new_batch()
-published = batch.publish(cent.PublishRequest(channel="news", data={"text": "hello"}))
-stats = batch.presence_stats(cent.PresenceStatsRequest(channel="news"))
+published = batch.publish(channel="news", data={"text": "hello"})
+stats = batch.presence_stats(channel="news")
 batch.send()  # raises unless every command succeeded
 print(f"published at offset {published.result().offset}; {stats.result().num_clients} clients in news")
 client.close()
@@ -252,10 +250,10 @@ async def main() -> None:
     async with cent.AsyncClient(
         "http://localhost:8000/api", api_key=os.environ["CENTRIFUGO_API_KEY"], request_timeout=5.0
     ) as client:
-        result = await client.publish(cent.PublishRequest(channel="news", data={"text": "hello"}))
+        result = await client.publish(channel="news", data={"text": "hello"})
         print(f"published at offset {result.offset}")
         try:
-            await client.broadcast(cent.BroadcastRequest(channels=["user:1", "user:2"], data={"text": "hello"}))
+            await client.broadcast(channels=["user:1", "user:2"], data={"text": "hello"})
             print("broadcast: 0 channels failed")
         except cent.BroadcastFailedChannelsError as e:
             print(f"broadcast: {len(e.failed)} channels failed")
@@ -293,11 +291,16 @@ client = cent.AsyncClient(api_url, api_key=api_key, request_timeout=5.0, http_cl
 
 ## Calls
 
-Methods take the same request objects:
+Methods take the request's fields as keyword arguments, instead of a request
+object:
 
 ```python
-client.publish(cent.PublishRequest(channel="news", data={"text": "hello"}))
+client.publish(channel="news", data={"text": "hello"})
 ```
+
+A batch has the same methods, and so do commands for async consumers:
+`batch.publish(...)`, `cent.command.publish(...)`. A misspelled field raises
+`TypeError` naming it.
 
 - `info()`, and the other methods whose request has no fields, take no
   argument.
@@ -306,9 +309,9 @@ client.publish(cent.PublishRequest(channel="news", data={"text": "hello"}))
   configured.
 - A payload which is not JSON - NaN, bytes - raises `InvalidRequestError`
   before sending. JSON text you already have goes in `cent.RawJSON(text)`.
-- `request.api_method` stays. `request.api_payload`, for async consumers, is
-  now `cent.new_command(request)`: its `method` and `payload`, or `to_json()`.
-  It validates the request first.
+- `request.api_payload`, for async consumers, is now
+  `cent.command.publish(...)` and the like: its `method` and `payload`, or
+  `to_json()`. It validates the request first.
 
 ## Errors
 

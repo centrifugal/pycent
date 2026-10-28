@@ -33,7 +33,7 @@ import cent
 
 client = cent.Client("http://localhost:8000/api", api_key=os.environ["CENTRIFUGO_API_KEY"])
 
-res = client.publish(cent.PublishRequest(channel="news", data={"text": "hello"}))
+res = client.publish(channel="news", data={"text": "hello"})
 print(f"published at offset {res.offset}")
 ```
 
@@ -41,13 +41,14 @@ And from asyncio code, the same methods awaited:
 
 ```python
 async with cent.AsyncClient("http://localhost:8000/api", api_key=key) as client:
-    await client.publish(cent.PublishRequest(channel="news", data={"text": "hello"}))
+    await client.publish(channel="news", data={"text": "hello"})
 ```
 
-Every API method takes its request - a dataclass generated from Centrifugo's
-`api.proto`, with its documentation - and returns its result, raising unless
-Centrifugo did everything asked. Create the client once and share it: it is
-safe for concurrent use.
+Every API method takes its request's fields as keyword arguments - generated
+from Centrifugo's `api.proto`, each documented - and returns its result, a
+dataclass, raising unless Centrifugo did everything asked. A batch and
+commands have the same methods: `batch.publish(...)`, `cent.command.publish(...)`.
+Create the client once and share it: it is safe for concurrent use.
 
 ## Payloads
 
@@ -58,7 +59,7 @@ is the same JSON value. A `str` is a JSON string. JSON you already have, or
 encode with rules of your own, goes in `cent.RawJSON`, sent as it is:
 
 ```python
-client.publish(cent.PublishRequest(channel="news", data=cent.RawJSON(row.payload_json)))
+client.publish(channel="news", data=cent.RawJSON(row.payload_json))
 ```
 
 A payload which is not JSON - NaN, bytes, a set - raises `InvalidRequestError`
@@ -113,7 +114,7 @@ internal error, the publication may have happened. So retry a publication only
 with an `idempotency_key`, and back off between a bounded number of attempts:
 
 ```python
-request = cent.PublishRequest(
+request = dict(
     channel="orders:42",
     data=data,
     # The same key on every attempt: a publication which happened in an
@@ -123,7 +124,7 @@ request = cent.PublishRequest(
 backoff = cent.exponential_backoff(0.2, 5.0)
 for attempt in itertools.count(1):
     try:
-        client.publish(request)
+        client.publish(**request)
         break
     except cent.CentError as e:
         if not cent.retryable(e) or attempt == 3:
@@ -151,13 +152,11 @@ Retry a broadcast with `broadcast_with_retry` rather than a loop: see below.
 sends many commands at once. Both raise unless every part succeeded:
 
 ```python
-client.broadcast(
-    cent.BroadcastRequest(channels=["user:1", "user:2"], data={"text": "hello"}, idempotency_key=message_id)
-)
+client.broadcast(channels=["user:1", "user:2"], data={"text": "hello"}, idempotency_key=message_id)
 
 batch = client.new_batch()
-pub = batch.publish(cent.PublishRequest(channel="news", data=data))
-stats = batch.presence_stats(cent.PresenceStatsRequest(channel="news"))
+pub = batch.publish(channel="news", data=data)
+stats = batch.presence_stats(channel="news")
 batch.send()
 pub.result()  # each command has its own result, or raises its own error
 stats.result()
@@ -503,13 +502,14 @@ follows their changes.
 
 ## Commands for async consumers
 
-`cent.new_command(request)` checks a request as a client would and encodes it,
+`cent.command.publish(...)` - and a method like it for every API method -
+checks a request as a client would and encodes it,
 for Centrifugo's [async consumers](https://centrifugal.dev/docs/server/consumers):
 its `method` and `payload` for an outbox table, or `to_json()` for a Kafka
 message.
 
 ```python
-cmd = cent.new_command(cent.PublishRequest(channel="news", data={"text": "hi"}))
+cmd = cent.command.publish(channel="news", data={"text": "hi"})
 cur.execute("INSERT INTO centrifugo_outbox (method, payload, partition) VALUES (%s, %s, 0)", (cmd.method, cmd.payload))
 ```
 

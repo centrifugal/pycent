@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import ast
 import inspect
+import re
 import sys
 import textwrap
 from pathlib import Path
@@ -71,7 +72,23 @@ def doc(text: str | None) -> str:
             out.extend(["", "```python", *block, "```", ""])
             code.clear()
 
+    in_args = False
     for line in lines:
+        # An "Args:" section: a list of the arguments.
+        if line.strip() == "Args:":
+            flush()
+            out.extend(["", "Arguments:", ""])
+            in_args = True
+            continue
+        if in_args:
+            if line.startswith("    ") and not line.startswith("        ") and ":" in line:
+                name, _, text = line.strip().partition(":")
+                out.append(f"- `{name}` - {text.strip()}")
+                continue
+            if line.startswith("        "):
+                out[-1] += " " + line.strip()
+                continue
+            in_args = False
         if line.startswith((">>> ", "... ")):
             code.append(line[4:])
             continue
@@ -104,7 +121,9 @@ def signature(node: ast.FunctionDef | ast.AsyncFunctionDef, name: str, drop_self
         )
     ret = f" -> {ast.unparse(node.returns)}" if node.returns else ""
     prefix = "async " if isinstance(node, ast.AsyncFunctionDef) else ""
-    params = ast.unparse(args)
+    # ast.unparse writes "name: type=default": PEP 8 wants spaces around "="
+    # when there is an annotation.
+    params = re.sub(r"(\w+: [^,=()\[\]]+(?:\[[^\]]*\])?(?: \| [^,=]+)?)=", r"\1 = ", ast.unparse(args))
     one_line = f"{prefix}{name}({params}){ret}"
     if len(one_line) <= 100:
         return one_line

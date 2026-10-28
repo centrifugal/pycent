@@ -112,10 +112,9 @@ class _BatchBase(_BatchAPI):
         method = self._methods[index]
         return Pending(self, index, lambda r: from_wire(r.get(method) or {}, f"replies[{index}].{method}"))
 
-    def broadcast(self, request: BroadcastRequest) -> Pending[BroadcastResult]:
-        """Adds a broadcast command. Its outcome is what Client.broadcast would
-        return: every channel's outcome, and BroadcastFailedChannelsError when
-        any channel failed."""
+    def _add_broadcast(self, request: BroadcastRequest) -> Pending[BroadcastResult]:
+        """Adds a broadcast command: its outcome is every channel's, and
+        BroadcastFailedChannelsError when any channel failed."""
         channels = list(request.channels)
         key = request.idempotency_key
         cache: list[BroadcastResult | Exception] = []
@@ -190,8 +189,8 @@ class Batch(_BatchBase):
     returning a Pending - then call send:
 
     >>> batch = client.new_batch()
-    >>> pub = batch.publish(cent.PublishRequest(channel="news", data={"text": "hi"}))
-    >>> stats = batch.presence_stats(cent.PresenceStatsRequest(channel="news"))
+    >>> pub = batch.publish(channel="news", data={"text": "hi"})
+    >>> stats = batch.presence_stats(channel="news")
     >>> batch.send()  # raises unless every command succeeded
     >>> pub.result()
 

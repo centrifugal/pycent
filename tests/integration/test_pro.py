@@ -53,89 +53,66 @@ def webpush_token() -> str:
 
 def test_user_status(pro: cent.Client, unique: Callable[[str], str]) -> None:
     user = unique("")
-    pro.update_user_status(cent.UpdateUserStatusRequest(users=[user], state="away"))
-    (st,) = pro.get_user_status(cent.GetUserStatusRequest(users=[user])).statuses
+    pro.update_user_status(users=[user], state="away")
+    (st,) = pro.get_user_status(users=[user]).statuses
     assert (st.user, st.state) == (user, "away")
     assert st.active > 0
-    pro.delete_user_status(cent.DeleteUserStatusRequest(users=[user]))
-    (st,) = pro.get_user_status(cent.GetUserStatusRequest(users=[user])).statuses
+    pro.delete_user_status(users=[user])
+    (st,) = pro.get_user_status(users=[user]).statuses
     assert st.active == 0
 
 
 def test_user_and_token_control(pro: cent.Client, unique: Callable[[str], str]) -> None:
     user = unique("")
     expire = int(time.time()) + 60
-    pro.block_user(cent.BlockUserRequest(user=user, expire_at=expire))
-    pro.unblock_user(cent.UnblockUserRequest(user=user))
-    pro.revoke_token(cent.RevokeTokenRequest(uid=user + "-jti", expire_at=expire))
-    pro.invalidate_user_tokens(
-        cent.InvalidateUserTokensRequest(user=user, issued_before=int(time.time()), expire_at=expire)
-    )
+    pro.block_user(user=user, expire_at=expire)
+    pro.unblock_user(user=user)
+    pro.revoke_token(uid=user + "-jti", expire_at=expire)
+    pro.invalidate_user_tokens(user=user, issued_before=int(time.time()), expire_at=expire)
 
 
 def test_devices_and_push(pro: cent.Client, unique: Callable[[str], str]) -> None:
     user = unique("")
     reg = pro.device_register(
-        cent.DeviceRegisterRequest(
-            provider="webpush",
-            platform="web",
-            token=webpush_token(),
-            user=user,
-            meta={"app": "pycent"},
-            topics=["news"],
-        )
+        provider="webpush", platform="web", token=webpush_token(), user=user, meta={"app": "pycent"}, topics=["news"]
     )
     assert reg.id
     by_user = cent.DeviceFilter(users=[user])
-    lst = pro.device_list(
-        cent.DeviceListRequest(filter=by_user, include_meta=True, include_topics=True, include_total_count=True)
-    )
+    lst = pro.device_list(filter=by_user, include_meta=True, include_topics=True, include_total_count=True)
     assert lst.total_count == 1
     assert lst.items[0].id == reg.id
     assert lst.items[0].meta == {"app": "pycent"}
     assert "news" in lst.items[0].topics
-    pro.device_topic_update(cent.DeviceTopicUpdateRequest(device_id=reg.id, op="add", topics=["sport"]))
-    topics = pro.device_topic_list(
-        cent.DeviceTopicListRequest(filter=cent.DeviceTopicFilter(device_ids=[reg.id]), include_total_count=True)
-    )
+    pro.device_topic_update(device_id=reg.id, op="add", topics=["sport"])
+    topics = pro.device_topic_list(filter=cent.DeviceTopicFilter(device_ids=[reg.id]), include_total_count=True)
     assert topics.total_count == 2
-    pro.device_update(
-        cent.DeviceUpdateRequest(ids=[reg.id], meta_update=cent.DeviceMetaUpdate(meta={"app": "updated"}))
-    )
-    assert pro.device_list(cent.DeviceListRequest(filter=by_user, include_meta=True)).items[0].meta == {
-        "app": "updated"
-    }
-    pro.user_topic_update(cent.UserTopicUpdateRequest(user=user, op="add", topics=["alerts"]))
-    ut = pro.user_topic_list(cent.UserTopicListRequest(filter=cent.UserTopicFilter(users=[user])))
+    pro.device_update(ids=[reg.id], meta_update=cent.DeviceMetaUpdate(meta={"app": "updated"}))
+    assert pro.device_list(filter=by_user, include_meta=True).items[0].meta == {"app": "updated"}
+    pro.user_topic_update(user=user, op="add", topics=["alerts"])
+    ut = pro.user_topic_list(filter=cent.UserTopicFilter(users=[user]))
     assert [i.topic for i in ut.items] == ["alerts"]
     push = pro.send_push_notification(
-        cent.SendPushNotificationRequest(
-            recipient=cent.PushRecipient(filter=by_user),
-            notification=cent.PushNotification(webpush=cent.WebPushPushNotification(payload={"title": "hi"})),
-            send_at=int(time.time()) + 3600,
-        )
+        recipient=cent.PushRecipient(filter=by_user),
+        notification=cent.PushNotification(webpush=cent.WebPushPushNotification(payload={"title": "hi"})),
+        send_at=int(time.time()) + 3600,
     )
     assert push.uid
-    pro.cancel_push(cent.CancelPushRequest(uid=push.uid))
+    pro.cancel_push(uid=push.uid)
     # Push status needs push analytics in ClickHouse; without it, the method
     # is not available.
     with contextlib.suppress(cent.NotAvailableError):
-        pro.update_push_status(
-            cent.UpdatePushStatusRequest(analytics_uid=push.uid, status="delivered", device_id=reg.id)
-        )
-    pro.device_remove(cent.DeviceRemoveRequest(ids=[reg.id]))
-    assert pro.device_list(cent.DeviceListRequest(filter=by_user)).items == []
+        pro.update_push_status(analytics_uid=push.uid, status="delivered", device_id=reg.id)
+    pro.device_remove(ids=[reg.id])
+    assert pro.device_list(filter=by_user).items == []
 
 
 def test_pro_batch(pro: cent.Client, unique: Callable[[str], str]) -> None:
     user = unique("")
     b = pro.new_batch()
-    b.update_user_status(cent.UpdateUserStatusRequest(users=[user], state="busy"))
-    status = b.get_user_status(cent.GetUserStatusRequest(users=[user]))
-    reg = b.device_register(
-        cent.DeviceRegisterRequest(provider="webpush", platform="web", token=webpush_token(), user=user)
-    )
-    conns = b.connections(cent.ConnectionsRequest(user=user))
+    b.update_user_status(users=[user], state="busy")
+    status = b.get_user_status(users=[user])
+    reg = b.device_register(provider="webpush", platform="web", token=webpush_token(), user=user)
+    conns = b.connections(user=user)
     b.send()
     assert status.result().statuses[0].state == "busy"
     r = reg.result()
@@ -148,7 +125,7 @@ def test_pro_batch(pro: cent.Client, unique: Callable[[str], str]) -> None:
 
     def run() -> None:
         try:
-            res = auto.device_list(cent.DeviceListRequest(filter=cent.DeviceFilter(users=[user])))
+            res = auto.device_list(filter=cent.DeviceFilter(users=[user]))
             assert [i.id for i in res.items] == [r.id]
         except Exception as e:
             errors.append(e)
@@ -160,7 +137,7 @@ def test_pro_batch(pro: cent.Client, unique: Callable[[str], str]) -> None:
         t.join(30)
     auto.close()
     assert errors == []
-    pro.device_remove(cent.DeviceRemoveRequest(ids=[r.id]))
+    pro.device_remove(ids=[r.id])
 
 
 def test_api_tokens(pro: cent.Client, unique: Callable[[str], str], serve: Callable[[int, Any], None]) -> None:
@@ -188,7 +165,7 @@ def test_api_tokens(pro: cent.Client, unique: Callable[[str], str], serve: Calla
 
     def publish(token_func: Callable[[], str]) -> None:
         with cent.Client(ADDR, bearer_token_func=token_func) as c:
-            c.publish(cent.PublishRequest(channel=unique(""), data={}))
+            c.publish(channel=unique(""), data={})
 
     tokens = token.APITokens(key=api_key, claims=token.APIClaims(audience="centrifugo-api", scope=["centrifugo:api"]))
     publish(tokens.token)
@@ -227,13 +204,13 @@ def test_command_consumed(pro: cent.Client, unique: Callable[[str], str]) -> Non
     Centrifugo's async consumer: apart, as method and payload, and whole."""
     addr = os.environ.get("PYCENT_TEST_REDIS", "localhost:46379")
     ch = unique("")
-    apart = cent.new_command(cent.PublishRequest(channel=ch, data={"n": 1}))
+    apart = cent.command.publish(channel=ch, data={"n": 1})
     redis_xadd(addr, "pycent_commands", "method", apart.method, "payload", apart.payload)
-    whole = cent.new_command(cent.PublishRequest(channel=ch, data={"n": 2}))
+    whole = cent.command.publish(channel=ch, data={"n": 2})
     redis_xadd(addr, "pycent_commands", "payload", whole.to_json())
     deadline = time.monotonic() + 15
     while True:
-        pubs = pro.history(cent.HistoryRequest(channel=ch, limit=10)).publications
+        pubs = pro.history(channel=ch, limit=10).publications
         if len(pubs) == 2:
             assert [p.data for p in pubs] == [{"n": 1}, {"n": 2}]
             return

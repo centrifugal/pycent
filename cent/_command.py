@@ -37,15 +37,10 @@ class Command:
 
 
 def new_command(request: Request) -> Command:
-    """The command making the API call request. The request is checked as a
-    Client checks it before sending - an invalid one raises
-    InvalidRequestError here, rather than in Centrifugo, whose consumers drop
-    a command they cannot run - and encoded.
-
-    >>> cmd = cent.new_command(cent.PublishRequest(channel="news", data={"text": "hi"}))
-    >>> cur.execute("INSERT INTO centrifugo_outbox (method, payload, partition) VALUES (%s, %s, 0)",
-    ...             (cmd.method, cmd.payload))
-    """
+    """The command making the API call request: what the methods of
+    cent.command call. The request is checked as a Client checks it before
+    sending - an invalid one raises InvalidRequestError here, rather than in
+    Centrifugo, whose consumers drop a command they cannot run - and encoded."""
     method = method_of(request)
     validate(request)
     return Command(method=method, payload=_w.encode(request._to_wire(), method).decode("utf-8"))

@@ -12,17 +12,17 @@ The client, batches, results and helpers.
 
 ```python
 Client(
-    api_endpoint: str | None=None,
+    api_endpoint: str | None = None,
     *,
     api_endpoint_func: Callable[[], str] | None=None,
-    api_key: str='',
+    api_key: str = '',
     bearer_token_func: Callable[[], str] | None=None,
-    http_client: httpx2.Client | None=None,
-    request_timeout: float | None=None,
-    headers: Mapping[str, str] | None=None,
+    http_client: httpx2.Client | None = None,
+    request_timeout: float | None = None,
+    headers: Mapping[str, str] | None = None,
     on_request: Callable[[RequestInfo], None] | None=None,
-    auto_batch: AutoBatch | None=None,
-    batch_context: BatchContext | None=None,
+    auto_batch: AutoBatch | None = None,
+    batch_context: BatchContext | None = None,
 ) -> None
 ```
 
@@ -31,7 +31,7 @@ threads, and meant to be created once and shared:
 
 ```python
 client = cent.Client("http://localhost:8000/api", api_key=os.environ["CENTRIFUGO_API_KEY"])
-client.publish(cent.PublishRequest(channel="news", data={"text": "hello"}))
+client.publish(channel="news", data={"text": "hello"})
 ```
 
 Every API method takes its request and returns its result, raising unless
@@ -69,42 +69,70 @@ Options:
   BatchContext. Without it, a batch runs in a context of its own, carrying
   no caller's values.
 
-#### `block_user(request: BlockUserRequest, *, timeout: float | None=None) -> BlockUserResult`
+#### `block_user(*, expire_at: int = 0, user: str = '', timeout: float | None = None) -> BlockUserResult`
 
 Blocks a user: the user is disconnected and can not
 connect again until unblocked or the block expires. Centrifugo PRO only.
 
-#### `broadcast(request: BroadcastRequest, *, timeout: float | None=None) -> BroadcastResult`
+Arguments:
 
-Publishes the same data into many channels in one request.
+- `expire_at` - The Unix time in seconds when the block expires. Optional, but a reasonably small value is recommended to keep the set of blocked users small.
+- `user` - The ID of the user to block. Required.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `broadcast(
+    *,
+    channels: list[str] | None = None,
+    data: JSON = None,
+    b64data: str = '',
+    skip_history: bool = False,
+    tags: dict[str, str] | None = None,
+    idempotency_key: str = '',
+    delta: bool = False,
+    version: int = 0,
+    version_epoch: str = '',
+    timeout: float | None = None,
+) -> BroadcastResult`
+
+Publishes the same data into many channels.
 
 Channels succeed or fail on their own. It returns when every channel
 got the publication. When Centrifugo carried the broadcast out and one
 or more channels failed - up to all of them - it raises
 BroadcastFailedChannelsError, whose ``result`` holds every channel's
-outcome. Any other error means it failed as a whole: no channel got a
-reply. After a timeout or a network error Centrifugo may still have
-published it.
+outcome. Any other exception means it failed as a whole: no channel got
+a reply. After a timeout or a network error Centrifugo may still have
+published it. Retry it with broadcast_with_retry, which sends again only
+the channels which may still succeed, with one idempotency_key.
 
-To go on despite some failed channels:
+Arguments:
 
-```python
-try:
-    client.broadcast(request)
-except cent.BroadcastFailedChannelsError as e:
-    log.warning("broadcast failed in %s", e.result.failed())
-```
-
-Retry it with broadcast_with_retry, which sends again only the
-channels which may still succeed, with one idempotency_key.
+- `channels` - The list of channels to publish into. Required.
+- `data` - The payload to publish into each channel. Required unless b64data is set. In the HTTP API it is any JSON value; over GRPC it may be binary.
+- `b64data` - A base64-encoded binary payload, an alternative to `data` to send binary over the HTTP API. Centrifugo decodes it before publishing.
+- `skip_history` - Skips adding the publications to the channels' history.
+- `tags` - A map of arbitrary string keys and values attached to each publication and delivered to clients.
+- `idempotency_key` - Drops duplicate publications upon retries. It acts per channel: a broadcast retried with the same key is not published again into the channels which already have it. Results are kept for 5 minutes by default. The memory, Redis and PostgreSQL brokers keep keys; the NATS broker ignores them.
+- `delta` - Tells Centrifugo to construct a delta update, if possible, when broadcasting the publications to subscribers.
+- `version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
+- `version_epoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
+- `timeout` - Seconds bounding the call: request_timeout when None.
 
 #### `broadcast_with_retry(
-    request: BroadcastRequest,
     *,
-    max_attempts: int=DEFAULT_MAX_ATTEMPTS,
-    attempt_timeout: float | None=None,
-    on_attempt_error: BroadcastAttemptCallback | None=None,
-    timeout: float | None=None,
+    channels: list[str] | None = None,
+    data: JSON = None,
+    b64data: str = '',
+    skip_history: bool = False,
+    tags: dict[str, str] | None = None,
+    idempotency_key: str = '',
+    delta: bool = False,
+    version: int = 0,
+    version_epoch: str = '',
+    max_attempts: int = 2,
+    attempt_timeout: float | None = None,
+    on_attempt_error: BroadcastAttemptCallback | None = None,
+    timeout: float | None = None,
 ) -> BroadcastResult`
 
 Broadcasts as broadcast does, and retries the channels which failed for
@@ -114,29 +142,39 @@ one retry).
 - Only the channels which may still succeed are sent again; when only
   channels which failed for good are left, it stops.
 - Every attempt carries the same idempotency_key - made for the call
-  when the request has none - so that a channel which got the
-  publication in an earlier attempt does not get it again. The memory,
-  Redis and PostgreSQL brokers keep keys; the NATS broker ignores them,
-  and a retry may publish again.
+  when none is given - so that a channel which got the publication in
+  an earlier attempt does not get it again. The memory, Redis and
+  PostgreSQL brokers keep keys; the NATS broker ignores them, and a
+  retry may publish again.
 - The result holds every channel's last outcome, and the key: retrying
   later with it publishes only into the channels which did not get it.
 
 timeout, when set, bounds the whole call, waits included;
-attempt_timeout - request_timeout by default - bounds each attempt. on_attempt_error decides the wait
-between attempts, and may stop them: see BroadcastAttemptCallback. It raises as
-broadcast does.
+attempt_timeout - request_timeout by default - bounds each attempt.
+on_attempt_error decides the wait between attempts, and may stop them:
+see BroadcastAttemptCallback. It raises as broadcast does.
 
-#### `cancel_push(request: CancelPushRequest, *, timeout: float | None=None) -> CancelPushResult`
+#### `cancel_push(*, uid: str = '', timeout: float | None = None) -> CancelPushResult`
 
 Cancels a delayed push notification (sent with
 send_at). Centrifugo PRO only.
 
-#### `channels(request: ChannelsRequest, *, timeout: float | None=None) -> ChannelsResult`
+Arguments:
+
+- `uid` - The uid of the push notification to cancel. Required.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `channels(*, pattern: str = '', timeout: float | None = None) -> ChannelsResult`
 
 Returns active channels (with one or more subscribers).
 It can be heavy on large deployments: there is no pagination.
 
-#### `close(timeout: float | None=None) -> None`
+Arguments:
+
+- `pattern` - Filters channels by name, using gobwas/glob syntax.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `close(timeout: float | None = None) -> None`
 
 Stops the client: calls made from now on raise ClosedError, and close
 waits for the calls in progress to end. A broadcast being retried stops
@@ -149,121 +187,396 @@ Call it when the application shuts down, so that what was accepted is
 sent before the process exits. A Client is also a context manager
 closing it.
 
-#### `connections(request: ConnectionsRequest, *, timeout: float | None=None) -> ConnectionsResult`
+#### `connections(
+    *,
+    user: str = '',
+    expression: str = '',
+    label_filter: FilterNode | None = None,
+    timeout: float | None = None,
+) -> ConnectionsResult`
 
 Returns information about active connections, without
 the need to enable presence. At least one of user, expression or
 label_filter must be set. Centrifugo PRO only.
 
+Arguments:
+
+- `user` - Returns only the connections of this user ID.
+- `expression` - A CEL expression to filter connections.
+- `label_filter` - Restricts the listing to clients whose labels match this filter. Centrifugo PRO only.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `delete_user_status(
-    request: DeleteUserStatusRequest,
     *,
-    timeout: float | None=None,
+    users: list[str] | None = None,
+    timeout: float | None = None,
 ) -> DeleteUserStatusResult`
 
 Deletes the status of users. Centrifugo PRO only.
 
-#### `device_list(request: DeviceListRequest, *, timeout: float | None=None) -> DeviceListResult`
+Arguments:
+
+- `users` - The list of user IDs to delete the status for. Required.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `device_list(
+    *,
+    filter: DeviceFilter | None = None,
+    include_total_count: bool = False,
+    include_meta: bool = False,
+    include_topics: bool = False,
+    include_webpush_keys: bool = False,
+    cursor: str = '',
+    limit: int = 0,
+    timeout: float | None = None,
+) -> DeviceListResult`
 
 Returns a paginated list of registered devices.
 Centrifugo PRO only.
 
+Arguments:
+
+- `filter` - Selects the devices to list. Required.
+- `include_total_count` - Includes the total count for the filter in the result.
+- `include_meta` - Includes meta of each device.
+- `include_topics` - Includes topics of each device.
+- `include_webpush_keys` - Includes webpush_keys of each device (webpush only).
+- `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
+- `limit` - The maximum number of devices to return.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `device_register(
-    request: DeviceRegisterRequest,
     *,
-    timeout: float | None=None,
+    id: str = '',
+    provider: str = '',
+    token: str = '',
+    platform: str = '',
+    user: str = '',
+    meta: dict[str, str] | None = None,
+    topics: list[str] | None = None,
+    timezone: str = '',
+    locale: str = '',
+    timeout: float | None = None,
 ) -> DeviceRegisterResult`
 
 Registers a device for push notifications, or
 updates a registered one. Centrifugo PRO only.
 
-#### `device_remove(request: DeviceRemoveRequest, *, timeout: float | None=None) -> DeviceRemoveResult`
+Arguments:
+
+- `id` - The device ID. Omit it on first registration: Centrifugo generates one and returns it. Pass the stored value to update the device.
+- `provider` - The provider of the device token: fcm, hms, apns or webpush. Required.
+- `token` - The push token of the device. For webpush, it is the browser PushSubscription serialized as a JSON string. Required.
+- `platform` - The device platform: ios, android or web. Required.
+- `user` - The user associated with the device.
+- `meta` - Additional custom metadata of the device.
+- `topics` - The full list of the device's topic subscriptions, replacing the previous one. The user's topics are attached automatically.
+- `timezone` - The IANA time zone of the device user, for example Europe/Nicosia.
+- `locale` - The locale of the device user as an IETF BCP 47 language tag, for example en-US.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `device_remove(
+    *,
+    ids: list[str] | None = None,
+    users: list[str] | None = None,
+    timeout: float | None = None,
+) -> DeviceRemoveResult`
 
 Removes devices, selected by ids and/or users.
 Centrifugo PRO only.
 
+Arguments:
+
+- `ids` - Selects devices to remove by ID.
+- `users` - Selects devices to remove by user.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `device_topic_list(
-    request: DeviceTopicListRequest,
     *,
-    timeout: float | None=None,
+    filter: DeviceTopicFilter | None = None,
+    include_total_count: bool = False,
+    include_device: bool = False,
+    cursor: str = '',
+    limit: int = 0,
+    timeout: float | None = None,
 ) -> DeviceTopicListResult`
 
 Returns a paginated list of device topic
 subscriptions. Centrifugo PRO only.
 
+Arguments:
+
+- `filter` - Selects the device topics to list.
+- `include_total_count` - Includes the total count for the filter in the result.
+- `include_device` - Includes the Device of each item.
+- `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
+- `limit` - The maximum number of items to return.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `device_topic_update(
-    request: DeviceTopicUpdateRequest,
     *,
-    timeout: float | None=None,
+    device_id: str = '',
+    op: str = '',
+    topics: list[str] | None = None,
+    user: str = '',
+    timeout: float | None = None,
 ) -> DeviceTopicUpdateResult`
 
 Changes the topics of a device. The device topic
 list is what decides who gets a push sent to a topic.
 Centrifugo PRO only.
 
-#### `device_update(request: DeviceUpdateRequest, *, timeout: float | None=None) -> DeviceUpdateResult`
+Arguments:
+
+- `device_id` - The ID of the device. Required.
+- `op` - The operation: add, remove or set. Required.
+- `topics` - The topics for the operation.
+- `user` - An optional ownership guard: the update is applied only if the device currently belongs to this user. Otherwise the call fails with a conflict error (or not found if there is no such device).
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `device_update(
+    *,
+    ids: list[str] | None = None,
+    users: list[str] | None = None,
+    user_update: DeviceUserUpdate | None = None,
+    meta_update: DeviceMetaUpdate | None = None,
+    topics_update: DeviceTopicsUpdate | None = None,
+    timezone_update: DeviceTimezoneUpdate | None = None,
+    locale_update: DeviceLocaleUpdate | None = None,
+    timeout: float | None = None,
+) -> DeviceUpdateResult`
 
 Updates registered devices, selected by ids and/or
 users. Centrifugo PRO only.
 
-#### `disconnect(request: DisconnectRequest, *, timeout: float | None=None) -> DisconnectResult`
+Arguments:
+
+- `ids` - Selects devices by ID.
+- `users` - Selects devices by user.
+- `user_update` - Changes the user ID of the devices. It does not re-sync user-bound topics; use DeviceRegisterRequest to assign a device to another user.
+- `meta_update` - Updates the device meta.
+- `topics_update` - Updates the device topics.
+- `timezone_update` - Updates the device timezone.
+- `locale_update` - Updates the device locale.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `disconnect(
+    *,
+    user: str = '',
+    disconnect: Disconnect | None = None,
+    client: str = '',
+    whitelist: list[str] | None = None,
+    session: str = '',
+    label_filter: FilterNode | None = None,
+    all_users: bool = False,
+    timeout: float | None = None,
+) -> DisconnectResult`
 
 Disconnects a user's connections.
 
-#### `get_user_status(request: GetUserStatusRequest, *, timeout: float | None=None) -> GetUserStatusResult`
+Arguments:
+
+- `user` - The ID of the user to disconnect. Required, unless all_users is used in Centrifugo PRO.
+- `disconnect` - A custom disconnect code and reason. If not set, clients are disconnected with a force no-reconnect disconnect.
+- `client` - Limits the call to the connection with this client ID. user is still required.
+- `whitelist` - A list of client IDs to keep connected.
+- `session` - Limits the call to the connection with this session ID. user is still required.
+- `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
+- `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `get_user_status(
+    *,
+    users: list[str] | None = None,
+    timeout: float | None = None,
+) -> GetUserStatusResult`
 
 Returns the status of users. Centrifugo PRO only.
 
-#### `history(request: HistoryRequest, *, timeout: float | None=None) -> HistoryResult`
+Arguments:
+
+- `users` - The list of user IDs to get the status for. Required.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `history(
+    *,
+    channel: str = '',
+    limit: int = 0,
+    since: StreamPosition | None = None,
+    reverse: bool = False,
+    timeout: float | None = None,
+) -> HistoryResult`
 
 Returns publications from the history of a channel.
 History must be enabled for the channel.
 
-#### `history_remove(request: HistoryRemoveRequest, *, timeout: float | None=None) -> HistoryRemoveResult`
+Arguments:
+
+- `channel` - The name of the channel. Required.
+- `limit` - The maximum number of publications to return; -1 returns all the channel keeps. If not set, only the current stream position is returned, without publications.
+- `since` - Returns publications after this stream position.
+- `reverse` - Iterates in reverse order, from latest to earliest.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `history_remove(*, channel: str = '', timeout: float | None = None) -> HistoryRemoveResult`
 
 Removes publications from the history of a channel.
 The current top stream position is kept, so clients do not get
 disconnected because of insufficient state.
 
-#### `info(request: InfoRequest | None=None, *, timeout: float | None=None) -> InfoResult`
+Arguments:
+
+- `channel` - The name of the channel. Required.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `info(*, timeout: float | None = None) -> InfoResult`
 
 Returns information about the running Centrifugo nodes.
 
+Arguments:
+
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `invalidate_user_tokens(
-    request: InvalidateUserTokensRequest,
     *,
-    timeout: float | None=None,
+    expire_at: int = 0,
+    user: str = '',
+    issued_before: int = 0,
+    channel: str = '',
+    timeout: float | None = None,
 ) -> InvalidateUserTokensResult`
 
 Revokes all tokens of a user issued before a
 certain time (based on the iat claim of a JWT). Centrifugo PRO only.
 
-#### `map_clear(request: MapClearRequest, *, timeout: float | None=None) -> MapClearResult`
+Arguments:
+
+- `expire_at` - The Unix time in seconds when the invalidation expires. Optional, but a value matching the token expiration is recommended.
+- `user` - The ID of the user whose tokens to invalidate. Required.
+- `issued_before` - The Unix time in seconds: tokens issued before it are considered revoked. If not set, the current time is used.
+- `channel` - Limits the invalidation to subscription tokens for this channel.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `map_clear(*, channel: str = '', timeout: float | None = None) -> MapClearResult`
 
 Removes all state and stream data of a map channel.
 
-#### `map_publish(request: MapPublishRequest, *, timeout: float | None=None) -> MapPublishResult`
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `map_publish(
+    *,
+    channel: str = '',
+    key: str = '',
+    data: JSON = None,
+    b64data: str = '',
+    stream_data: JSON = None,
+    b64stream_data: str = '',
+    tags: dict[str, str] | None = None,
+    idempotency_key: str = '',
+    delta: bool = False,
+    version: int = 0,
+    version_epoch: str = '',
+    score: int = 0,
+    key_mode: str = '',
+    timeout: float | None = None,
+) -> MapPublishResult`
 
 Publishes or updates a key in a map channel.
 
-#### `map_read_state(request: MapReadStateRequest, *, timeout: float | None=None) -> MapReadStateResult`
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `key` - The entry key. Required.
+- `data` - The entry data. In the HTTP API it is any JSON value; over GRPC it may be binary.
+- `b64data` - Data as base64, for binary over the HTTP API. Centrifugo decodes it.
+- `stream_data` - Currently not used by the server API.
+- `b64stream_data` - Currently not used by the server API.
+- `tags` - Key-value metadata attached to the publication.
+- `idempotency_key` - Drops duplicate publications upon retries: a publication with a key already used in the channel is not applied again, and its result has the first one's position, with suppressed set and suppress_reason "idempotency". It acts per channel; keys are kept for 5 minutes by default. Every map broker - memory, Redis and PostgreSQL - keeps keys.
+- `delta` - Enables delta compression for this publication.
+- `version` - A per-key version: publications with a version not higher than the key's current one are suppressed.
+- `version_epoch` - Scopes version. A different epoch resets version comparison.
+- `score` - Currently not used by the server API.
+- `key_mode` - Makes the publish conditional: "if_new" writes only if the key does not exist, "if_exists" only if it exists. Empty always writes.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `map_read_state(
+    *,
+    channel: str = '',
+    cursor: str = '',
+    limit: int = 0,
+    key: str = '',
+    asc: bool = False,
+    revision_offset: int = 0,
+    revision_epoch: str = '',
+    timeout: float | None = None,
+) -> MapReadStateResult`
 
 Reads the current state of a map channel, with
 optional pagination.
 
-#### `map_read_stream(request: MapReadStreamRequest, *, timeout: float | None=None) -> MapReadStreamResult`
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `cursor` - The pagination cursor from the previous page. Empty starts from the beginning.
+- `limit` - The maximum number of entries per page: -1 means no limit, 0 returns only the stream position. Page sizes may exceed it with the Redis map broker.
+- `key` - Reads a single entry by exact key. cursor and limit are ignored when it is set.
+- `asc` - Sorts ordered state by score ascending instead of descending. Ignored for unordered channels.
+- `revision_offset` - The offset of the position from a previous state read, used with revision_epoch.
+- `revision_epoch` - The epoch of the position from a previous state read. If the epoch changed, the call fails with an unrecoverable position error.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `map_read_stream(
+    *,
+    channel: str = '',
+    since_offset: int = 0,
+    since_epoch: str = '',
+    limit: int = 0,
+    reverse: bool = False,
+    timeout: float | None = None,
+) -> MapReadStreamResult`
 
 Reads the change stream of a map channel.
 
-#### `map_remove(request: MapRemoveRequest, *, timeout: float | None=None) -> MapRemoveResult`
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `since_offset` - Returns entries after this offset, used with since_epoch.
+- `since_epoch` - The epoch of the since position. It must match the current stream epoch.
+- `limit` - The maximum number of entries: -1 means no limit, 0 returns only the stream position.
+- `reverse` - Returns entries newest first.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `map_remove(
+    *,
+    channel: str = '',
+    key: str = '',
+    idempotency_key: str = '',
+    timeout: float | None = None,
+) -> MapRemoveResult`
 
 Removes a key from a map channel.
 
-#### `map_stats(request: MapStatsRequest, *, timeout: float | None=None) -> MapStatsResult`
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `key` - The key to remove. Required.
+- `idempotency_key` - Drops duplicate removals upon retries, as it does for MapPublishRequest: a removal with a key already used in the channel is not applied again, and its result is suppressed with suppress_reason "idempotency". Keys are kept for 5 minutes by default.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `map_stats(*, channel: str = '', timeout: float | None = None) -> MapStatsResult`
 
 Returns statistics about a map channel.
 
-#### `new_batch(*, parallel: bool=False) -> Batch`
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `new_batch(*, parallel: bool = False) -> Batch`
 
 An empty Batch sent by this client. Without parallel the commands run
 one by one, in the order added - but Centrifugo PRO sends a sequential
@@ -272,114 +585,320 @@ effect in order, publications into different channels may not, unless
 the namespace sets publication_grouping_disabled. With parallel,
 Centrifugo runs them concurrently, with no order.
 
-#### `presence(request: PresenceRequest, *, timeout: float | None=None) -> PresenceResult`
+#### `presence(*, channel: str = '', timeout: float | None = None) -> PresenceResult`
 
 Returns the online presence of a channel: all clients
 currently subscribed to it. Presence must be enabled for the channel.
 
-#### `presence_stats(request: PresenceStatsRequest, *, timeout: float | None=None) -> PresenceStatsResult`
+Arguments:
+
+- `channel` - The name of the channel. Required.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `presence_stats(*, channel: str = '', timeout: float | None = None) -> PresenceStatsResult`
 
 Returns short presence information of a channel: the
 number of clients and of unique users. Presence must be enabled for the
 channel.
 
-#### `publish(request: PublishRequest, *, timeout: float | None=None) -> PublishResult`
+Arguments:
+
+- `channel` - The name of the channel. Required.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `publish(
+    *,
+    channel: str = '',
+    data: JSON = None,
+    b64data: str = '',
+    skip_history: bool = False,
+    tags: dict[str, str] | None = None,
+    idempotency_key: str = '',
+    delta: bool = False,
+    version: int = 0,
+    version_epoch: str = '',
+    timeout: float | None = None,
+) -> PublishResult`
 
 Publishes data into a channel.
 
-#### `refresh(request: RefreshRequest, *, timeout: float | None=None) -> RefreshResult`
+Arguments:
+
+- `channel` - The name of the channel to publish into. Required.
+- `data` - The payload to publish. Required unless b64data is set. In the HTTP API it is any JSON value; over GRPC it may be binary.
+- `b64data` - A base64-encoded binary payload, an alternative to `data` to send binary over the HTTP API. Centrifugo decodes it before publishing.
+- `skip_history` - Skips adding this publication to the channel history.
+- `tags` - A map of arbitrary string keys and values attached to the publication and delivered to clients.
+- `idempotency_key` - Drops duplicate publications upon retries: a publication with a key already used in the channel is not published again, and the first one's result is returned. It acts per channel; results are kept for 5 minutes by default. The memory, Redis and PostgreSQL brokers keep keys; the NATS broker ignores them.
+- `delta` - Tells Centrifugo to construct a delta update, if possible, when broadcasting the publication to subscribers.
+- `version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
+- `version_epoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `refresh(
+    *,
+    user: str = '',
+    client: str = '',
+    expired: bool = False,
+    expire_at: int = 0,
+    info: JSON = None,
+    session: str = '',
+    label_filter: FilterNode | None = None,
+    all_users: bool = False,
+    timeout: float | None = None,
+) -> RefreshResult`
 
 Refreshes a user's connections, mostly useful with
 unidirectional transports. Without expire_at the connections become
 non-expiring.
 
-#### `revoke_token(request: RevokeTokenRequest, *, timeout: float | None=None) -> RevokeTokenResult`
+Arguments:
+
+- `user` - The ID of the user to refresh. Required, unless all_users is used in Centrifugo PRO.
+- `client` - Limits the call to the connection with this client ID. user is still required.
+- `expired` - Marks the connections as expired and closes them with an expired disconnect reason.
+- `expire_at` - The Unix time in seconds when the connections expire.
+- `info` - Attaches or replaces the connection info.
+- `session` - Limits the call to the connection with this session ID. user is still required.
+- `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
+- `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `revoke_token(
+    *,
+    expire_at: int = 0,
+    uid: str = '',
+    timeout: float | None = None,
+) -> RevokeTokenResult`
 
 Revokes a token by its unique ID (jti claim of a JWT).
 Clients using the token are disconnected shortly, and can not connect
 with it again. Centrifugo PRO only.
 
+Arguments:
+
+- `expire_at` - The Unix time in seconds when the revocation expires. Optional, but a value matching the token expiration is recommended.
+- `uid` - The unique ID of the token to revoke (jti claim). Required.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `send_push_notification(
-    request: SendPushNotificationRequest,
     *,
-    timeout: float | None=None,
+    recipient: PushRecipient | None = None,
+    notification: PushNotification | None = None,
+    uid: str = '',
+    send_at: int = 0,
+    optimize_for_reliability: bool = False,
+    limit_strategy: PushLimitStrategy | None = None,
+    analytics_uid: str = '',
+    localizations: dict[str, PushLocalization] | None = None,
+    use_templating: bool = False,
+    use_meta: bool = False,
+    timeout: float | None = None,
 ) -> SendPushNotificationResult`
 
 Sends a push notification. The request is
 queued and sent to the provider by Centrifugo workers.
 Centrifugo PRO only.
 
+Arguments:
+
+- `recipient` - Who receives the notification. Required.
+- `notification` - The notification to send. Required.
+- `uid` - A unique identifier of the request, can be used to cancel the push. UUID v4 is recommended; different requests must use different uids.
+- `send_at` - The Unix time in seconds when to send the notification. If not set, the notification is sent immediately.
+- `optimize_for_reliability` - Makes processing heavier, but tolerates edge cases, like not losing inflight pushes when the queue is briefly unavailable.
+- `limit_strategy` - Sets time constraints and rate limits. Only applies with a filter recipient; devices are then processed one by one instead of in batches.
+- `analytics_uid` - The identifier for push notification analytics. If not set, uid is used.
+- `localizations` - Optional per language/locale localizations. Setting them enables templating.
+- `use_templating` - Enables templating of the notification. Only works with a filter recipient.
+- `use_meta` - Additionally loads device meta while sending, making it available in templating.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `shared_poll_publish(
-    request: SharedPollPublishRequest,
     *,
-    timeout: float | None=None,
+    channel: str = '',
+    key: str = '',
+    data: JSON = None,
+    b64data: str = '',
+    version: int = 0,
+    epoch: str = '',
+    timeout: float | None = None,
 ) -> SharedPollPublishResult`
 
 Pushes data for a key directly to clients of a
 shared poll channel, without waiting for the next poll cycle. Requires
 versioned mode and publish_enabled on the namespace.
 
-#### `subscribe(request: SubscribeRequest, *, timeout: float | None=None) -> SubscribeResult`
+Arguments:
+
+- `channel` - The name of the shared poll channel. Required.
+- `key` - The item key. Required.
+- `data` - The item data, delivered to clients as is.
+- `b64data` - Data as base64, for binary payloads. Centrifugo decodes it.
+- `version` - The item version, must be >= 1. Required. A version not higher than the current one within the same epoch is silently dropped.
+- `epoch` - The channel-level publisher epoch. A change resets per-key versions and unsubscribes current subscribers with insufficient state.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `subscribe(
+    *,
+    channel: str = '',
+    user: str = '',
+    expire_at: int = 0,
+    info: JSON = None,
+    b64info: str = '',
+    client: str = '',
+    data: JSON = None,
+    b64data: str = '',
+    recover_since: StreamPosition | None = None,
+    override: SubscribeOptionOverride | None = None,
+    session: str = '',
+    label_filter: FilterNode | None = None,
+    all_users: bool = False,
+    timeout: float | None = None,
+) -> SubscribeResult`
 
 Subscribes active sessions of a user to a channel
 (server-side subscription). It does not create a streaming subscription
 for the caller.
 
-#### `unblock_user(request: UnblockUserRequest, *, timeout: float | None=None) -> UnblockUserResult`
+Arguments:
+
+- `channel` - The name of the channel to subscribe to. Required.
+- `user` - The ID of the user to subscribe. Required, unless all_users is used in Centrifugo PRO.
+- `expire_at` - The Unix time in seconds when the subscription expires.
+- `info` - Custom channel info attached to the subscription, used in presence and join/leave messages.
+- `b64info` - Info as base64, for binary. Centrifugo decodes it.
+- `client` - Limits the call to the connection with this client ID. user is still required.
+- `data` - Custom subscription data sent to the client in the Subscribe push.
+- `b64data` - Data as base64, for binary. Centrifugo decodes it.
+- `recover_since` - The stream position to recover publications from.
+- `override` - Dynamically overrides some channel options set in the Centrifugo configuration.
+- `session` - Limits the call to the connection with this session ID. user is still required.
+- `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
+- `all_users` - When user is empty, targets every connection on every node instead of the anonymous-only bucket. No effect when user is non-empty. Without label_filter it acts on every connection. Centrifugo PRO only.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `unblock_user(*, user: str = '', timeout: float | None = None) -> UnblockUserResult`
 
 Unblocks a user. Centrifugo PRO only.
 
-#### `unsubscribe(request: UnsubscribeRequest, *, timeout: float | None=None) -> UnsubscribeResult`
+Arguments:
+
+- `user` - The ID of the user to unblock. Required.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `unsubscribe(
+    *,
+    channel: str = '',
+    user: str = '',
+    client: str = '',
+    session: str = '',
+    label_filter: FilterNode | None = None,
+    all_users: bool = False,
+    timeout: float | None = None,
+) -> UnsubscribeResult`
 
 Unsubscribes a user from a channel.
 
+Arguments:
+
+- `channel` - The name of the channel to unsubscribe from. Required.
+- `user` - The ID of the user to unsubscribe. Required, unless all_users is used in Centrifugo PRO.
+- `client` - Limits the call to the connection with this client ID. user is still required.
+- `session` - Limits the call to the connection with this session ID. user is still required.
+- `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
+- `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `update_push_status(
-    request: UpdatePushStatusRequest,
     *,
-    timeout: float | None=None,
+    analytics_uid: str = '',
+    status: str = '',
+    device_id: str = '',
+    msg_id: str = '',
+    timeout: float | None = None,
 ) -> UpdatePushStatusResult`
 
 Saves the delivery or interaction status of a
 push notification to analytics. Experimental. Centrifugo PRO only.
 
+Arguments:
+
+- `analytics_uid` - The analytics_uid of the push notification (as in SendPushNotificationRequest). Required.
+- `status` - The status of the push notification: delivered or interacted. Required.
+- `device_id` - The Centrifugo device ID. Required.
+- `msg_id` - The message ID issued by the provider.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `update_user_status(
-    request: UpdateUserStatusRequest,
     *,
-    timeout: float | None=None,
+    users: list[str] | None = None,
+    state: str = '',
+    timeout: float | None = None,
 ) -> UpdateUserStatusResult`
 
 Marks users as active and online now, and sets
 their state when one is given. Centrifugo PRO only.
 
-#### `user_topic_list(request: UserTopicListRequest, *, timeout: float | None=None) -> UserTopicListResult`
+Arguments:
+
+- `users` - The list of user IDs to update the status for. Required.
+- `state` - An optional custom state to store in the user status. It can be restricted by the user_status.state_regex option.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `user_topic_list(
+    *,
+    filter: UserTopicFilter | None = None,
+    include_total_count: bool = False,
+    cursor: str = '',
+    limit: int = 0,
+    timeout: float | None = None,
+) -> UserTopicListResult`
 
 Returns a paginated list of user topic
 subscriptions. Centrifugo PRO only.
 
+Arguments:
+
+- `filter` - Selects the user topics to list.
+- `include_total_count` - Includes the total count for the filter in the result.
+- `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
+- `limit` - The maximum number of items to return.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `user_topic_update(
-    request: UserTopicUpdateRequest,
     *,
-    timeout: float | None=None,
+    user: str = '',
+    op: str = '',
+    topics: list[str] | None = None,
+    timeout: float | None = None,
 ) -> UserTopicUpdateResult`
 
 Changes the topics of a user. The change is also
 applied to the user's registered devices. Centrifugo PRO only.
 
+Arguments:
+
+- `user` - The user ID. Required.
+- `op` - The operation: add, remove or set. Required.
+- `topics` - The topics for the operation.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 ### `AsyncClient`
 
 ```python
 AsyncClient(
-    api_endpoint: str | None=None,
+    api_endpoint: str | None = None,
     *,
     api_endpoint_func: Callable[[], str | Awaitable[str]] | None=None,
-    api_key: str='',
+    api_key: str = '',
     bearer_token_func: Callable[[], str | Awaitable[str]] | None=None,
-    http_client: httpx2.AsyncClient | None=None,
-    request_timeout: float | None=None,
-    headers: Mapping[str, str] | None=None,
+    http_client: httpx2.AsyncClient | None = None,
+    request_timeout: float | None = None,
+    headers: Mapping[str, str] | None = None,
     on_request: Callable[[RequestInfo], None] | None=None,
-    auto_batch: AutoBatch | None=None,
-    batch_context: BatchContext | None=None,
+    auto_batch: AutoBatch | None = None,
+    batch_context: BatchContext | None = None,
 ) -> None
 ```
 
@@ -388,290 +907,817 @@ the same methods - awaited - options, errors and behaviour.
 
 ```python
 async with cent.AsyncClient("http://localhost:8000/api", api_key=key) as client:
-    await client.publish(cent.PublishRequest(channel="news", data={"text": "hello"}))
+    await client.publish(channel="news", data={"text": "hello"})
 ```
 
 api_endpoint_func and bearer_token_func may be coroutine functions.
 http_client is an httpx2.AsyncClient. A call's timeout bounds it; an
 asyncio.timeout around it, or cancelling its task, ends it sooner.
 
-#### `async aclose(timeout: float | None=None) -> None`
+#### `async aclose(timeout: float | None = None) -> None`
 
 Stops the client and waits for the calls in progress, as Client.close
 does.
 
-#### `async block_user(request: BlockUserRequest, *, timeout: float | None=None) -> BlockUserResult`
+#### `async block_user(
+    *,
+    expire_at: int = 0,
+    user: str = '',
+    timeout: float | None = None,
+) -> BlockUserResult`
 
 Blocks a user: the user is disconnected and can not
 connect again until unblocked or the block expires. Centrifugo PRO only.
 
-#### `async broadcast(request: BroadcastRequest, *, timeout: float | None=None) -> BroadcastResult`
+Arguments:
 
-Publishes the same data into many channels in one request, as
-Client.broadcast does.
+- `expire_at` - The Unix time in seconds when the block expires. Optional, but a reasonably small value is recommended to keep the set of blocked users small.
+- `user` - The ID of the user to block. Required.
+- `timeout` - Seconds bounding the call: request_timeout when None.
 
-#### `async broadcast_with_retry(
-    request: BroadcastRequest,
+#### `async broadcast(
     *,
-    max_attempts: int=DEFAULT_MAX_ATTEMPTS,
-    attempt_timeout: float | None=None,
-    on_attempt_error: BroadcastAttemptCallback | None=None,
-    timeout: float | None=None,
+    channels: list[str] | None = None,
+    data: JSON = None,
+    b64data: str = '',
+    skip_history: bool = False,
+    tags: dict[str, str] | None = None,
+    idempotency_key: str = '',
+    delta: bool = False,
+    version: int = 0,
+    version_epoch: str = '',
+    timeout: float | None = None,
 ) -> BroadcastResult`
 
-Broadcasts and retries the channels which may still succeed, as
-Client.broadcast_with_retry does.
+Publishes the same data into many channels.
 
-#### `async cancel_push(request: CancelPushRequest, *, timeout: float | None=None) -> CancelPushResult`
+Channels succeed or fail on their own. It returns when every channel
+got the publication. When Centrifugo carried the broadcast out and one
+or more channels failed - up to all of them - it raises
+BroadcastFailedChannelsError, whose ``result`` holds every channel's
+outcome. Any other exception means it failed as a whole: no channel got
+a reply. After a timeout or a network error Centrifugo may still have
+published it. Retry it with broadcast_with_retry, which sends again only
+the channels which may still succeed, with one idempotency_key.
+
+Arguments:
+
+- `channels` - The list of channels to publish into. Required.
+- `data` - The payload to publish into each channel. Required unless b64data is set. In the HTTP API it is any JSON value; over GRPC it may be binary.
+- `b64data` - A base64-encoded binary payload, an alternative to `data` to send binary over the HTTP API. Centrifugo decodes it before publishing.
+- `skip_history` - Skips adding the publications to the channels' history.
+- `tags` - A map of arbitrary string keys and values attached to each publication and delivered to clients.
+- `idempotency_key` - Drops duplicate publications upon retries. It acts per channel: a broadcast retried with the same key is not published again into the channels which already have it. Results are kept for 5 minutes by default. The memory, Redis and PostgreSQL brokers keep keys; the NATS broker ignores them.
+- `delta` - Tells Centrifugo to construct a delta update, if possible, when broadcasting the publications to subscribers.
+- `version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
+- `version_epoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `async broadcast_with_retry(
+    *,
+    channels: list[str] | None = None,
+    data: JSON = None,
+    b64data: str = '',
+    skip_history: bool = False,
+    tags: dict[str, str] | None = None,
+    idempotency_key: str = '',
+    delta: bool = False,
+    version: int = 0,
+    version_epoch: str = '',
+    max_attempts: int = 2,
+    attempt_timeout: float | None = None,
+    on_attempt_error: BroadcastAttemptCallback | None = None,
+    timeout: float | None = None,
+) -> BroadcastResult`
+
+Broadcasts as broadcast does, and retries the channels which failed for
+a temporary reason - see retryable - up to max_attempts (2 by default:
+one retry).
+
+- Only the channels which may still succeed are sent again; when only
+  channels which failed for good are left, it stops.
+- Every attempt carries the same idempotency_key - made for the call
+  when none is given - so that a channel which got the publication in
+  an earlier attempt does not get it again. The memory, Redis and
+  PostgreSQL brokers keep keys; the NATS broker ignores them, and a
+  retry may publish again.
+- The result holds every channel's last outcome, and the key: retrying
+  later with it publishes only into the channels which did not get it.
+
+timeout, when set, bounds the whole call, waits included;
+attempt_timeout - request_timeout by default - bounds each attempt.
+on_attempt_error decides the wait between attempts, and may stop them:
+see BroadcastAttemptCallback. It raises as broadcast does.
+
+#### `async cancel_push(*, uid: str = '', timeout: float | None = None) -> CancelPushResult`
 
 Cancels a delayed push notification (sent with
 send_at). Centrifugo PRO only.
 
-#### `async channels(request: ChannelsRequest, *, timeout: float | None=None) -> ChannelsResult`
+Arguments:
+
+- `uid` - The uid of the push notification to cancel. Required.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `async channels(*, pattern: str = '', timeout: float | None = None) -> ChannelsResult`
 
 Returns active channels (with one or more subscribers).
 It can be heavy on large deployments: there is no pagination.
 
-#### `async connections(request: ConnectionsRequest, *, timeout: float | None=None) -> ConnectionsResult`
+Arguments:
+
+- `pattern` - Filters channels by name, using gobwas/glob syntax.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `async connections(
+    *,
+    user: str = '',
+    expression: str = '',
+    label_filter: FilterNode | None = None,
+    timeout: float | None = None,
+) -> ConnectionsResult`
 
 Returns information about active connections, without
 the need to enable presence. At least one of user, expression or
 label_filter must be set. Centrifugo PRO only.
 
+Arguments:
+
+- `user` - Returns only the connections of this user ID.
+- `expression` - A CEL expression to filter connections.
+- `label_filter` - Restricts the listing to clients whose labels match this filter. Centrifugo PRO only.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `async delete_user_status(
-    request: DeleteUserStatusRequest,
     *,
-    timeout: float | None=None,
+    users: list[str] | None = None,
+    timeout: float | None = None,
 ) -> DeleteUserStatusResult`
 
 Deletes the status of users. Centrifugo PRO only.
 
-#### `async device_list(request: DeviceListRequest, *, timeout: float | None=None) -> DeviceListResult`
+Arguments:
+
+- `users` - The list of user IDs to delete the status for. Required.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `async device_list(
+    *,
+    filter: DeviceFilter | None = None,
+    include_total_count: bool = False,
+    include_meta: bool = False,
+    include_topics: bool = False,
+    include_webpush_keys: bool = False,
+    cursor: str = '',
+    limit: int = 0,
+    timeout: float | None = None,
+) -> DeviceListResult`
 
 Returns a paginated list of registered devices.
 Centrifugo PRO only.
 
+Arguments:
+
+- `filter` - Selects the devices to list. Required.
+- `include_total_count` - Includes the total count for the filter in the result.
+- `include_meta` - Includes meta of each device.
+- `include_topics` - Includes topics of each device.
+- `include_webpush_keys` - Includes webpush_keys of each device (webpush only).
+- `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
+- `limit` - The maximum number of devices to return.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `async device_register(
-    request: DeviceRegisterRequest,
     *,
-    timeout: float | None=None,
+    id: str = '',
+    provider: str = '',
+    token: str = '',
+    platform: str = '',
+    user: str = '',
+    meta: dict[str, str] | None = None,
+    topics: list[str] | None = None,
+    timezone: str = '',
+    locale: str = '',
+    timeout: float | None = None,
 ) -> DeviceRegisterResult`
 
 Registers a device for push notifications, or
 updates a registered one. Centrifugo PRO only.
 
+Arguments:
+
+- `id` - The device ID. Omit it on first registration: Centrifugo generates one and returns it. Pass the stored value to update the device.
+- `provider` - The provider of the device token: fcm, hms, apns or webpush. Required.
+- `token` - The push token of the device. For webpush, it is the browser PushSubscription serialized as a JSON string. Required.
+- `platform` - The device platform: ios, android or web. Required.
+- `user` - The user associated with the device.
+- `meta` - Additional custom metadata of the device.
+- `topics` - The full list of the device's topic subscriptions, replacing the previous one. The user's topics are attached automatically.
+- `timezone` - The IANA time zone of the device user, for example Europe/Nicosia.
+- `locale` - The locale of the device user as an IETF BCP 47 language tag, for example en-US.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `async device_remove(
-    request: DeviceRemoveRequest,
     *,
-    timeout: float | None=None,
+    ids: list[str] | None = None,
+    users: list[str] | None = None,
+    timeout: float | None = None,
 ) -> DeviceRemoveResult`
 
 Removes devices, selected by ids and/or users.
 Centrifugo PRO only.
 
+Arguments:
+
+- `ids` - Selects devices to remove by ID.
+- `users` - Selects devices to remove by user.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `async device_topic_list(
-    request: DeviceTopicListRequest,
     *,
-    timeout: float | None=None,
+    filter: DeviceTopicFilter | None = None,
+    include_total_count: bool = False,
+    include_device: bool = False,
+    cursor: str = '',
+    limit: int = 0,
+    timeout: float | None = None,
 ) -> DeviceTopicListResult`
 
 Returns a paginated list of device topic
 subscriptions. Centrifugo PRO only.
 
+Arguments:
+
+- `filter` - Selects the device topics to list.
+- `include_total_count` - Includes the total count for the filter in the result.
+- `include_device` - Includes the Device of each item.
+- `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
+- `limit` - The maximum number of items to return.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `async device_topic_update(
-    request: DeviceTopicUpdateRequest,
     *,
-    timeout: float | None=None,
+    device_id: str = '',
+    op: str = '',
+    topics: list[str] | None = None,
+    user: str = '',
+    timeout: float | None = None,
 ) -> DeviceTopicUpdateResult`
 
 Changes the topics of a device. The device topic
 list is what decides who gets a push sent to a topic.
 Centrifugo PRO only.
 
+Arguments:
+
+- `device_id` - The ID of the device. Required.
+- `op` - The operation: add, remove or set. Required.
+- `topics` - The topics for the operation.
+- `user` - An optional ownership guard: the update is applied only if the device currently belongs to this user. Otherwise the call fails with a conflict error (or not found if there is no such device).
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `async device_update(
-    request: DeviceUpdateRequest,
     *,
-    timeout: float | None=None,
+    ids: list[str] | None = None,
+    users: list[str] | None = None,
+    user_update: DeviceUserUpdate | None = None,
+    meta_update: DeviceMetaUpdate | None = None,
+    topics_update: DeviceTopicsUpdate | None = None,
+    timezone_update: DeviceTimezoneUpdate | None = None,
+    locale_update: DeviceLocaleUpdate | None = None,
+    timeout: float | None = None,
 ) -> DeviceUpdateResult`
 
 Updates registered devices, selected by ids and/or
 users. Centrifugo PRO only.
 
-#### `async disconnect(request: DisconnectRequest, *, timeout: float | None=None) -> DisconnectResult`
+Arguments:
+
+- `ids` - Selects devices by ID.
+- `users` - Selects devices by user.
+- `user_update` - Changes the user ID of the devices. It does not re-sync user-bound topics; use DeviceRegisterRequest to assign a device to another user.
+- `meta_update` - Updates the device meta.
+- `topics_update` - Updates the device topics.
+- `timezone_update` - Updates the device timezone.
+- `locale_update` - Updates the device locale.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `async disconnect(
+    *,
+    user: str = '',
+    disconnect: Disconnect | None = None,
+    client: str = '',
+    whitelist: list[str] | None = None,
+    session: str = '',
+    label_filter: FilterNode | None = None,
+    all_users: bool = False,
+    timeout: float | None = None,
+) -> DisconnectResult`
 
 Disconnects a user's connections.
 
+Arguments:
+
+- `user` - The ID of the user to disconnect. Required, unless all_users is used in Centrifugo PRO.
+- `disconnect` - A custom disconnect code and reason. If not set, clients are disconnected with a force no-reconnect disconnect.
+- `client` - Limits the call to the connection with this client ID. user is still required.
+- `whitelist` - A list of client IDs to keep connected.
+- `session` - Limits the call to the connection with this session ID. user is still required.
+- `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
+- `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `async get_user_status(
-    request: GetUserStatusRequest,
     *,
-    timeout: float | None=None,
+    users: list[str] | None = None,
+    timeout: float | None = None,
 ) -> GetUserStatusResult`
 
 Returns the status of users. Centrifugo PRO only.
 
-#### `async history(request: HistoryRequest, *, timeout: float | None=None) -> HistoryResult`
+Arguments:
+
+- `users` - The list of user IDs to get the status for. Required.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `async history(
+    *,
+    channel: str = '',
+    limit: int = 0,
+    since: StreamPosition | None = None,
+    reverse: bool = False,
+    timeout: float | None = None,
+) -> HistoryResult`
 
 Returns publications from the history of a channel.
 History must be enabled for the channel.
 
-#### `async history_remove(
-    request: HistoryRemoveRequest,
-    *,
-    timeout: float | None=None,
-) -> HistoryRemoveResult`
+Arguments:
+
+- `channel` - The name of the channel. Required.
+- `limit` - The maximum number of publications to return; -1 returns all the channel keeps. If not set, only the current stream position is returned, without publications.
+- `since` - Returns publications after this stream position.
+- `reverse` - Iterates in reverse order, from latest to earliest.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `async history_remove(*, channel: str = '', timeout: float | None = None) -> HistoryRemoveResult`
 
 Removes publications from the history of a channel.
 The current top stream position is kept, so clients do not get
 disconnected because of insufficient state.
 
-#### `async info(request: InfoRequest | None=None, *, timeout: float | None=None) -> InfoResult`
+Arguments:
+
+- `channel` - The name of the channel. Required.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `async info(*, timeout: float | None = None) -> InfoResult`
 
 Returns information about the running Centrifugo nodes.
 
+Arguments:
+
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `async invalidate_user_tokens(
-    request: InvalidateUserTokensRequest,
     *,
-    timeout: float | None=None,
+    expire_at: int = 0,
+    user: str = '',
+    issued_before: int = 0,
+    channel: str = '',
+    timeout: float | None = None,
 ) -> InvalidateUserTokensResult`
 
 Revokes all tokens of a user issued before a
 certain time (based on the iat claim of a JWT). Centrifugo PRO only.
 
-#### `async map_clear(request: MapClearRequest, *, timeout: float | None=None) -> MapClearResult`
+Arguments:
+
+- `expire_at` - The Unix time in seconds when the invalidation expires. Optional, but a value matching the token expiration is recommended.
+- `user` - The ID of the user whose tokens to invalidate. Required.
+- `issued_before` - The Unix time in seconds: tokens issued before it are considered revoked. If not set, the current time is used.
+- `channel` - Limits the invalidation to subscription tokens for this channel.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `async map_clear(*, channel: str = '', timeout: float | None = None) -> MapClearResult`
 
 Removes all state and stream data of a map channel.
 
-#### `async map_publish(request: MapPublishRequest, *, timeout: float | None=None) -> MapPublishResult`
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `async map_publish(
+    *,
+    channel: str = '',
+    key: str = '',
+    data: JSON = None,
+    b64data: str = '',
+    stream_data: JSON = None,
+    b64stream_data: str = '',
+    tags: dict[str, str] | None = None,
+    idempotency_key: str = '',
+    delta: bool = False,
+    version: int = 0,
+    version_epoch: str = '',
+    score: int = 0,
+    key_mode: str = '',
+    timeout: float | None = None,
+) -> MapPublishResult`
 
 Publishes or updates a key in a map channel.
 
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `key` - The entry key. Required.
+- `data` - The entry data. In the HTTP API it is any JSON value; over GRPC it may be binary.
+- `b64data` - Data as base64, for binary over the HTTP API. Centrifugo decodes it.
+- `stream_data` - Currently not used by the server API.
+- `b64stream_data` - Currently not used by the server API.
+- `tags` - Key-value metadata attached to the publication.
+- `idempotency_key` - Drops duplicate publications upon retries: a publication with a key already used in the channel is not applied again, and its result has the first one's position, with suppressed set and suppress_reason "idempotency". It acts per channel; keys are kept for 5 minutes by default. Every map broker - memory, Redis and PostgreSQL - keeps keys.
+- `delta` - Enables delta compression for this publication.
+- `version` - A per-key version: publications with a version not higher than the key's current one are suppressed.
+- `version_epoch` - Scopes version. A different epoch resets version comparison.
+- `score` - Currently not used by the server API.
+- `key_mode` - Makes the publish conditional: "if_new" writes only if the key does not exist, "if_exists" only if it exists. Empty always writes.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `async map_read_state(
-    request: MapReadStateRequest,
     *,
-    timeout: float | None=None,
+    channel: str = '',
+    cursor: str = '',
+    limit: int = 0,
+    key: str = '',
+    asc: bool = False,
+    revision_offset: int = 0,
+    revision_epoch: str = '',
+    timeout: float | None = None,
 ) -> MapReadStateResult`
 
 Reads the current state of a map channel, with
 optional pagination.
 
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `cursor` - The pagination cursor from the previous page. Empty starts from the beginning.
+- `limit` - The maximum number of entries per page: -1 means no limit, 0 returns only the stream position. Page sizes may exceed it with the Redis map broker.
+- `key` - Reads a single entry by exact key. cursor and limit are ignored when it is set.
+- `asc` - Sorts ordered state by score ascending instead of descending. Ignored for unordered channels.
+- `revision_offset` - The offset of the position from a previous state read, used with revision_epoch.
+- `revision_epoch` - The epoch of the position from a previous state read. If the epoch changed, the call fails with an unrecoverable position error.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `async map_read_stream(
-    request: MapReadStreamRequest,
     *,
-    timeout: float | None=None,
+    channel: str = '',
+    since_offset: int = 0,
+    since_epoch: str = '',
+    limit: int = 0,
+    reverse: bool = False,
+    timeout: float | None = None,
 ) -> MapReadStreamResult`
 
 Reads the change stream of a map channel.
 
-#### `async map_remove(request: MapRemoveRequest, *, timeout: float | None=None) -> MapRemoveResult`
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `since_offset` - Returns entries after this offset, used with since_epoch.
+- `since_epoch` - The epoch of the since position. It must match the current stream epoch.
+- `limit` - The maximum number of entries: -1 means no limit, 0 returns only the stream position.
+- `reverse` - Returns entries newest first.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `async map_remove(
+    *,
+    channel: str = '',
+    key: str = '',
+    idempotency_key: str = '',
+    timeout: float | None = None,
+) -> MapRemoveResult`
 
 Removes a key from a map channel.
 
-#### `async map_stats(request: MapStatsRequest, *, timeout: float | None=None) -> MapStatsResult`
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `key` - The key to remove. Required.
+- `idempotency_key` - Drops duplicate removals upon retries, as it does for MapPublishRequest: a removal with a key already used in the channel is not applied again, and its result is suppressed with suppress_reason "idempotency". Keys are kept for 5 minutes by default.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `async map_stats(*, channel: str = '', timeout: float | None = None) -> MapStatsResult`
 
 Returns statistics about a map channel.
 
-#### `async presence(request: PresenceRequest, *, timeout: float | None=None) -> PresenceResult`
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `async presence(*, channel: str = '', timeout: float | None = None) -> PresenceResult`
 
 Returns the online presence of a channel: all clients
 currently subscribed to it. Presence must be enabled for the channel.
 
-#### `async presence_stats(
-    request: PresenceStatsRequest,
-    *,
-    timeout: float | None=None,
-) -> PresenceStatsResult`
+Arguments:
+
+- `channel` - The name of the channel. Required.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `async presence_stats(*, channel: str = '', timeout: float | None = None) -> PresenceStatsResult`
 
 Returns short presence information of a channel: the
 number of clients and of unique users. Presence must be enabled for the
 channel.
 
-#### `async publish(request: PublishRequest, *, timeout: float | None=None) -> PublishResult`
+Arguments:
+
+- `channel` - The name of the channel. Required.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `async publish(
+    *,
+    channel: str = '',
+    data: JSON = None,
+    b64data: str = '',
+    skip_history: bool = False,
+    tags: dict[str, str] | None = None,
+    idempotency_key: str = '',
+    delta: bool = False,
+    version: int = 0,
+    version_epoch: str = '',
+    timeout: float | None = None,
+) -> PublishResult`
 
 Publishes data into a channel.
 
-#### `async refresh(request: RefreshRequest, *, timeout: float | None=None) -> RefreshResult`
+Arguments:
+
+- `channel` - The name of the channel to publish into. Required.
+- `data` - The payload to publish. Required unless b64data is set. In the HTTP API it is any JSON value; over GRPC it may be binary.
+- `b64data` - A base64-encoded binary payload, an alternative to `data` to send binary over the HTTP API. Centrifugo decodes it before publishing.
+- `skip_history` - Skips adding this publication to the channel history.
+- `tags` - A map of arbitrary string keys and values attached to the publication and delivered to clients.
+- `idempotency_key` - Drops duplicate publications upon retries: a publication with a key already used in the channel is not published again, and the first one's result is returned. It acts per channel; results are kept for 5 minutes by default. The memory, Redis and PostgreSQL brokers keep keys; the NATS broker ignores them.
+- `delta` - Tells Centrifugo to construct a delta update, if possible, when broadcasting the publication to subscribers.
+- `version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
+- `version_epoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `async refresh(
+    *,
+    user: str = '',
+    client: str = '',
+    expired: bool = False,
+    expire_at: int = 0,
+    info: JSON = None,
+    session: str = '',
+    label_filter: FilterNode | None = None,
+    all_users: bool = False,
+    timeout: float | None = None,
+) -> RefreshResult`
 
 Refreshes a user's connections, mostly useful with
 unidirectional transports. Without expire_at the connections become
 non-expiring.
 
-#### `async revoke_token(request: RevokeTokenRequest, *, timeout: float | None=None) -> RevokeTokenResult`
+Arguments:
+
+- `user` - The ID of the user to refresh. Required, unless all_users is used in Centrifugo PRO.
+- `client` - Limits the call to the connection with this client ID. user is still required.
+- `expired` - Marks the connections as expired and closes them with an expired disconnect reason.
+- `expire_at` - The Unix time in seconds when the connections expire.
+- `info` - Attaches or replaces the connection info.
+- `session` - Limits the call to the connection with this session ID. user is still required.
+- `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
+- `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `async revoke_token(
+    *,
+    expire_at: int = 0,
+    uid: str = '',
+    timeout: float | None = None,
+) -> RevokeTokenResult`
 
 Revokes a token by its unique ID (jti claim of a JWT).
 Clients using the token are disconnected shortly, and can not connect
 with it again. Centrifugo PRO only.
 
+Arguments:
+
+- `expire_at` - The Unix time in seconds when the revocation expires. Optional, but a value matching the token expiration is recommended.
+- `uid` - The unique ID of the token to revoke (jti claim). Required.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `async send_push_notification(
-    request: SendPushNotificationRequest,
     *,
-    timeout: float | None=None,
+    recipient: PushRecipient | None = None,
+    notification: PushNotification | None = None,
+    uid: str = '',
+    send_at: int = 0,
+    optimize_for_reliability: bool = False,
+    limit_strategy: PushLimitStrategy | None = None,
+    analytics_uid: str = '',
+    localizations: dict[str, PushLocalization] | None = None,
+    use_templating: bool = False,
+    use_meta: bool = False,
+    timeout: float | None = None,
 ) -> SendPushNotificationResult`
 
 Sends a push notification. The request is
 queued and sent to the provider by Centrifugo workers.
 Centrifugo PRO only.
 
+Arguments:
+
+- `recipient` - Who receives the notification. Required.
+- `notification` - The notification to send. Required.
+- `uid` - A unique identifier of the request, can be used to cancel the push. UUID v4 is recommended; different requests must use different uids.
+- `send_at` - The Unix time in seconds when to send the notification. If not set, the notification is sent immediately.
+- `optimize_for_reliability` - Makes processing heavier, but tolerates edge cases, like not losing inflight pushes when the queue is briefly unavailable.
+- `limit_strategy` - Sets time constraints and rate limits. Only applies with a filter recipient; devices are then processed one by one instead of in batches.
+- `analytics_uid` - The identifier for push notification analytics. If not set, uid is used.
+- `localizations` - Optional per language/locale localizations. Setting them enables templating.
+- `use_templating` - Enables templating of the notification. Only works with a filter recipient.
+- `use_meta` - Additionally loads device meta while sending, making it available in templating.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `async shared_poll_publish(
-    request: SharedPollPublishRequest,
     *,
-    timeout: float | None=None,
+    channel: str = '',
+    key: str = '',
+    data: JSON = None,
+    b64data: str = '',
+    version: int = 0,
+    epoch: str = '',
+    timeout: float | None = None,
 ) -> SharedPollPublishResult`
 
 Pushes data for a key directly to clients of a
 shared poll channel, without waiting for the next poll cycle. Requires
 versioned mode and publish_enabled on the namespace.
 
-#### `async subscribe(request: SubscribeRequest, *, timeout: float | None=None) -> SubscribeResult`
+Arguments:
+
+- `channel` - The name of the shared poll channel. Required.
+- `key` - The item key. Required.
+- `data` - The item data, delivered to clients as is.
+- `b64data` - Data as base64, for binary payloads. Centrifugo decodes it.
+- `version` - The item version, must be >= 1. Required. A version not higher than the current one within the same epoch is silently dropped.
+- `epoch` - The channel-level publisher epoch. A change resets per-key versions and unsubscribes current subscribers with insufficient state.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `async subscribe(
+    *,
+    channel: str = '',
+    user: str = '',
+    expire_at: int = 0,
+    info: JSON = None,
+    b64info: str = '',
+    client: str = '',
+    data: JSON = None,
+    b64data: str = '',
+    recover_since: StreamPosition | None = None,
+    override: SubscribeOptionOverride | None = None,
+    session: str = '',
+    label_filter: FilterNode | None = None,
+    all_users: bool = False,
+    timeout: float | None = None,
+) -> SubscribeResult`
 
 Subscribes active sessions of a user to a channel
 (server-side subscription). It does not create a streaming subscription
 for the caller.
 
-#### `async unblock_user(request: UnblockUserRequest, *, timeout: float | None=None) -> UnblockUserResult`
+Arguments:
+
+- `channel` - The name of the channel to subscribe to. Required.
+- `user` - The ID of the user to subscribe. Required, unless all_users is used in Centrifugo PRO.
+- `expire_at` - The Unix time in seconds when the subscription expires.
+- `info` - Custom channel info attached to the subscription, used in presence and join/leave messages.
+- `b64info` - Info as base64, for binary. Centrifugo decodes it.
+- `client` - Limits the call to the connection with this client ID. user is still required.
+- `data` - Custom subscription data sent to the client in the Subscribe push.
+- `b64data` - Data as base64, for binary. Centrifugo decodes it.
+- `recover_since` - The stream position to recover publications from.
+- `override` - Dynamically overrides some channel options set in the Centrifugo configuration.
+- `session` - Limits the call to the connection with this session ID. user is still required.
+- `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
+- `all_users` - When user is empty, targets every connection on every node instead of the anonymous-only bucket. No effect when user is non-empty. Without label_filter it acts on every connection. Centrifugo PRO only.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `async unblock_user(*, user: str = '', timeout: float | None = None) -> UnblockUserResult`
 
 Unblocks a user. Centrifugo PRO only.
 
-#### `async unsubscribe(request: UnsubscribeRequest, *, timeout: float | None=None) -> UnsubscribeResult`
+Arguments:
+
+- `user` - The ID of the user to unblock. Required.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `async unsubscribe(
+    *,
+    channel: str = '',
+    user: str = '',
+    client: str = '',
+    session: str = '',
+    label_filter: FilterNode | None = None,
+    all_users: bool = False,
+    timeout: float | None = None,
+) -> UnsubscribeResult`
 
 Unsubscribes a user from a channel.
 
+Arguments:
+
+- `channel` - The name of the channel to unsubscribe from. Required.
+- `user` - The ID of the user to unsubscribe. Required, unless all_users is used in Centrifugo PRO.
+- `client` - Limits the call to the connection with this client ID. user is still required.
+- `session` - Limits the call to the connection with this session ID. user is still required.
+- `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
+- `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `async update_push_status(
-    request: UpdatePushStatusRequest,
     *,
-    timeout: float | None=None,
+    analytics_uid: str = '',
+    status: str = '',
+    device_id: str = '',
+    msg_id: str = '',
+    timeout: float | None = None,
 ) -> UpdatePushStatusResult`
 
 Saves the delivery or interaction status of a
 push notification to analytics. Experimental. Centrifugo PRO only.
 
+Arguments:
+
+- `analytics_uid` - The analytics_uid of the push notification (as in SendPushNotificationRequest). Required.
+- `status` - The status of the push notification: delivered or interacted. Required.
+- `device_id` - The Centrifugo device ID. Required.
+- `msg_id` - The message ID issued by the provider.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `async update_user_status(
-    request: UpdateUserStatusRequest,
     *,
-    timeout: float | None=None,
+    users: list[str] | None = None,
+    state: str = '',
+    timeout: float | None = None,
 ) -> UpdateUserStatusResult`
 
 Marks users as active and online now, and sets
 their state when one is given. Centrifugo PRO only.
 
+Arguments:
+
+- `users` - The list of user IDs to update the status for. Required.
+- `state` - An optional custom state to store in the user status. It can be restricted by the user_status.state_regex option.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `async user_topic_list(
-    request: UserTopicListRequest,
     *,
-    timeout: float | None=None,
+    filter: UserTopicFilter | None = None,
+    include_total_count: bool = False,
+    cursor: str = '',
+    limit: int = 0,
+    timeout: float | None = None,
 ) -> UserTopicListResult`
 
 Returns a paginated list of user topic
 subscriptions. Centrifugo PRO only.
 
+Arguments:
+
+- `filter` - Selects the user topics to list.
+- `include_total_count` - Includes the total count for the filter in the result.
+- `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
+- `limit` - The maximum number of items to return.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
 #### `async user_topic_update(
-    request: UserTopicUpdateRequest,
     *,
-    timeout: float | None=None,
+    user: str = '',
+    op: str = '',
+    topics: list[str] | None = None,
+    timeout: float | None = None,
 ) -> UserTopicUpdateResult`
 
 Changes the topics of a user. The change is also
 applied to the user's registered devices. Centrifugo PRO only.
 
-#### `new_batch(*, parallel: bool=False) -> AsyncBatch`
+Arguments:
+
+- `user` - The user ID. Required.
+- `op` - The operation: add, remove or set. Required.
+- `topics` - The topics for the operation.
+- `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `new_batch(*, parallel: bool = False) -> AsyncBatch`
 
 An empty AsyncBatch sent by this client, as Client.new_batch.
 
@@ -718,133 +1764,474 @@ returning a Pending - then call send:
 
 ```python
 batch = client.new_batch()
-pub = batch.publish(cent.PublishRequest(channel="news", data={"text": "hi"}))
-stats = batch.presence_stats(cent.PresenceStatsRequest(channel="news"))
+pub = batch.publish(channel="news", data={"text": "hi"})
+stats = batch.presence_stats(channel="news")
 batch.send()  # raises unless every command succeeded
 pub.result()
 ```
 
 A batch is sent once, and is not safe for concurrent use.
 
-#### `block_user(request: BlockUserRequest) -> Pending[BlockUserResult]`
+#### `block_user(*, expire_at: int = 0, user: str = '') -> Pending[BlockUserResult]`
 
 Adds a block_user command; its outcome is what Client.block_user would return.
 
-#### `broadcast(request: BroadcastRequest) -> Pending[BroadcastResult]`
+Arguments:
 
-Adds a broadcast command. Its outcome is what Client.broadcast would
-return: every channel's outcome, and BroadcastFailedChannelsError when
-any channel failed.
+- `expire_at` - The Unix time in seconds when the block expires. Optional, but a reasonably small value is recommended to keep the set of blocked users small.
+- `user` - The ID of the user to block. Required.
 
-#### `cancel_push(request: CancelPushRequest) -> Pending[CancelPushResult]`
+#### `broadcast(
+    *,
+    channels: list[str] | None = None,
+    data: JSON = None,
+    b64data: str = '',
+    skip_history: bool = False,
+    tags: dict[str, str] | None = None,
+    idempotency_key: str = '',
+    delta: bool = False,
+    version: int = 0,
+    version_epoch: str = '',
+) -> Pending[BroadcastResult]`
+
+Adds a broadcast command; its outcome is what Client.broadcast would return.
+
+Arguments:
+
+- `channels` - The list of channels to publish into. Required.
+- `data` - The payload to publish into each channel. Required unless b64data is set. In the HTTP API it is any JSON value; over GRPC it may be binary.
+- `b64data` - A base64-encoded binary payload, an alternative to `data` to send binary over the HTTP API. Centrifugo decodes it before publishing.
+- `skip_history` - Skips adding the publications to the channels' history.
+- `tags` - A map of arbitrary string keys and values attached to each publication and delivered to clients.
+- `idempotency_key` - Drops duplicate publications upon retries. It acts per channel: a broadcast retried with the same key is not published again into the channels which already have it. Results are kept for 5 minutes by default. The memory, Redis and PostgreSQL brokers keep keys; the NATS broker ignores them.
+- `delta` - Tells Centrifugo to construct a delta update, if possible, when broadcasting the publications to subscribers.
+- `version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
+- `version_epoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
+
+#### `cancel_push(*, uid: str = '') -> Pending[CancelPushResult]`
 
 Adds a cancel_push command; its outcome is what Client.cancel_push would return.
 
-#### `channels(request: ChannelsRequest) -> Pending[ChannelsResult]`
+Arguments:
+
+- `uid` - The uid of the push notification to cancel. Required.
+
+#### `channels(*, pattern: str = '') -> Pending[ChannelsResult]`
 
 Adds a channels command; its outcome is what Client.channels would return.
 
-#### `connections(request: ConnectionsRequest) -> Pending[ConnectionsResult]`
+Arguments:
+
+- `pattern` - Filters channels by name, using gobwas/glob syntax.
+
+#### `connections(
+    *,
+    user: str = '',
+    expression: str = '',
+    label_filter: FilterNode | None = None,
+) -> Pending[ConnectionsResult]`
 
 Adds a connections command; its outcome is what Client.connections would return.
 
-#### `delete_user_status(request: DeleteUserStatusRequest) -> Pending[DeleteUserStatusResult]`
+Arguments:
+
+- `user` - Returns only the connections of this user ID.
+- `expression` - A CEL expression to filter connections.
+- `label_filter` - Restricts the listing to clients whose labels match this filter. Centrifugo PRO only.
+
+#### `delete_user_status(*, users: list[str] | None = None) -> Pending[DeleteUserStatusResult]`
 
 Adds a delete_user_status command; its outcome is what Client.delete_user_status would return.
 
-#### `device_list(request: DeviceListRequest) -> Pending[DeviceListResult]`
+Arguments:
+
+- `users` - The list of user IDs to delete the status for. Required.
+
+#### `device_list(
+    *,
+    filter: DeviceFilter | None = None,
+    include_total_count: bool = False,
+    include_meta: bool = False,
+    include_topics: bool = False,
+    include_webpush_keys: bool = False,
+    cursor: str = '',
+    limit: int = 0,
+) -> Pending[DeviceListResult]`
 
 Adds a device_list command; its outcome is what Client.device_list would return.
 
-#### `device_register(request: DeviceRegisterRequest) -> Pending[DeviceRegisterResult]`
+Arguments:
+
+- `filter` - Selects the devices to list. Required.
+- `include_total_count` - Includes the total count for the filter in the result.
+- `include_meta` - Includes meta of each device.
+- `include_topics` - Includes topics of each device.
+- `include_webpush_keys` - Includes webpush_keys of each device (webpush only).
+- `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
+- `limit` - The maximum number of devices to return.
+
+#### `device_register(
+    *,
+    id: str = '',
+    provider: str = '',
+    token: str = '',
+    platform: str = '',
+    user: str = '',
+    meta: dict[str, str] | None = None,
+    topics: list[str] | None = None,
+    timezone: str = '',
+    locale: str = '',
+) -> Pending[DeviceRegisterResult]`
 
 Adds a device_register command; its outcome is what Client.device_register would return.
 
-#### `device_remove(request: DeviceRemoveRequest) -> Pending[DeviceRemoveResult]`
+Arguments:
+
+- `id` - The device ID. Omit it on first registration: Centrifugo generates one and returns it. Pass the stored value to update the device.
+- `provider` - The provider of the device token: fcm, hms, apns or webpush. Required.
+- `token` - The push token of the device. For webpush, it is the browser PushSubscription serialized as a JSON string. Required.
+- `platform` - The device platform: ios, android or web. Required.
+- `user` - The user associated with the device.
+- `meta` - Additional custom metadata of the device.
+- `topics` - The full list of the device's topic subscriptions, replacing the previous one. The user's topics are attached automatically.
+- `timezone` - The IANA time zone of the device user, for example Europe/Nicosia.
+- `locale` - The locale of the device user as an IETF BCP 47 language tag, for example en-US.
+
+#### `device_remove(
+    *,
+    ids: list[str] | None = None,
+    users: list[str] | None = None,
+) -> Pending[DeviceRemoveResult]`
 
 Adds a device_remove command; its outcome is what Client.device_remove would return.
 
-#### `device_topic_list(request: DeviceTopicListRequest) -> Pending[DeviceTopicListResult]`
+Arguments:
+
+- `ids` - Selects devices to remove by ID.
+- `users` - Selects devices to remove by user.
+
+#### `device_topic_list(
+    *,
+    filter: DeviceTopicFilter | None = None,
+    include_total_count: bool = False,
+    include_device: bool = False,
+    cursor: str = '',
+    limit: int = 0,
+) -> Pending[DeviceTopicListResult]`
 
 Adds a device_topic_list command; its outcome is what Client.device_topic_list would return.
 
-#### `device_topic_update(request: DeviceTopicUpdateRequest) -> Pending[DeviceTopicUpdateResult]`
+Arguments:
+
+- `filter` - Selects the device topics to list.
+- `include_total_count` - Includes the total count for the filter in the result.
+- `include_device` - Includes the Device of each item.
+- `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
+- `limit` - The maximum number of items to return.
+
+#### `device_topic_update(
+    *,
+    device_id: str = '',
+    op: str = '',
+    topics: list[str] | None = None,
+    user: str = '',
+) -> Pending[DeviceTopicUpdateResult]`
 
 Adds a device_topic_update command; its outcome is what Client.device_topic_update would return.
 
-#### `device_update(request: DeviceUpdateRequest) -> Pending[DeviceUpdateResult]`
+Arguments:
+
+- `device_id` - The ID of the device. Required.
+- `op` - The operation: add, remove or set. Required.
+- `topics` - The topics for the operation.
+- `user` - An optional ownership guard: the update is applied only if the device currently belongs to this user. Otherwise the call fails with a conflict error (or not found if there is no such device).
+
+#### `device_update(
+    *,
+    ids: list[str] | None = None,
+    users: list[str] | None = None,
+    user_update: DeviceUserUpdate | None = None,
+    meta_update: DeviceMetaUpdate | None = None,
+    topics_update: DeviceTopicsUpdate | None = None,
+    timezone_update: DeviceTimezoneUpdate | None = None,
+    locale_update: DeviceLocaleUpdate | None = None,
+) -> Pending[DeviceUpdateResult]`
 
 Adds a device_update command; its outcome is what Client.device_update would return.
 
-#### `disconnect(request: DisconnectRequest) -> Pending[DisconnectResult]`
+Arguments:
+
+- `ids` - Selects devices by ID.
+- `users` - Selects devices by user.
+- `user_update` - Changes the user ID of the devices. It does not re-sync user-bound topics; use DeviceRegisterRequest to assign a device to another user.
+- `meta_update` - Updates the device meta.
+- `topics_update` - Updates the device topics.
+- `timezone_update` - Updates the device timezone.
+- `locale_update` - Updates the device locale.
+
+#### `disconnect(
+    *,
+    user: str = '',
+    disconnect: Disconnect | None = None,
+    client: str = '',
+    whitelist: list[str] | None = None,
+    session: str = '',
+    label_filter: FilterNode | None = None,
+    all_users: bool = False,
+) -> Pending[DisconnectResult]`
 
 Adds a disconnect command; its outcome is what Client.disconnect would return.
 
-#### `get_user_status(request: GetUserStatusRequest) -> Pending[GetUserStatusResult]`
+Arguments:
+
+- `user` - The ID of the user to disconnect. Required, unless all_users is used in Centrifugo PRO.
+- `disconnect` - A custom disconnect code and reason. If not set, clients are disconnected with a force no-reconnect disconnect.
+- `client` - Limits the call to the connection with this client ID. user is still required.
+- `whitelist` - A list of client IDs to keep connected.
+- `session` - Limits the call to the connection with this session ID. user is still required.
+- `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
+- `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
+
+#### `get_user_status(*, users: list[str] | None = None) -> Pending[GetUserStatusResult]`
 
 Adds a get_user_status command; its outcome is what Client.get_user_status would return.
 
-#### `history(request: HistoryRequest) -> Pending[HistoryResult]`
+Arguments:
+
+- `users` - The list of user IDs to get the status for. Required.
+
+#### `history(
+    *,
+    channel: str = '',
+    limit: int = 0,
+    since: StreamPosition | None = None,
+    reverse: bool = False,
+) -> Pending[HistoryResult]`
 
 Adds a history command; its outcome is what Client.history would return.
 
-#### `history_remove(request: HistoryRemoveRequest) -> Pending[HistoryRemoveResult]`
+Arguments:
+
+- `channel` - The name of the channel. Required.
+- `limit` - The maximum number of publications to return; -1 returns all the channel keeps. If not set, only the current stream position is returned, without publications.
+- `since` - Returns publications after this stream position.
+- `reverse` - Iterates in reverse order, from latest to earliest.
+
+#### `history_remove(*, channel: str = '') -> Pending[HistoryRemoveResult]`
 
 Adds a history_remove command; its outcome is what Client.history_remove would return.
 
-#### `info(request: InfoRequest | None=None) -> Pending[InfoResult]`
+Arguments:
+
+- `channel` - The name of the channel. Required.
+
+#### `info() -> Pending[InfoResult]`
 
 Adds a info command; its outcome is what Client.info would return.
 
-#### `invalidate_user_tokens(request: InvalidateUserTokensRequest) -> Pending[InvalidateUserTokensResult]`
+#### `invalidate_user_tokens(
+    *,
+    expire_at: int = 0,
+    user: str = '',
+    issued_before: int = 0,
+    channel: str = '',
+) -> Pending[InvalidateUserTokensResult]`
 
 Adds a invalidate_user_tokens command; its outcome is what Client.invalidate_user_tokens would return.
 
-#### `map_clear(request: MapClearRequest) -> Pending[MapClearResult]`
+Arguments:
+
+- `expire_at` - The Unix time in seconds when the invalidation expires. Optional, but a value matching the token expiration is recommended.
+- `user` - The ID of the user whose tokens to invalidate. Required.
+- `issued_before` - The Unix time in seconds: tokens issued before it are considered revoked. If not set, the current time is used.
+- `channel` - Limits the invalidation to subscription tokens for this channel.
+
+#### `map_clear(*, channel: str = '') -> Pending[MapClearResult]`
 
 Adds a map_clear command; its outcome is what Client.map_clear would return.
 
-#### `map_publish(request: MapPublishRequest) -> Pending[MapPublishResult]`
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+
+#### `map_publish(
+    *,
+    channel: str = '',
+    key: str = '',
+    data: JSON = None,
+    b64data: str = '',
+    stream_data: JSON = None,
+    b64stream_data: str = '',
+    tags: dict[str, str] | None = None,
+    idempotency_key: str = '',
+    delta: bool = False,
+    version: int = 0,
+    version_epoch: str = '',
+    score: int = 0,
+    key_mode: str = '',
+) -> Pending[MapPublishResult]`
 
 Adds a map_publish command; its outcome is what Client.map_publish would return.
 
-#### `map_read_state(request: MapReadStateRequest) -> Pending[MapReadStateResult]`
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `key` - The entry key. Required.
+- `data` - The entry data. In the HTTP API it is any JSON value; over GRPC it may be binary.
+- `b64data` - Data as base64, for binary over the HTTP API. Centrifugo decodes it.
+- `stream_data` - Currently not used by the server API.
+- `b64stream_data` - Currently not used by the server API.
+- `tags` - Key-value metadata attached to the publication.
+- `idempotency_key` - Drops duplicate publications upon retries: a publication with a key already used in the channel is not applied again, and its result has the first one's position, with suppressed set and suppress_reason "idempotency". It acts per channel; keys are kept for 5 minutes by default. Every map broker - memory, Redis and PostgreSQL - keeps keys.
+- `delta` - Enables delta compression for this publication.
+- `version` - A per-key version: publications with a version not higher than the key's current one are suppressed.
+- `version_epoch` - Scopes version. A different epoch resets version comparison.
+- `score` - Currently not used by the server API.
+- `key_mode` - Makes the publish conditional: "if_new" writes only if the key does not exist, "if_exists" only if it exists. Empty always writes.
+
+#### `map_read_state(
+    *,
+    channel: str = '',
+    cursor: str = '',
+    limit: int = 0,
+    key: str = '',
+    asc: bool = False,
+    revision_offset: int = 0,
+    revision_epoch: str = '',
+) -> Pending[MapReadStateResult]`
 
 Adds a map_read_state command; its outcome is what Client.map_read_state would return.
 
-#### `map_read_stream(request: MapReadStreamRequest) -> Pending[MapReadStreamResult]`
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `cursor` - The pagination cursor from the previous page. Empty starts from the beginning.
+- `limit` - The maximum number of entries per page: -1 means no limit, 0 returns only the stream position. Page sizes may exceed it with the Redis map broker.
+- `key` - Reads a single entry by exact key. cursor and limit are ignored when it is set.
+- `asc` - Sorts ordered state by score ascending instead of descending. Ignored for unordered channels.
+- `revision_offset` - The offset of the position from a previous state read, used with revision_epoch.
+- `revision_epoch` - The epoch of the position from a previous state read. If the epoch changed, the call fails with an unrecoverable position error.
+
+#### `map_read_stream(
+    *,
+    channel: str = '',
+    since_offset: int = 0,
+    since_epoch: str = '',
+    limit: int = 0,
+    reverse: bool = False,
+) -> Pending[MapReadStreamResult]`
 
 Adds a map_read_stream command; its outcome is what Client.map_read_stream would return.
 
-#### `map_remove(request: MapRemoveRequest) -> Pending[MapRemoveResult]`
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `since_offset` - Returns entries after this offset, used with since_epoch.
+- `since_epoch` - The epoch of the since position. It must match the current stream epoch.
+- `limit` - The maximum number of entries: -1 means no limit, 0 returns only the stream position.
+- `reverse` - Returns entries newest first.
+
+#### `map_remove(
+    *,
+    channel: str = '',
+    key: str = '',
+    idempotency_key: str = '',
+) -> Pending[MapRemoveResult]`
 
 Adds a map_remove command; its outcome is what Client.map_remove would return.
 
-#### `map_stats(request: MapStatsRequest) -> Pending[MapStatsResult]`
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `key` - The key to remove. Required.
+- `idempotency_key` - Drops duplicate removals upon retries, as it does for MapPublishRequest: a removal with a key already used in the channel is not applied again, and its result is suppressed with suppress_reason "idempotency". Keys are kept for 5 minutes by default.
+
+#### `map_stats(*, channel: str = '') -> Pending[MapStatsResult]`
 
 Adds a map_stats command; its outcome is what Client.map_stats would return.
 
-#### `presence(request: PresenceRequest) -> Pending[PresenceResult]`
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+
+#### `presence(*, channel: str = '') -> Pending[PresenceResult]`
 
 Adds a presence command; its outcome is what Client.presence would return.
 
-#### `presence_stats(request: PresenceStatsRequest) -> Pending[PresenceStatsResult]`
+Arguments:
+
+- `channel` - The name of the channel. Required.
+
+#### `presence_stats(*, channel: str = '') -> Pending[PresenceStatsResult]`
 
 Adds a presence_stats command; its outcome is what Client.presence_stats would return.
 
-#### `publish(request: PublishRequest) -> Pending[PublishResult]`
+Arguments:
+
+- `channel` - The name of the channel. Required.
+
+#### `publish(
+    *,
+    channel: str = '',
+    data: JSON = None,
+    b64data: str = '',
+    skip_history: bool = False,
+    tags: dict[str, str] | None = None,
+    idempotency_key: str = '',
+    delta: bool = False,
+    version: int = 0,
+    version_epoch: str = '',
+) -> Pending[PublishResult]`
 
 Adds a publish command; its outcome is what Client.publish would return.
 
-#### `refresh(request: RefreshRequest) -> Pending[RefreshResult]`
+Arguments:
+
+- `channel` - The name of the channel to publish into. Required.
+- `data` - The payload to publish. Required unless b64data is set. In the HTTP API it is any JSON value; over GRPC it may be binary.
+- `b64data` - A base64-encoded binary payload, an alternative to `data` to send binary over the HTTP API. Centrifugo decodes it before publishing.
+- `skip_history` - Skips adding this publication to the channel history.
+- `tags` - A map of arbitrary string keys and values attached to the publication and delivered to clients.
+- `idempotency_key` - Drops duplicate publications upon retries: a publication with a key already used in the channel is not published again, and the first one's result is returned. It acts per channel; results are kept for 5 minutes by default. The memory, Redis and PostgreSQL brokers keep keys; the NATS broker ignores them.
+- `delta` - Tells Centrifugo to construct a delta update, if possible, when broadcasting the publication to subscribers.
+- `version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
+- `version_epoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
+
+#### `refresh(
+    *,
+    user: str = '',
+    client: str = '',
+    expired: bool = False,
+    expire_at: int = 0,
+    info: JSON = None,
+    session: str = '',
+    label_filter: FilterNode | None = None,
+    all_users: bool = False,
+) -> Pending[RefreshResult]`
 
 Adds a refresh command; its outcome is what Client.refresh would return.
 
-#### `revoke_token(request: RevokeTokenRequest) -> Pending[RevokeTokenResult]`
+Arguments:
+
+- `user` - The ID of the user to refresh. Required, unless all_users is used in Centrifugo PRO.
+- `client` - Limits the call to the connection with this client ID. user is still required.
+- `expired` - Marks the connections as expired and closes them with an expired disconnect reason.
+- `expire_at` - The Unix time in seconds when the connections expire.
+- `info` - Attaches or replaces the connection info.
+- `session` - Limits the call to the connection with this session ID. user is still required.
+- `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
+- `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
+
+#### `revoke_token(*, expire_at: int = 0, uid: str = '') -> Pending[RevokeTokenResult]`
 
 Adds a revoke_token command; its outcome is what Client.revoke_token would return.
 
-#### `send(*, timeout: float | None=None) -> BatchResult`
+Arguments:
+
+- `expire_at` - The Unix time in seconds when the revocation expires. Optional, but a value matching the token expiration is recommended.
+- `uid` - The unique ID of the token to revoke (jti claim). Required.
+
+#### `send(*, timeout: float | None = None) -> BatchResult`
 
 Sends the batch and waits for Centrifugo's reply to every command.
 
@@ -855,41 +2242,181 @@ failed as a whole: no command got a reply, and every Pending raises
 that error. A command the client can tell is invalid fails the whole
 batch before anything is sent. An empty batch sends nothing.
 
-#### `send_push_notification(request: SendPushNotificationRequest) -> Pending[SendPushNotificationResult]`
+#### `send_push_notification(
+    *,
+    recipient: PushRecipient | None = None,
+    notification: PushNotification | None = None,
+    uid: str = '',
+    send_at: int = 0,
+    optimize_for_reliability: bool = False,
+    limit_strategy: PushLimitStrategy | None = None,
+    analytics_uid: str = '',
+    localizations: dict[str, PushLocalization] | None = None,
+    use_templating: bool = False,
+    use_meta: bool = False,
+) -> Pending[SendPushNotificationResult]`
 
 Adds a send_push_notification command; its outcome is what Client.send_push_notification would return.
 
-#### `shared_poll_publish(request: SharedPollPublishRequest) -> Pending[SharedPollPublishResult]`
+Arguments:
+
+- `recipient` - Who receives the notification. Required.
+- `notification` - The notification to send. Required.
+- `uid` - A unique identifier of the request, can be used to cancel the push. UUID v4 is recommended; different requests must use different uids.
+- `send_at` - The Unix time in seconds when to send the notification. If not set, the notification is sent immediately.
+- `optimize_for_reliability` - Makes processing heavier, but tolerates edge cases, like not losing inflight pushes when the queue is briefly unavailable.
+- `limit_strategy` - Sets time constraints and rate limits. Only applies with a filter recipient; devices are then processed one by one instead of in batches.
+- `analytics_uid` - The identifier for push notification analytics. If not set, uid is used.
+- `localizations` - Optional per language/locale localizations. Setting them enables templating.
+- `use_templating` - Enables templating of the notification. Only works with a filter recipient.
+- `use_meta` - Additionally loads device meta while sending, making it available in templating.
+
+#### `shared_poll_publish(
+    *,
+    channel: str = '',
+    key: str = '',
+    data: JSON = None,
+    b64data: str = '',
+    version: int = 0,
+    epoch: str = '',
+) -> Pending[SharedPollPublishResult]`
 
 Adds a shared_poll_publish command; its outcome is what Client.shared_poll_publish would return.
 
-#### `subscribe(request: SubscribeRequest) -> Pending[SubscribeResult]`
+Arguments:
+
+- `channel` - The name of the shared poll channel. Required.
+- `key` - The item key. Required.
+- `data` - The item data, delivered to clients as is.
+- `b64data` - Data as base64, for binary payloads. Centrifugo decodes it.
+- `version` - The item version, must be >= 1. Required. A version not higher than the current one within the same epoch is silently dropped.
+- `epoch` - The channel-level publisher epoch. A change resets per-key versions and unsubscribes current subscribers with insufficient state.
+
+#### `subscribe(
+    *,
+    channel: str = '',
+    user: str = '',
+    expire_at: int = 0,
+    info: JSON = None,
+    b64info: str = '',
+    client: str = '',
+    data: JSON = None,
+    b64data: str = '',
+    recover_since: StreamPosition | None = None,
+    override: SubscribeOptionOverride | None = None,
+    session: str = '',
+    label_filter: FilterNode | None = None,
+    all_users: bool = False,
+) -> Pending[SubscribeResult]`
 
 Adds a subscribe command; its outcome is what Client.subscribe would return.
 
-#### `unblock_user(request: UnblockUserRequest) -> Pending[UnblockUserResult]`
+Arguments:
+
+- `channel` - The name of the channel to subscribe to. Required.
+- `user` - The ID of the user to subscribe. Required, unless all_users is used in Centrifugo PRO.
+- `expire_at` - The Unix time in seconds when the subscription expires.
+- `info` - Custom channel info attached to the subscription, used in presence and join/leave messages.
+- `b64info` - Info as base64, for binary. Centrifugo decodes it.
+- `client` - Limits the call to the connection with this client ID. user is still required.
+- `data` - Custom subscription data sent to the client in the Subscribe push.
+- `b64data` - Data as base64, for binary. Centrifugo decodes it.
+- `recover_since` - The stream position to recover publications from.
+- `override` - Dynamically overrides some channel options set in the Centrifugo configuration.
+- `session` - Limits the call to the connection with this session ID. user is still required.
+- `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
+- `all_users` - When user is empty, targets every connection on every node instead of the anonymous-only bucket. No effect when user is non-empty. Without label_filter it acts on every connection. Centrifugo PRO only.
+
+#### `unblock_user(*, user: str = '') -> Pending[UnblockUserResult]`
 
 Adds a unblock_user command; its outcome is what Client.unblock_user would return.
 
-#### `unsubscribe(request: UnsubscribeRequest) -> Pending[UnsubscribeResult]`
+Arguments:
+
+- `user` - The ID of the user to unblock. Required.
+
+#### `unsubscribe(
+    *,
+    channel: str = '',
+    user: str = '',
+    client: str = '',
+    session: str = '',
+    label_filter: FilterNode | None = None,
+    all_users: bool = False,
+) -> Pending[UnsubscribeResult]`
 
 Adds a unsubscribe command; its outcome is what Client.unsubscribe would return.
 
-#### `update_push_status(request: UpdatePushStatusRequest) -> Pending[UpdatePushStatusResult]`
+Arguments:
+
+- `channel` - The name of the channel to unsubscribe from. Required.
+- `user` - The ID of the user to unsubscribe. Required, unless all_users is used in Centrifugo PRO.
+- `client` - Limits the call to the connection with this client ID. user is still required.
+- `session` - Limits the call to the connection with this session ID. user is still required.
+- `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
+- `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
+
+#### `update_push_status(
+    *,
+    analytics_uid: str = '',
+    status: str = '',
+    device_id: str = '',
+    msg_id: str = '',
+) -> Pending[UpdatePushStatusResult]`
 
 Adds a update_push_status command; its outcome is what Client.update_push_status would return.
 
-#### `update_user_status(request: UpdateUserStatusRequest) -> Pending[UpdateUserStatusResult]`
+Arguments:
+
+- `analytics_uid` - The analytics_uid of the push notification (as in SendPushNotificationRequest). Required.
+- `status` - The status of the push notification: delivered or interacted. Required.
+- `device_id` - The Centrifugo device ID. Required.
+- `msg_id` - The message ID issued by the provider.
+
+#### `update_user_status(
+    *,
+    users: list[str] | None = None,
+    state: str = '',
+) -> Pending[UpdateUserStatusResult]`
 
 Adds a update_user_status command; its outcome is what Client.update_user_status would return.
 
-#### `user_topic_list(request: UserTopicListRequest) -> Pending[UserTopicListResult]`
+Arguments:
+
+- `users` - The list of user IDs to update the status for. Required.
+- `state` - An optional custom state to store in the user status. It can be restricted by the user_status.state_regex option.
+
+#### `user_topic_list(
+    *,
+    filter: UserTopicFilter | None = None,
+    include_total_count: bool = False,
+    cursor: str = '',
+    limit: int = 0,
+) -> Pending[UserTopicListResult]`
 
 Adds a user_topic_list command; its outcome is what Client.user_topic_list would return.
 
-#### `user_topic_update(request: UserTopicUpdateRequest) -> Pending[UserTopicUpdateResult]`
+Arguments:
+
+- `filter` - Selects the user topics to list.
+- `include_total_count` - Includes the total count for the filter in the result.
+- `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
+- `limit` - The maximum number of items to return.
+
+#### `user_topic_update(
+    *,
+    user: str = '',
+    op: str = '',
+    topics: list[str] | None = None,
+) -> Pending[UserTopicUpdateResult]`
 
 Adds a user_topic_update command; its outcome is what Client.user_topic_update would return.
+
+Arguments:
+
+- `user` - The user ID. Required.
+- `op` - The operation: add, remove or set. Required.
+- `topics` - The topics for the operation.
 
 ### `AsyncBatch`
 
@@ -899,163 +2426,644 @@ AsyncBatch(client: AsyncClient, parallel: bool) -> None
 
 A batch of an AsyncClient: as Batch, with ``await batch.send()``.
 
-#### `async send(*, timeout: float | None=None) -> BatchResult`
+#### `async send(*, timeout: float | None = None) -> BatchResult`
 
 Sends the batch, as Batch.send does.
 
-#### `block_user(request: BlockUserRequest) -> Pending[BlockUserResult]`
+#### `block_user(*, expire_at: int = 0, user: str = '') -> Pending[BlockUserResult]`
 
 Adds a block_user command; its outcome is what Client.block_user would return.
 
-#### `broadcast(request: BroadcastRequest) -> Pending[BroadcastResult]`
+Arguments:
 
-Adds a broadcast command. Its outcome is what Client.broadcast would
-return: every channel's outcome, and BroadcastFailedChannelsError when
-any channel failed.
+- `expire_at` - The Unix time in seconds when the block expires. Optional, but a reasonably small value is recommended to keep the set of blocked users small.
+- `user` - The ID of the user to block. Required.
 
-#### `cancel_push(request: CancelPushRequest) -> Pending[CancelPushResult]`
+#### `broadcast(
+    *,
+    channels: list[str] | None = None,
+    data: JSON = None,
+    b64data: str = '',
+    skip_history: bool = False,
+    tags: dict[str, str] | None = None,
+    idempotency_key: str = '',
+    delta: bool = False,
+    version: int = 0,
+    version_epoch: str = '',
+) -> Pending[BroadcastResult]`
+
+Adds a broadcast command; its outcome is what Client.broadcast would return.
+
+Arguments:
+
+- `channels` - The list of channels to publish into. Required.
+- `data` - The payload to publish into each channel. Required unless b64data is set. In the HTTP API it is any JSON value; over GRPC it may be binary.
+- `b64data` - A base64-encoded binary payload, an alternative to `data` to send binary over the HTTP API. Centrifugo decodes it before publishing.
+- `skip_history` - Skips adding the publications to the channels' history.
+- `tags` - A map of arbitrary string keys and values attached to each publication and delivered to clients.
+- `idempotency_key` - Drops duplicate publications upon retries. It acts per channel: a broadcast retried with the same key is not published again into the channels which already have it. Results are kept for 5 minutes by default. The memory, Redis and PostgreSQL brokers keep keys; the NATS broker ignores them.
+- `delta` - Tells Centrifugo to construct a delta update, if possible, when broadcasting the publications to subscribers.
+- `version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
+- `version_epoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
+
+#### `cancel_push(*, uid: str = '') -> Pending[CancelPushResult]`
 
 Adds a cancel_push command; its outcome is what Client.cancel_push would return.
 
-#### `channels(request: ChannelsRequest) -> Pending[ChannelsResult]`
+Arguments:
+
+- `uid` - The uid of the push notification to cancel. Required.
+
+#### `channels(*, pattern: str = '') -> Pending[ChannelsResult]`
 
 Adds a channels command; its outcome is what Client.channels would return.
 
-#### `connections(request: ConnectionsRequest) -> Pending[ConnectionsResult]`
+Arguments:
+
+- `pattern` - Filters channels by name, using gobwas/glob syntax.
+
+#### `connections(
+    *,
+    user: str = '',
+    expression: str = '',
+    label_filter: FilterNode | None = None,
+) -> Pending[ConnectionsResult]`
 
 Adds a connections command; its outcome is what Client.connections would return.
 
-#### `delete_user_status(request: DeleteUserStatusRequest) -> Pending[DeleteUserStatusResult]`
+Arguments:
+
+- `user` - Returns only the connections of this user ID.
+- `expression` - A CEL expression to filter connections.
+- `label_filter` - Restricts the listing to clients whose labels match this filter. Centrifugo PRO only.
+
+#### `delete_user_status(*, users: list[str] | None = None) -> Pending[DeleteUserStatusResult]`
 
 Adds a delete_user_status command; its outcome is what Client.delete_user_status would return.
 
-#### `device_list(request: DeviceListRequest) -> Pending[DeviceListResult]`
+Arguments:
+
+- `users` - The list of user IDs to delete the status for. Required.
+
+#### `device_list(
+    *,
+    filter: DeviceFilter | None = None,
+    include_total_count: bool = False,
+    include_meta: bool = False,
+    include_topics: bool = False,
+    include_webpush_keys: bool = False,
+    cursor: str = '',
+    limit: int = 0,
+) -> Pending[DeviceListResult]`
 
 Adds a device_list command; its outcome is what Client.device_list would return.
 
-#### `device_register(request: DeviceRegisterRequest) -> Pending[DeviceRegisterResult]`
+Arguments:
+
+- `filter` - Selects the devices to list. Required.
+- `include_total_count` - Includes the total count for the filter in the result.
+- `include_meta` - Includes meta of each device.
+- `include_topics` - Includes topics of each device.
+- `include_webpush_keys` - Includes webpush_keys of each device (webpush only).
+- `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
+- `limit` - The maximum number of devices to return.
+
+#### `device_register(
+    *,
+    id: str = '',
+    provider: str = '',
+    token: str = '',
+    platform: str = '',
+    user: str = '',
+    meta: dict[str, str] | None = None,
+    topics: list[str] | None = None,
+    timezone: str = '',
+    locale: str = '',
+) -> Pending[DeviceRegisterResult]`
 
 Adds a device_register command; its outcome is what Client.device_register would return.
 
-#### `device_remove(request: DeviceRemoveRequest) -> Pending[DeviceRemoveResult]`
+Arguments:
+
+- `id` - The device ID. Omit it on first registration: Centrifugo generates one and returns it. Pass the stored value to update the device.
+- `provider` - The provider of the device token: fcm, hms, apns or webpush. Required.
+- `token` - The push token of the device. For webpush, it is the browser PushSubscription serialized as a JSON string. Required.
+- `platform` - The device platform: ios, android or web. Required.
+- `user` - The user associated with the device.
+- `meta` - Additional custom metadata of the device.
+- `topics` - The full list of the device's topic subscriptions, replacing the previous one. The user's topics are attached automatically.
+- `timezone` - The IANA time zone of the device user, for example Europe/Nicosia.
+- `locale` - The locale of the device user as an IETF BCP 47 language tag, for example en-US.
+
+#### `device_remove(
+    *,
+    ids: list[str] | None = None,
+    users: list[str] | None = None,
+) -> Pending[DeviceRemoveResult]`
 
 Adds a device_remove command; its outcome is what Client.device_remove would return.
 
-#### `device_topic_list(request: DeviceTopicListRequest) -> Pending[DeviceTopicListResult]`
+Arguments:
+
+- `ids` - Selects devices to remove by ID.
+- `users` - Selects devices to remove by user.
+
+#### `device_topic_list(
+    *,
+    filter: DeviceTopicFilter | None = None,
+    include_total_count: bool = False,
+    include_device: bool = False,
+    cursor: str = '',
+    limit: int = 0,
+) -> Pending[DeviceTopicListResult]`
 
 Adds a device_topic_list command; its outcome is what Client.device_topic_list would return.
 
-#### `device_topic_update(request: DeviceTopicUpdateRequest) -> Pending[DeviceTopicUpdateResult]`
+Arguments:
+
+- `filter` - Selects the device topics to list.
+- `include_total_count` - Includes the total count for the filter in the result.
+- `include_device` - Includes the Device of each item.
+- `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
+- `limit` - The maximum number of items to return.
+
+#### `device_topic_update(
+    *,
+    device_id: str = '',
+    op: str = '',
+    topics: list[str] | None = None,
+    user: str = '',
+) -> Pending[DeviceTopicUpdateResult]`
 
 Adds a device_topic_update command; its outcome is what Client.device_topic_update would return.
 
-#### `device_update(request: DeviceUpdateRequest) -> Pending[DeviceUpdateResult]`
+Arguments:
+
+- `device_id` - The ID of the device. Required.
+- `op` - The operation: add, remove or set. Required.
+- `topics` - The topics for the operation.
+- `user` - An optional ownership guard: the update is applied only if the device currently belongs to this user. Otherwise the call fails with a conflict error (or not found if there is no such device).
+
+#### `device_update(
+    *,
+    ids: list[str] | None = None,
+    users: list[str] | None = None,
+    user_update: DeviceUserUpdate | None = None,
+    meta_update: DeviceMetaUpdate | None = None,
+    topics_update: DeviceTopicsUpdate | None = None,
+    timezone_update: DeviceTimezoneUpdate | None = None,
+    locale_update: DeviceLocaleUpdate | None = None,
+) -> Pending[DeviceUpdateResult]`
 
 Adds a device_update command; its outcome is what Client.device_update would return.
 
-#### `disconnect(request: DisconnectRequest) -> Pending[DisconnectResult]`
+Arguments:
+
+- `ids` - Selects devices by ID.
+- `users` - Selects devices by user.
+- `user_update` - Changes the user ID of the devices. It does not re-sync user-bound topics; use DeviceRegisterRequest to assign a device to another user.
+- `meta_update` - Updates the device meta.
+- `topics_update` - Updates the device topics.
+- `timezone_update` - Updates the device timezone.
+- `locale_update` - Updates the device locale.
+
+#### `disconnect(
+    *,
+    user: str = '',
+    disconnect: Disconnect | None = None,
+    client: str = '',
+    whitelist: list[str] | None = None,
+    session: str = '',
+    label_filter: FilterNode | None = None,
+    all_users: bool = False,
+) -> Pending[DisconnectResult]`
 
 Adds a disconnect command; its outcome is what Client.disconnect would return.
 
-#### `get_user_status(request: GetUserStatusRequest) -> Pending[GetUserStatusResult]`
+Arguments:
+
+- `user` - The ID of the user to disconnect. Required, unless all_users is used in Centrifugo PRO.
+- `disconnect` - A custom disconnect code and reason. If not set, clients are disconnected with a force no-reconnect disconnect.
+- `client` - Limits the call to the connection with this client ID. user is still required.
+- `whitelist` - A list of client IDs to keep connected.
+- `session` - Limits the call to the connection with this session ID. user is still required.
+- `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
+- `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
+
+#### `get_user_status(*, users: list[str] | None = None) -> Pending[GetUserStatusResult]`
 
 Adds a get_user_status command; its outcome is what Client.get_user_status would return.
 
-#### `history(request: HistoryRequest) -> Pending[HistoryResult]`
+Arguments:
+
+- `users` - The list of user IDs to get the status for. Required.
+
+#### `history(
+    *,
+    channel: str = '',
+    limit: int = 0,
+    since: StreamPosition | None = None,
+    reverse: bool = False,
+) -> Pending[HistoryResult]`
 
 Adds a history command; its outcome is what Client.history would return.
 
-#### `history_remove(request: HistoryRemoveRequest) -> Pending[HistoryRemoveResult]`
+Arguments:
+
+- `channel` - The name of the channel. Required.
+- `limit` - The maximum number of publications to return; -1 returns all the channel keeps. If not set, only the current stream position is returned, without publications.
+- `since` - Returns publications after this stream position.
+- `reverse` - Iterates in reverse order, from latest to earliest.
+
+#### `history_remove(*, channel: str = '') -> Pending[HistoryRemoveResult]`
 
 Adds a history_remove command; its outcome is what Client.history_remove would return.
 
-#### `info(request: InfoRequest | None=None) -> Pending[InfoResult]`
+Arguments:
+
+- `channel` - The name of the channel. Required.
+
+#### `info() -> Pending[InfoResult]`
 
 Adds a info command; its outcome is what Client.info would return.
 
-#### `invalidate_user_tokens(request: InvalidateUserTokensRequest) -> Pending[InvalidateUserTokensResult]`
+#### `invalidate_user_tokens(
+    *,
+    expire_at: int = 0,
+    user: str = '',
+    issued_before: int = 0,
+    channel: str = '',
+) -> Pending[InvalidateUserTokensResult]`
 
 Adds a invalidate_user_tokens command; its outcome is what Client.invalidate_user_tokens would return.
 
-#### `map_clear(request: MapClearRequest) -> Pending[MapClearResult]`
+Arguments:
+
+- `expire_at` - The Unix time in seconds when the invalidation expires. Optional, but a value matching the token expiration is recommended.
+- `user` - The ID of the user whose tokens to invalidate. Required.
+- `issued_before` - The Unix time in seconds: tokens issued before it are considered revoked. If not set, the current time is used.
+- `channel` - Limits the invalidation to subscription tokens for this channel.
+
+#### `map_clear(*, channel: str = '') -> Pending[MapClearResult]`
 
 Adds a map_clear command; its outcome is what Client.map_clear would return.
 
-#### `map_publish(request: MapPublishRequest) -> Pending[MapPublishResult]`
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+
+#### `map_publish(
+    *,
+    channel: str = '',
+    key: str = '',
+    data: JSON = None,
+    b64data: str = '',
+    stream_data: JSON = None,
+    b64stream_data: str = '',
+    tags: dict[str, str] | None = None,
+    idempotency_key: str = '',
+    delta: bool = False,
+    version: int = 0,
+    version_epoch: str = '',
+    score: int = 0,
+    key_mode: str = '',
+) -> Pending[MapPublishResult]`
 
 Adds a map_publish command; its outcome is what Client.map_publish would return.
 
-#### `map_read_state(request: MapReadStateRequest) -> Pending[MapReadStateResult]`
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `key` - The entry key. Required.
+- `data` - The entry data. In the HTTP API it is any JSON value; over GRPC it may be binary.
+- `b64data` - Data as base64, for binary over the HTTP API. Centrifugo decodes it.
+- `stream_data` - Currently not used by the server API.
+- `b64stream_data` - Currently not used by the server API.
+- `tags` - Key-value metadata attached to the publication.
+- `idempotency_key` - Drops duplicate publications upon retries: a publication with a key already used in the channel is not applied again, and its result has the first one's position, with suppressed set and suppress_reason "idempotency". It acts per channel; keys are kept for 5 minutes by default. Every map broker - memory, Redis and PostgreSQL - keeps keys.
+- `delta` - Enables delta compression for this publication.
+- `version` - A per-key version: publications with a version not higher than the key's current one are suppressed.
+- `version_epoch` - Scopes version. A different epoch resets version comparison.
+- `score` - Currently not used by the server API.
+- `key_mode` - Makes the publish conditional: "if_new" writes only if the key does not exist, "if_exists" only if it exists. Empty always writes.
+
+#### `map_read_state(
+    *,
+    channel: str = '',
+    cursor: str = '',
+    limit: int = 0,
+    key: str = '',
+    asc: bool = False,
+    revision_offset: int = 0,
+    revision_epoch: str = '',
+) -> Pending[MapReadStateResult]`
 
 Adds a map_read_state command; its outcome is what Client.map_read_state would return.
 
-#### `map_read_stream(request: MapReadStreamRequest) -> Pending[MapReadStreamResult]`
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `cursor` - The pagination cursor from the previous page. Empty starts from the beginning.
+- `limit` - The maximum number of entries per page: -1 means no limit, 0 returns only the stream position. Page sizes may exceed it with the Redis map broker.
+- `key` - Reads a single entry by exact key. cursor and limit are ignored when it is set.
+- `asc` - Sorts ordered state by score ascending instead of descending. Ignored for unordered channels.
+- `revision_offset` - The offset of the position from a previous state read, used with revision_epoch.
+- `revision_epoch` - The epoch of the position from a previous state read. If the epoch changed, the call fails with an unrecoverable position error.
+
+#### `map_read_stream(
+    *,
+    channel: str = '',
+    since_offset: int = 0,
+    since_epoch: str = '',
+    limit: int = 0,
+    reverse: bool = False,
+) -> Pending[MapReadStreamResult]`
 
 Adds a map_read_stream command; its outcome is what Client.map_read_stream would return.
 
-#### `map_remove(request: MapRemoveRequest) -> Pending[MapRemoveResult]`
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `since_offset` - Returns entries after this offset, used with since_epoch.
+- `since_epoch` - The epoch of the since position. It must match the current stream epoch.
+- `limit` - The maximum number of entries: -1 means no limit, 0 returns only the stream position.
+- `reverse` - Returns entries newest first.
+
+#### `map_remove(
+    *,
+    channel: str = '',
+    key: str = '',
+    idempotency_key: str = '',
+) -> Pending[MapRemoveResult]`
 
 Adds a map_remove command; its outcome is what Client.map_remove would return.
 
-#### `map_stats(request: MapStatsRequest) -> Pending[MapStatsResult]`
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `key` - The key to remove. Required.
+- `idempotency_key` - Drops duplicate removals upon retries, as it does for MapPublishRequest: a removal with a key already used in the channel is not applied again, and its result is suppressed with suppress_reason "idempotency". Keys are kept for 5 minutes by default.
+
+#### `map_stats(*, channel: str = '') -> Pending[MapStatsResult]`
 
 Adds a map_stats command; its outcome is what Client.map_stats would return.
 
-#### `presence(request: PresenceRequest) -> Pending[PresenceResult]`
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+
+#### `presence(*, channel: str = '') -> Pending[PresenceResult]`
 
 Adds a presence command; its outcome is what Client.presence would return.
 
-#### `presence_stats(request: PresenceStatsRequest) -> Pending[PresenceStatsResult]`
+Arguments:
+
+- `channel` - The name of the channel. Required.
+
+#### `presence_stats(*, channel: str = '') -> Pending[PresenceStatsResult]`
 
 Adds a presence_stats command; its outcome is what Client.presence_stats would return.
 
-#### `publish(request: PublishRequest) -> Pending[PublishResult]`
+Arguments:
+
+- `channel` - The name of the channel. Required.
+
+#### `publish(
+    *,
+    channel: str = '',
+    data: JSON = None,
+    b64data: str = '',
+    skip_history: bool = False,
+    tags: dict[str, str] | None = None,
+    idempotency_key: str = '',
+    delta: bool = False,
+    version: int = 0,
+    version_epoch: str = '',
+) -> Pending[PublishResult]`
 
 Adds a publish command; its outcome is what Client.publish would return.
 
-#### `refresh(request: RefreshRequest) -> Pending[RefreshResult]`
+Arguments:
+
+- `channel` - The name of the channel to publish into. Required.
+- `data` - The payload to publish. Required unless b64data is set. In the HTTP API it is any JSON value; over GRPC it may be binary.
+- `b64data` - A base64-encoded binary payload, an alternative to `data` to send binary over the HTTP API. Centrifugo decodes it before publishing.
+- `skip_history` - Skips adding this publication to the channel history.
+- `tags` - A map of arbitrary string keys and values attached to the publication and delivered to clients.
+- `idempotency_key` - Drops duplicate publications upon retries: a publication with a key already used in the channel is not published again, and the first one's result is returned. It acts per channel; results are kept for 5 minutes by default. The memory, Redis and PostgreSQL brokers keep keys; the NATS broker ignores them.
+- `delta` - Tells Centrifugo to construct a delta update, if possible, when broadcasting the publication to subscribers.
+- `version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
+- `version_epoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
+
+#### `refresh(
+    *,
+    user: str = '',
+    client: str = '',
+    expired: bool = False,
+    expire_at: int = 0,
+    info: JSON = None,
+    session: str = '',
+    label_filter: FilterNode | None = None,
+    all_users: bool = False,
+) -> Pending[RefreshResult]`
 
 Adds a refresh command; its outcome is what Client.refresh would return.
 
-#### `revoke_token(request: RevokeTokenRequest) -> Pending[RevokeTokenResult]`
+Arguments:
+
+- `user` - The ID of the user to refresh. Required, unless all_users is used in Centrifugo PRO.
+- `client` - Limits the call to the connection with this client ID. user is still required.
+- `expired` - Marks the connections as expired and closes them with an expired disconnect reason.
+- `expire_at` - The Unix time in seconds when the connections expire.
+- `info` - Attaches or replaces the connection info.
+- `session` - Limits the call to the connection with this session ID. user is still required.
+- `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
+- `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
+
+#### `revoke_token(*, expire_at: int = 0, uid: str = '') -> Pending[RevokeTokenResult]`
 
 Adds a revoke_token command; its outcome is what Client.revoke_token would return.
 
-#### `send_push_notification(request: SendPushNotificationRequest) -> Pending[SendPushNotificationResult]`
+Arguments:
+
+- `expire_at` - The Unix time in seconds when the revocation expires. Optional, but a value matching the token expiration is recommended.
+- `uid` - The unique ID of the token to revoke (jti claim). Required.
+
+#### `send_push_notification(
+    *,
+    recipient: PushRecipient | None = None,
+    notification: PushNotification | None = None,
+    uid: str = '',
+    send_at: int = 0,
+    optimize_for_reliability: bool = False,
+    limit_strategy: PushLimitStrategy | None = None,
+    analytics_uid: str = '',
+    localizations: dict[str, PushLocalization] | None = None,
+    use_templating: bool = False,
+    use_meta: bool = False,
+) -> Pending[SendPushNotificationResult]`
 
 Adds a send_push_notification command; its outcome is what Client.send_push_notification would return.
 
-#### `shared_poll_publish(request: SharedPollPublishRequest) -> Pending[SharedPollPublishResult]`
+Arguments:
+
+- `recipient` - Who receives the notification. Required.
+- `notification` - The notification to send. Required.
+- `uid` - A unique identifier of the request, can be used to cancel the push. UUID v4 is recommended; different requests must use different uids.
+- `send_at` - The Unix time in seconds when to send the notification. If not set, the notification is sent immediately.
+- `optimize_for_reliability` - Makes processing heavier, but tolerates edge cases, like not losing inflight pushes when the queue is briefly unavailable.
+- `limit_strategy` - Sets time constraints and rate limits. Only applies with a filter recipient; devices are then processed one by one instead of in batches.
+- `analytics_uid` - The identifier for push notification analytics. If not set, uid is used.
+- `localizations` - Optional per language/locale localizations. Setting them enables templating.
+- `use_templating` - Enables templating of the notification. Only works with a filter recipient.
+- `use_meta` - Additionally loads device meta while sending, making it available in templating.
+
+#### `shared_poll_publish(
+    *,
+    channel: str = '',
+    key: str = '',
+    data: JSON = None,
+    b64data: str = '',
+    version: int = 0,
+    epoch: str = '',
+) -> Pending[SharedPollPublishResult]`
 
 Adds a shared_poll_publish command; its outcome is what Client.shared_poll_publish would return.
 
-#### `subscribe(request: SubscribeRequest) -> Pending[SubscribeResult]`
+Arguments:
+
+- `channel` - The name of the shared poll channel. Required.
+- `key` - The item key. Required.
+- `data` - The item data, delivered to clients as is.
+- `b64data` - Data as base64, for binary payloads. Centrifugo decodes it.
+- `version` - The item version, must be >= 1. Required. A version not higher than the current one within the same epoch is silently dropped.
+- `epoch` - The channel-level publisher epoch. A change resets per-key versions and unsubscribes current subscribers with insufficient state.
+
+#### `subscribe(
+    *,
+    channel: str = '',
+    user: str = '',
+    expire_at: int = 0,
+    info: JSON = None,
+    b64info: str = '',
+    client: str = '',
+    data: JSON = None,
+    b64data: str = '',
+    recover_since: StreamPosition | None = None,
+    override: SubscribeOptionOverride | None = None,
+    session: str = '',
+    label_filter: FilterNode | None = None,
+    all_users: bool = False,
+) -> Pending[SubscribeResult]`
 
 Adds a subscribe command; its outcome is what Client.subscribe would return.
 
-#### `unblock_user(request: UnblockUserRequest) -> Pending[UnblockUserResult]`
+Arguments:
+
+- `channel` - The name of the channel to subscribe to. Required.
+- `user` - The ID of the user to subscribe. Required, unless all_users is used in Centrifugo PRO.
+- `expire_at` - The Unix time in seconds when the subscription expires.
+- `info` - Custom channel info attached to the subscription, used in presence and join/leave messages.
+- `b64info` - Info as base64, for binary. Centrifugo decodes it.
+- `client` - Limits the call to the connection with this client ID. user is still required.
+- `data` - Custom subscription data sent to the client in the Subscribe push.
+- `b64data` - Data as base64, for binary. Centrifugo decodes it.
+- `recover_since` - The stream position to recover publications from.
+- `override` - Dynamically overrides some channel options set in the Centrifugo configuration.
+- `session` - Limits the call to the connection with this session ID. user is still required.
+- `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
+- `all_users` - When user is empty, targets every connection on every node instead of the anonymous-only bucket. No effect when user is non-empty. Without label_filter it acts on every connection. Centrifugo PRO only.
+
+#### `unblock_user(*, user: str = '') -> Pending[UnblockUserResult]`
 
 Adds a unblock_user command; its outcome is what Client.unblock_user would return.
 
-#### `unsubscribe(request: UnsubscribeRequest) -> Pending[UnsubscribeResult]`
+Arguments:
+
+- `user` - The ID of the user to unblock. Required.
+
+#### `unsubscribe(
+    *,
+    channel: str = '',
+    user: str = '',
+    client: str = '',
+    session: str = '',
+    label_filter: FilterNode | None = None,
+    all_users: bool = False,
+) -> Pending[UnsubscribeResult]`
 
 Adds a unsubscribe command; its outcome is what Client.unsubscribe would return.
 
-#### `update_push_status(request: UpdatePushStatusRequest) -> Pending[UpdatePushStatusResult]`
+Arguments:
+
+- `channel` - The name of the channel to unsubscribe from. Required.
+- `user` - The ID of the user to unsubscribe. Required, unless all_users is used in Centrifugo PRO.
+- `client` - Limits the call to the connection with this client ID. user is still required.
+- `session` - Limits the call to the connection with this session ID. user is still required.
+- `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
+- `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
+
+#### `update_push_status(
+    *,
+    analytics_uid: str = '',
+    status: str = '',
+    device_id: str = '',
+    msg_id: str = '',
+) -> Pending[UpdatePushStatusResult]`
 
 Adds a update_push_status command; its outcome is what Client.update_push_status would return.
 
-#### `update_user_status(request: UpdateUserStatusRequest) -> Pending[UpdateUserStatusResult]`
+Arguments:
+
+- `analytics_uid` - The analytics_uid of the push notification (as in SendPushNotificationRequest). Required.
+- `status` - The status of the push notification: delivered or interacted. Required.
+- `device_id` - The Centrifugo device ID. Required.
+- `msg_id` - The message ID issued by the provider.
+
+#### `update_user_status(
+    *,
+    users: list[str] | None = None,
+    state: str = '',
+) -> Pending[UpdateUserStatusResult]`
 
 Adds a update_user_status command; its outcome is what Client.update_user_status would return.
 
-#### `user_topic_list(request: UserTopicListRequest) -> Pending[UserTopicListResult]`
+Arguments:
+
+- `users` - The list of user IDs to update the status for. Required.
+- `state` - An optional custom state to store in the user status. It can be restricted by the user_status.state_regex option.
+
+#### `user_topic_list(
+    *,
+    filter: UserTopicFilter | None = None,
+    include_total_count: bool = False,
+    cursor: str = '',
+    limit: int = 0,
+) -> Pending[UserTopicListResult]`
 
 Adds a user_topic_list command; its outcome is what Client.user_topic_list would return.
 
-#### `user_topic_update(request: UserTopicUpdateRequest) -> Pending[UserTopicUpdateResult]`
+Arguments:
+
+- `filter` - Selects the user topics to list.
+- `include_total_count` - Includes the total count for the filter in the result.
+- `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
+- `limit` - The maximum number of items to return.
+
+#### `user_topic_update(
+    *,
+    user: str = '',
+    op: str = '',
+    topics: list[str] | None = None,
+) -> Pending[UserTopicUpdateResult]`
 
 Adds a user_topic_update command; its outcome is what Client.user_topic_update would return.
+
+Arguments:
+
+- `user` - The user ID. Required.
+- `op` - The operation: add, remove or set. Required.
+- `topics` - The topics for the operation.
 
 ### `Pending`
 
@@ -1140,6 +3148,633 @@ from the channel the same way - the channel as a Kafka message key, say.
 #### `to_json() -> str`
 
 The command as one JSON message: ``{"method": ..., "payload": ...}``.
+
+### `Commands`
+
+Commands for Centrifugo's async consumers, one per API method: each checks
+its request as a call does, and encodes it - see Command. Use the instance,
+cent.command:
+
+```python
+cmd = cent.command.publish(channel="news", data={"text": "hi"})
+```
+
+#### `block_user(*, expire_at: int = 0, user: str = '') -> Command`
+
+The block_user command.
+
+Arguments:
+
+- `expire_at` - The Unix time in seconds when the block expires. Optional, but a reasonably small value is recommended to keep the set of blocked users small.
+- `user` - The ID of the user to block. Required.
+
+#### `broadcast(
+    *,
+    channels: list[str] | None = None,
+    data: JSON = None,
+    b64data: str = '',
+    skip_history: bool = False,
+    tags: dict[str, str] | None = None,
+    idempotency_key: str = '',
+    delta: bool = False,
+    version: int = 0,
+    version_epoch: str = '',
+) -> Command`
+
+The broadcast command.
+
+Arguments:
+
+- `channels` - The list of channels to publish into. Required.
+- `data` - The payload to publish into each channel. Required unless b64data is set. In the HTTP API it is any JSON value; over GRPC it may be binary.
+- `b64data` - A base64-encoded binary payload, an alternative to `data` to send binary over the HTTP API. Centrifugo decodes it before publishing.
+- `skip_history` - Skips adding the publications to the channels' history.
+- `tags` - A map of arbitrary string keys and values attached to each publication and delivered to clients.
+- `idempotency_key` - Drops duplicate publications upon retries. It acts per channel: a broadcast retried with the same key is not published again into the channels which already have it. Results are kept for 5 minutes by default. The memory, Redis and PostgreSQL brokers keep keys; the NATS broker ignores them.
+- `delta` - Tells Centrifugo to construct a delta update, if possible, when broadcasting the publications to subscribers.
+- `version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
+- `version_epoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
+
+#### `cancel_push(*, uid: str = '') -> Command`
+
+The cancel_push command.
+
+Arguments:
+
+- `uid` - The uid of the push notification to cancel. Required.
+
+#### `channels(*, pattern: str = '') -> Command`
+
+The channels command.
+
+Arguments:
+
+- `pattern` - Filters channels by name, using gobwas/glob syntax.
+
+#### `connections(
+    *,
+    user: str = '',
+    expression: str = '',
+    label_filter: FilterNode | None = None,
+) -> Command`
+
+The connections command.
+
+Arguments:
+
+- `user` - Returns only the connections of this user ID.
+- `expression` - A CEL expression to filter connections.
+- `label_filter` - Restricts the listing to clients whose labels match this filter. Centrifugo PRO only.
+
+#### `delete_user_status(*, users: list[str] | None = None) -> Command`
+
+The delete_user_status command.
+
+Arguments:
+
+- `users` - The list of user IDs to delete the status for. Required.
+
+#### `device_list(
+    *,
+    filter: DeviceFilter | None = None,
+    include_total_count: bool = False,
+    include_meta: bool = False,
+    include_topics: bool = False,
+    include_webpush_keys: bool = False,
+    cursor: str = '',
+    limit: int = 0,
+) -> Command`
+
+The device_list command.
+
+Arguments:
+
+- `filter` - Selects the devices to list. Required.
+- `include_total_count` - Includes the total count for the filter in the result.
+- `include_meta` - Includes meta of each device.
+- `include_topics` - Includes topics of each device.
+- `include_webpush_keys` - Includes webpush_keys of each device (webpush only).
+- `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
+- `limit` - The maximum number of devices to return.
+
+#### `device_register(
+    *,
+    id: str = '',
+    provider: str = '',
+    token: str = '',
+    platform: str = '',
+    user: str = '',
+    meta: dict[str, str] | None = None,
+    topics: list[str] | None = None,
+    timezone: str = '',
+    locale: str = '',
+) -> Command`
+
+The device_register command.
+
+Arguments:
+
+- `id` - The device ID. Omit it on first registration: Centrifugo generates one and returns it. Pass the stored value to update the device.
+- `provider` - The provider of the device token: fcm, hms, apns or webpush. Required.
+- `token` - The push token of the device. For webpush, it is the browser PushSubscription serialized as a JSON string. Required.
+- `platform` - The device platform: ios, android or web. Required.
+- `user` - The user associated with the device.
+- `meta` - Additional custom metadata of the device.
+- `topics` - The full list of the device's topic subscriptions, replacing the previous one. The user's topics are attached automatically.
+- `timezone` - The IANA time zone of the device user, for example Europe/Nicosia.
+- `locale` - The locale of the device user as an IETF BCP 47 language tag, for example en-US.
+
+#### `device_remove(*, ids: list[str] | None = None, users: list[str] | None = None) -> Command`
+
+The device_remove command.
+
+Arguments:
+
+- `ids` - Selects devices to remove by ID.
+- `users` - Selects devices to remove by user.
+
+#### `device_topic_list(
+    *,
+    filter: DeviceTopicFilter | None = None,
+    include_total_count: bool = False,
+    include_device: bool = False,
+    cursor: str = '',
+    limit: int = 0,
+) -> Command`
+
+The device_topic_list command.
+
+Arguments:
+
+- `filter` - Selects the device topics to list.
+- `include_total_count` - Includes the total count for the filter in the result.
+- `include_device` - Includes the Device of each item.
+- `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
+- `limit` - The maximum number of items to return.
+
+#### `device_topic_update(
+    *,
+    device_id: str = '',
+    op: str = '',
+    topics: list[str] | None = None,
+    user: str = '',
+) -> Command`
+
+The device_topic_update command.
+
+Arguments:
+
+- `device_id` - The ID of the device. Required.
+- `op` - The operation: add, remove or set. Required.
+- `topics` - The topics for the operation.
+- `user` - An optional ownership guard: the update is applied only if the device currently belongs to this user. Otherwise the call fails with a conflict error (or not found if there is no such device).
+
+#### `device_update(
+    *,
+    ids: list[str] | None = None,
+    users: list[str] | None = None,
+    user_update: DeviceUserUpdate | None = None,
+    meta_update: DeviceMetaUpdate | None = None,
+    topics_update: DeviceTopicsUpdate | None = None,
+    timezone_update: DeviceTimezoneUpdate | None = None,
+    locale_update: DeviceLocaleUpdate | None = None,
+) -> Command`
+
+The device_update command.
+
+Arguments:
+
+- `ids` - Selects devices by ID.
+- `users` - Selects devices by user.
+- `user_update` - Changes the user ID of the devices. It does not re-sync user-bound topics; use DeviceRegisterRequest to assign a device to another user.
+- `meta_update` - Updates the device meta.
+- `topics_update` - Updates the device topics.
+- `timezone_update` - Updates the device timezone.
+- `locale_update` - Updates the device locale.
+
+#### `disconnect(
+    *,
+    user: str = '',
+    disconnect: Disconnect | None = None,
+    client: str = '',
+    whitelist: list[str] | None = None,
+    session: str = '',
+    label_filter: FilterNode | None = None,
+    all_users: bool = False,
+) -> Command`
+
+The disconnect command.
+
+Arguments:
+
+- `user` - The ID of the user to disconnect. Required, unless all_users is used in Centrifugo PRO.
+- `disconnect` - A custom disconnect code and reason. If not set, clients are disconnected with a force no-reconnect disconnect.
+- `client` - Limits the call to the connection with this client ID. user is still required.
+- `whitelist` - A list of client IDs to keep connected.
+- `session` - Limits the call to the connection with this session ID. user is still required.
+- `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
+- `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
+
+#### `get_user_status(*, users: list[str] | None = None) -> Command`
+
+The get_user_status command.
+
+Arguments:
+
+- `users` - The list of user IDs to get the status for. Required.
+
+#### `history(
+    *,
+    channel: str = '',
+    limit: int = 0,
+    since: StreamPosition | None = None,
+    reverse: bool = False,
+) -> Command`
+
+The history command.
+
+Arguments:
+
+- `channel` - The name of the channel. Required.
+- `limit` - The maximum number of publications to return; -1 returns all the channel keeps. If not set, only the current stream position is returned, without publications.
+- `since` - Returns publications after this stream position.
+- `reverse` - Iterates in reverse order, from latest to earliest.
+
+#### `history_remove(*, channel: str = '') -> Command`
+
+The history_remove command.
+
+Arguments:
+
+- `channel` - The name of the channel. Required.
+
+#### `info() -> Command`
+
+The info command.
+
+#### `invalidate_user_tokens(
+    *,
+    expire_at: int = 0,
+    user: str = '',
+    issued_before: int = 0,
+    channel: str = '',
+) -> Command`
+
+The invalidate_user_tokens command.
+
+Arguments:
+
+- `expire_at` - The Unix time in seconds when the invalidation expires. Optional, but a value matching the token expiration is recommended.
+- `user` - The ID of the user whose tokens to invalidate. Required.
+- `issued_before` - The Unix time in seconds: tokens issued before it are considered revoked. If not set, the current time is used.
+- `channel` - Limits the invalidation to subscription tokens for this channel.
+
+#### `map_clear(*, channel: str = '') -> Command`
+
+The map_clear command.
+
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+
+#### `map_publish(
+    *,
+    channel: str = '',
+    key: str = '',
+    data: JSON = None,
+    b64data: str = '',
+    stream_data: JSON = None,
+    b64stream_data: str = '',
+    tags: dict[str, str] | None = None,
+    idempotency_key: str = '',
+    delta: bool = False,
+    version: int = 0,
+    version_epoch: str = '',
+    score: int = 0,
+    key_mode: str = '',
+) -> Command`
+
+The map_publish command.
+
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `key` - The entry key. Required.
+- `data` - The entry data. In the HTTP API it is any JSON value; over GRPC it may be binary.
+- `b64data` - Data as base64, for binary over the HTTP API. Centrifugo decodes it.
+- `stream_data` - Currently not used by the server API.
+- `b64stream_data` - Currently not used by the server API.
+- `tags` - Key-value metadata attached to the publication.
+- `idempotency_key` - Drops duplicate publications upon retries: a publication with a key already used in the channel is not applied again, and its result has the first one's position, with suppressed set and suppress_reason "idempotency". It acts per channel; keys are kept for 5 minutes by default. Every map broker - memory, Redis and PostgreSQL - keeps keys.
+- `delta` - Enables delta compression for this publication.
+- `version` - A per-key version: publications with a version not higher than the key's current one are suppressed.
+- `version_epoch` - Scopes version. A different epoch resets version comparison.
+- `score` - Currently not used by the server API.
+- `key_mode` - Makes the publish conditional: "if_new" writes only if the key does not exist, "if_exists" only if it exists. Empty always writes.
+
+#### `map_read_state(
+    *,
+    channel: str = '',
+    cursor: str = '',
+    limit: int = 0,
+    key: str = '',
+    asc: bool = False,
+    revision_offset: int = 0,
+    revision_epoch: str = '',
+) -> Command`
+
+The map_read_state command.
+
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `cursor` - The pagination cursor from the previous page. Empty starts from the beginning.
+- `limit` - The maximum number of entries per page: -1 means no limit, 0 returns only the stream position. Page sizes may exceed it with the Redis map broker.
+- `key` - Reads a single entry by exact key. cursor and limit are ignored when it is set.
+- `asc` - Sorts ordered state by score ascending instead of descending. Ignored for unordered channels.
+- `revision_offset` - The offset of the position from a previous state read, used with revision_epoch.
+- `revision_epoch` - The epoch of the position from a previous state read. If the epoch changed, the call fails with an unrecoverable position error.
+
+#### `map_read_stream(
+    *,
+    channel: str = '',
+    since_offset: int = 0,
+    since_epoch: str = '',
+    limit: int = 0,
+    reverse: bool = False,
+) -> Command`
+
+The map_read_stream command.
+
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `since_offset` - Returns entries after this offset, used with since_epoch.
+- `since_epoch` - The epoch of the since position. It must match the current stream epoch.
+- `limit` - The maximum number of entries: -1 means no limit, 0 returns only the stream position.
+- `reverse` - Returns entries newest first.
+
+#### `map_remove(*, channel: str = '', key: str = '', idempotency_key: str = '') -> Command`
+
+The map_remove command.
+
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `key` - The key to remove. Required.
+- `idempotency_key` - Drops duplicate removals upon retries, as it does for MapPublishRequest: a removal with a key already used in the channel is not applied again, and its result is suppressed with suppress_reason "idempotency". Keys are kept for 5 minutes by default.
+
+#### `map_stats(*, channel: str = '') -> Command`
+
+The map_stats command.
+
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+
+#### `presence(*, channel: str = '') -> Command`
+
+The presence command.
+
+Arguments:
+
+- `channel` - The name of the channel. Required.
+
+#### `presence_stats(*, channel: str = '') -> Command`
+
+The presence_stats command.
+
+Arguments:
+
+- `channel` - The name of the channel. Required.
+
+#### `publish(
+    *,
+    channel: str = '',
+    data: JSON = None,
+    b64data: str = '',
+    skip_history: bool = False,
+    tags: dict[str, str] | None = None,
+    idempotency_key: str = '',
+    delta: bool = False,
+    version: int = 0,
+    version_epoch: str = '',
+) -> Command`
+
+The publish command.
+
+Arguments:
+
+- `channel` - The name of the channel to publish into. Required.
+- `data` - The payload to publish. Required unless b64data is set. In the HTTP API it is any JSON value; over GRPC it may be binary.
+- `b64data` - A base64-encoded binary payload, an alternative to `data` to send binary over the HTTP API. Centrifugo decodes it before publishing.
+- `skip_history` - Skips adding this publication to the channel history.
+- `tags` - A map of arbitrary string keys and values attached to the publication and delivered to clients.
+- `idempotency_key` - Drops duplicate publications upon retries: a publication with a key already used in the channel is not published again, and the first one's result is returned. It acts per channel; results are kept for 5 minutes by default. The memory, Redis and PostgreSQL brokers keep keys; the NATS broker ignores them.
+- `delta` - Tells Centrifugo to construct a delta update, if possible, when broadcasting the publication to subscribers.
+- `version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
+- `version_epoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
+
+#### `refresh(
+    *,
+    user: str = '',
+    client: str = '',
+    expired: bool = False,
+    expire_at: int = 0,
+    info: JSON = None,
+    session: str = '',
+    label_filter: FilterNode | None = None,
+    all_users: bool = False,
+) -> Command`
+
+The refresh command.
+
+Arguments:
+
+- `user` - The ID of the user to refresh. Required, unless all_users is used in Centrifugo PRO.
+- `client` - Limits the call to the connection with this client ID. user is still required.
+- `expired` - Marks the connections as expired and closes them with an expired disconnect reason.
+- `expire_at` - The Unix time in seconds when the connections expire.
+- `info` - Attaches or replaces the connection info.
+- `session` - Limits the call to the connection with this session ID. user is still required.
+- `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
+- `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
+
+#### `revoke_token(*, expire_at: int = 0, uid: str = '') -> Command`
+
+The revoke_token command.
+
+Arguments:
+
+- `expire_at` - The Unix time in seconds when the revocation expires. Optional, but a value matching the token expiration is recommended.
+- `uid` - The unique ID of the token to revoke (jti claim). Required.
+
+#### `send_push_notification(
+    *,
+    recipient: PushRecipient | None = None,
+    notification: PushNotification | None = None,
+    uid: str = '',
+    send_at: int = 0,
+    optimize_for_reliability: bool = False,
+    limit_strategy: PushLimitStrategy | None = None,
+    analytics_uid: str = '',
+    localizations: dict[str, PushLocalization] | None = None,
+    use_templating: bool = False,
+    use_meta: bool = False,
+) -> Command`
+
+The send_push_notification command.
+
+Arguments:
+
+- `recipient` - Who receives the notification. Required.
+- `notification` - The notification to send. Required.
+- `uid` - A unique identifier of the request, can be used to cancel the push. UUID v4 is recommended; different requests must use different uids.
+- `send_at` - The Unix time in seconds when to send the notification. If not set, the notification is sent immediately.
+- `optimize_for_reliability` - Makes processing heavier, but tolerates edge cases, like not losing inflight pushes when the queue is briefly unavailable.
+- `limit_strategy` - Sets time constraints and rate limits. Only applies with a filter recipient; devices are then processed one by one instead of in batches.
+- `analytics_uid` - The identifier for push notification analytics. If not set, uid is used.
+- `localizations` - Optional per language/locale localizations. Setting them enables templating.
+- `use_templating` - Enables templating of the notification. Only works with a filter recipient.
+- `use_meta` - Additionally loads device meta while sending, making it available in templating.
+
+#### `shared_poll_publish(
+    *,
+    channel: str = '',
+    key: str = '',
+    data: JSON = None,
+    b64data: str = '',
+    version: int = 0,
+    epoch: str = '',
+) -> Command`
+
+The shared_poll_publish command.
+
+Arguments:
+
+- `channel` - The name of the shared poll channel. Required.
+- `key` - The item key. Required.
+- `data` - The item data, delivered to clients as is.
+- `b64data` - Data as base64, for binary payloads. Centrifugo decodes it.
+- `version` - The item version, must be >= 1. Required. A version not higher than the current one within the same epoch is silently dropped.
+- `epoch` - The channel-level publisher epoch. A change resets per-key versions and unsubscribes current subscribers with insufficient state.
+
+#### `subscribe(
+    *,
+    channel: str = '',
+    user: str = '',
+    expire_at: int = 0,
+    info: JSON = None,
+    b64info: str = '',
+    client: str = '',
+    data: JSON = None,
+    b64data: str = '',
+    recover_since: StreamPosition | None = None,
+    override: SubscribeOptionOverride | None = None,
+    session: str = '',
+    label_filter: FilterNode | None = None,
+    all_users: bool = False,
+) -> Command`
+
+The subscribe command.
+
+Arguments:
+
+- `channel` - The name of the channel to subscribe to. Required.
+- `user` - The ID of the user to subscribe. Required, unless all_users is used in Centrifugo PRO.
+- `expire_at` - The Unix time in seconds when the subscription expires.
+- `info` - Custom channel info attached to the subscription, used in presence and join/leave messages.
+- `b64info` - Info as base64, for binary. Centrifugo decodes it.
+- `client` - Limits the call to the connection with this client ID. user is still required.
+- `data` - Custom subscription data sent to the client in the Subscribe push.
+- `b64data` - Data as base64, for binary. Centrifugo decodes it.
+- `recover_since` - The stream position to recover publications from.
+- `override` - Dynamically overrides some channel options set in the Centrifugo configuration.
+- `session` - Limits the call to the connection with this session ID. user is still required.
+- `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
+- `all_users` - When user is empty, targets every connection on every node instead of the anonymous-only bucket. No effect when user is non-empty. Without label_filter it acts on every connection. Centrifugo PRO only.
+
+#### `unblock_user(*, user: str = '') -> Command`
+
+The unblock_user command.
+
+Arguments:
+
+- `user` - The ID of the user to unblock. Required.
+
+#### `unsubscribe(
+    *,
+    channel: str = '',
+    user: str = '',
+    client: str = '',
+    session: str = '',
+    label_filter: FilterNode | None = None,
+    all_users: bool = False,
+) -> Command`
+
+The unsubscribe command.
+
+Arguments:
+
+- `channel` - The name of the channel to unsubscribe from. Required.
+- `user` - The ID of the user to unsubscribe. Required, unless all_users is used in Centrifugo PRO.
+- `client` - Limits the call to the connection with this client ID. user is still required.
+- `session` - Limits the call to the connection with this session ID. user is still required.
+- `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
+- `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
+
+#### `update_push_status(
+    *,
+    analytics_uid: str = '',
+    status: str = '',
+    device_id: str = '',
+    msg_id: str = '',
+) -> Command`
+
+The update_push_status command.
+
+Arguments:
+
+- `analytics_uid` - The analytics_uid of the push notification (as in SendPushNotificationRequest). Required.
+- `status` - The status of the push notification: delivered or interacted. Required.
+- `device_id` - The Centrifugo device ID. Required.
+- `msg_id` - The message ID issued by the provider.
+
+#### `update_user_status(*, users: list[str] | None = None, state: str = '') -> Command`
+
+The update_user_status command.
+
+Arguments:
+
+- `users` - The list of user IDs to update the status for. Required.
+- `state` - An optional custom state to store in the user status. It can be restricted by the user_status.state_regex option.
+
+#### `user_topic_list(
+    *,
+    filter: UserTopicFilter | None = None,
+    include_total_count: bool = False,
+    cursor: str = '',
+    limit: int = 0,
+) -> Command`
+
+The user_topic_list command.
+
+Arguments:
+
+- `filter` - Selects the user topics to list.
+- `include_total_count` - Includes the total count for the filter in the result.
+- `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
+- `limit` - The maximum number of items to return.
+
+#### `user_topic_update(*, user: str = '', op: str = '', topics: list[str] | None = None) -> Command`
+
+The user_topic_update command.
+
+Arguments:
+
+- `user` - The user ID. Required.
+- `op` - The operation: add, remove or set. Required.
+- `topics` - The topics for the operation.
 
 ### `FailedCommand`
 
@@ -1226,19 +3861,6 @@ for attempt in itertools.count(1):
 Retry a broadcast with broadcast_with_retry instead: repeating it resends
 to the channels which already got it.
 
-### `new_command(request: Request) -> Command`
-
-The command making the API call request. The request is checked as a
-Client checks it before sending - an invalid one raises
-InvalidRequestError here, rather than in Centrifugo, whose consumers drop
-a command they cannot run - and encoded.
-
-```python
-cmd = cent.new_command(cent.PublishRequest(channel="news", data={"text": "hi"}))
-cur.execute("INSERT INTO centrifugo_outbox (method, payload, partition) VALUES (%s, %s, 0)",
-            (cmd.method, cmd.payload))
-```
-
 ### `retryable(err: BaseException | None) -> bool`
 
 Whether a new attempt, with time left, may succeed after err: the error
@@ -1304,13 +3926,13 @@ propagates, chained to the broadcast's error (``__cause__``), which carries
 the result when Centrifugo replied. The wait never outlasts the call's
 timeout.
 
-### `Request`
+### `command`
 
 ```python
-Request = PublishRequest | BroadcastRequest | SubscribeRequest | UnsubscribeRequest | DisconnectRequest | P...
+command = Commands()
 ```
 
-Any request of the server API: what Client methods and new_command take.
+The commands for Centrifugo's async consumers: cent.command.publish(...) and the like.
 
 ## cent: errors
 
@@ -1340,7 +3962,7 @@ Any request of the server API: what Client methods and new_command take.
 ### `ApiError`
 
 ```python
-ApiError(code: int, message: str='', temporary: bool=False) -> None
+ApiError(code: int, message: str = '', temporary: bool = False) -> None
 ```
 
 An error of Centrifugo itself: it understood the request and refused it,
@@ -1356,7 +3978,7 @@ handle and treat the rest by their class.
 - `message: str`
 - `temporary: bool`
 
-#### `from_wire(code: int, message: str='', temporary: bool=False) -> ApiError`
+#### `from_wire(code: int, message: str = '', temporary: bool = False) -> ApiError`
 
 The error for code: the subclass of a known code, ApiError otherwise.
 
@@ -1364,7 +3986,7 @@ The error for code: the subclass of a known code, ApiError otherwise.
 
 Code 107: Centrifugo refused the request as invalid.
 
-#### `from_wire(code: int, message: str='', temporary: bool=False) -> ApiError`
+#### `from_wire(code: int, message: str = '', temporary: bool = False) -> ApiError`
 
 The error for code: the subclass of a known code, ApiError otherwise.
 
@@ -1441,7 +4063,7 @@ A call made after the client was closed.
 Code 113: the request conflicts with the current state - a map publish
 whose version check failed, say.
 
-#### `from_wire(code: int, message: str='', temporary: bool=False) -> ApiError`
+#### `from_wire(code: int, message: str = '', temporary: bool = False) -> ApiError`
 
 The error for code: the subclass of a known code, ApiError otherwise.
 
@@ -1454,7 +4076,7 @@ else - a proxy, a web page - answers instead.
 ### `HTTPError`
 
 ```python
-HTTPError(status_code: int, body: bytes=b'', headers: Mapping[str, str] | None=None) -> None
+HTTPError(status_code: int, body: bytes = b'', headers: Mapping[str, str] | None = None) -> None
 ```
 
 A reply with an HTTP status other than 200: the request did not reach the
@@ -1468,7 +4090,7 @@ API method. A 401 is an UnauthorizedError.
 
 Code 100: an internal error of Centrifugo, temporary.
 
-#### `from_wire(code: int, message: str='', temporary: bool=False) -> ApiError`
+#### `from_wire(code: int, message: str = '', temporary: bool = False) -> ApiError`
 
 The error for code: the subclass of a known code, ApiError otherwise.
 
@@ -1496,7 +4118,7 @@ TLS handshake. The cause is chained.
 Code 108: the feature is not available - history or presence off in the
 channel's namespace, say.
 
-#### `from_wire(code: int, message: str='', temporary: bool=False) -> ApiError`
+#### `from_wire(code: int, message: str = '', temporary: bool = False) -> ApiError`
 
 The error for code: the subclass of a known code, ApiError otherwise.
 
@@ -1507,7 +4129,7 @@ Code 104: what the request refers to was not found.
 A method only Centrifugo PRO has, sent in a batch to Centrifugo OSS, fails
 with it too, instead of the 404 it gets when sent alone.
 
-#### `from_wire(code: int, message: str='', temporary: bool=False) -> ApiError`
+#### `from_wire(code: int, message: str = '', temporary: bool = False) -> ApiError`
 
 The error for code: the subclass of a known code, ApiError otherwise.
 
@@ -1515,7 +4137,7 @@ The error for code: the subclass of a known code, ApiError otherwise.
 
 Code 111: a rate limit was reached, temporary.
 
-#### `from_wire(code: int, message: str='', temporary: bool=False) -> ApiError`
+#### `from_wire(code: int, message: str = '', temporary: bool = False) -> ApiError`
 
 The error for code: the subclass of a known code, ApiError otherwise.
 
@@ -1528,7 +4150,7 @@ bearer token.
 
 Code 102: the channel is not in a namespace Centrifugo is configured with.
 
-#### `from_wire(code: int, message: str='', temporary: bool=False) -> ApiError`
+#### `from_wire(code: int, message: str = '', temporary: bool = False) -> ApiError`
 
 The error for code: the subclass of a known code, ApiError otherwise.
 
@@ -1536,7 +4158,7 @@ The error for code: the subclass of a known code, ApiError otherwise.
 
 Code 112: the stream position asked for is not in the history any more.
 
-#### `from_wire(code: int, message: str='', temporary: bool=False) -> ApiError`
+#### `from_wire(code: int, message: str = '', temporary: bool = False) -> ApiError`
 
 The error for code: the subclass of a known code, ApiError otherwise.
 
@@ -1599,9 +4221,9 @@ the connection and subscription tokens users hold:
 APITokens(
     *,
     claims: APIClaims,
-    key: Key | None=None,
+    key: Key | None = None,
     current_key: Callable[[], Key] | None=None,
-    ttl: float=300.0,
+    ttl: float = 300.0,
 ) -> None
 ```
 
@@ -1660,7 +4282,7 @@ https://centrifugal.dev/docs/server/authentication.
 ### `Key`
 
 ```python
-Key(alg: str, sign: Callable[[bytes], bytes], jwk: dict[str, str] | None, kid: str='') -> None
+Key(alg: str, sign: Callable[[bytes], bytes], jwk: dict[str, str] | None, kid: str = '') -> None
 ```
 
 A key signing tokens, matching the one Centrifugo verifies with. Make one
@@ -1681,7 +4303,7 @@ A key signing with EdDSA, whose public key is Centrifugo's
 client.token.ed25519_public_key (Centrifugo v6.10.2+), or is published
 in its JWKS with jwks.
 
-#### `from_pem(pem: bytes | str, password: bytes | None=None) -> Key`
+#### `from_pem(pem: bytes | str, password: bytes | None = None) -> Key`
 
 The key of a PEM-encoded private key - RSA, ECDSA or Ed25519 - as
 Key.rsa, Key.ecdsa or Key.ed25519 make it.
@@ -1812,11 +4434,11 @@ here, when the endpoint is built.
 #### `async ahandle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request, awaiting an async function. A blocking one runs in
@@ -1834,11 +4456,11 @@ in FastAPI or Starlette, say.
 #### `handle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request with a blocking function. raw is passed on to the
@@ -1855,7 +4477,7 @@ needs a blocking function.
 ConnectionToken(
     issue: Callable[[HTTPRequest], str | Awaitable[str]],
     *,
-    on_error: OnError | None=None,
+    on_error: OnError | None = None,
 ) -> None
 ```
 
@@ -1867,11 +4489,11 @@ be a coroutine function, served by ahandle and asgi.
 #### `async ahandle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request, awaiting an async function. A blocking one runs in
@@ -1889,11 +4511,11 @@ in FastAPI or Starlette, say.
 #### `handle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request with a blocking function. raw is passed on to the
@@ -1910,7 +4532,7 @@ needs a blocking function.
 SharedPollSignature(
     sign: Callable[[HTTPRequest, str, list[str]], tuple[Sequence[str], str] | Awaitable[tuple[Sequence[str], str]]],
     *,
-    on_error: OnError | None=None,
+    on_error: OnError | None = None,
 ) -> None
 ```
 
@@ -1929,11 +4551,11 @@ key fails the request with 500.
 #### `async ahandle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request, awaiting an async function. A blocking one runs in
@@ -1951,11 +4573,11 @@ in FastAPI or Starlette, say.
 #### `handle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request with a blocking function. raw is passed on to the
@@ -1972,7 +4594,7 @@ needs a blocking function.
 SubscriptionToken(
     issue: Callable[[HTTPRequest, str], str | Awaitable[str]],
     *,
-    on_error: OnError | None=None,
+    on_error: OnError | None = None,
 ) -> None
 ```
 
@@ -1985,11 +4607,11 @@ or from a GET's channel query parameter; it is required.
 #### `async ahandle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request, awaiting an async function. A blocking one runs in
@@ -2007,11 +4629,11 @@ in FastAPI or Starlette, say.
 #### `handle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request with a blocking function. raw is passed on to the
@@ -2044,7 +4666,7 @@ changes.
     user: str,
     channel: str,
     keys: Sequence[str],
-    expires_at: datetime | None=None,
+    expires_at: datetime | None = None,
 ) -> str`
 
 The signature authorizing user to track keys in channel until expires_at,
@@ -2138,11 +4760,11 @@ Disconnect closes it with that code.
 #### `async ahandle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request, awaiting an async function. A blocking one runs in
@@ -2160,11 +4782,11 @@ in FastAPI or Starlette, say.
 #### `handle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request with a blocking function. raw is passed on to the
@@ -2178,7 +4800,7 @@ needs a blocking function.
 ### `Disconnect`
 
 ```python
-Disconnect(code: int, reason: str='') -> None
+Disconnect(code: int, reason: str = '') -> None
 ```
 
 Raised by a proxy function to close the client's connection: code in
@@ -2193,11 +4815,11 @@ a key into a map channel, and may change the publication.
 #### `async ahandle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request, awaiting an async function. A blocking one runs in
@@ -2215,11 +4837,11 @@ in FastAPI or Starlette, say.
 #### `handle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request with a blocking function. raw is passed on to the
@@ -2238,11 +4860,11 @@ key from a map channel.
 #### `async ahandle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request, awaiting an async function. A blocking one runs in
@@ -2260,11 +4882,11 @@ in FastAPI or Starlette, say.
 #### `handle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request with a blocking function. raw is passed on to the
@@ -2286,11 +4908,11 @@ and the client which subscribed is disconnected to reconnect.
 #### `async ahandle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request, awaiting an async function. A blocking one runs in
@@ -2308,11 +4930,11 @@ in FastAPI or Starlette, say.
 #### `handle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request with a blocking function. raw is passed on to the
@@ -2332,11 +4954,11 @@ exception, fails the request.
 #### `async ahandle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request, awaiting an async function. A blocking one runs in
@@ -2354,11 +4976,11 @@ in FastAPI or Starlette, say.
 #### `handle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request with a blocking function. raw is passed on to the
@@ -2372,7 +4994,7 @@ needs a blocking function.
 ### `ProxyError`
 
 ```python
-ProxyError(code: int, message: str='', temporary: bool=False) -> None
+ProxyError(code: int, message: str = '', temporary: bool = False) -> None
 ```
 
 Raised by a proxy function to reject the client's request with this error:
@@ -2388,11 +5010,11 @@ Disconnect closes the connection.
 #### `async ahandle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request, awaiting an async function. A blocking one runs in
@@ -2410,11 +5032,11 @@ in FastAPI or Starlette, say.
 #### `handle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request with a blocking function. raw is passed on to the
@@ -2433,11 +5055,11 @@ the call; Disconnect closes the connection.
 #### `async ahandle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request, awaiting an async function. A blocking one runs in
@@ -2455,11 +5077,11 @@ in FastAPI or Starlette, say.
 #### `handle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request with a blocking function. raw is passed on to the
@@ -2480,11 +5102,11 @@ for another minute before asking again.
 #### `async ahandle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request, awaiting an async function. A blocking one runs in
@@ -2502,11 +5124,11 @@ in FastAPI or Starlette, say.
 #### `handle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request with a blocking function. raw is passed on to the
@@ -2527,11 +5149,11 @@ interval.
 #### `async ahandle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request, awaiting an async function. A blocking one runs in
@@ -2549,11 +5171,11 @@ in FastAPI or Starlette, say.
 #### `handle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request with a blocking function. raw is passed on to the
@@ -2574,11 +5196,11 @@ subscription for another minute before asking again.
 #### `async ahandle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request, awaiting an async function. A blocking one runs in
@@ -2596,11 +5218,11 @@ in FastAPI or Starlette, say.
 #### `handle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request with a blocking function. raw is passed on to the
@@ -2620,11 +5242,11 @@ connection.
 #### `async ahandle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request, awaiting an async function. A blocking one runs in
@@ -2642,11 +5264,11 @@ in FastAPI or Starlette, say.
 #### `handle(
     method: str,
     headers: Mapping[str, str] | Iterable[tuple[str, str]] | None=None,
-    body: bytes=b'',
+    body: bytes = b'',
     *,
-    query: Mapping[str, str] | None=None,
-    path: str='',
-    raw: Any=None,
+    query: Mapping[str, str] | None = None,
+    path: str = '',
+    raw: Any = None,
 ) -> HTTPResponse`
 
 Answers a request with a blocking function. raw is passed on to the
@@ -2660,7 +5282,7 @@ needs a blocking function.
 ## cent: request and result types
 
 <details>
-<summary>114 types</summary>
+<summary>76 types</summary>
 
 #### `ApnsPushNotification`
 
@@ -2669,39 +5291,10 @@ ApnsPushNotification is a notification for APNs. Centrifugo PRO only.
 - `headers: dict[str, str] = {}` - headers are the APNs request headers.
 - `payload: JSON = None` - payload is the APNs payload as JSON. Required.
 
-#### `BlockUserRequest`
-
-BlockUserRequest blocks a user: the user is disconnected and can not
-connect again until unblocked or the block expires. Centrifugo PRO only.
-
-- `expire_at: int = 0` - expire_at is the Unix time in seconds when the block expires. Optional, but a reasonably small value is recommended to keep the set of blocked users small.
-- `user: str = ''` - user is the ID of the user to block. Required.
-
 #### `BlockUserResult`
 
 BlockUserResult is the result of a block user call. Empty at the moment.
 Centrifugo PRO only.
-
-#### `BroadcastRequest`
-
-BroadcastRequest publishes the same data into many channels.
-
-- `channels: list[str] = []` - channels is the list of channels to publish into. Required.
-- `data: JSON = None` - data is the payload to publish into each channel. Required unless b64data is set. In the HTTP API it is any JSON value; over GRPC it may be binary.
-- `b64data: str = ''` - b64data is a base64-encoded binary payload, an alternative to `data` to send binary over the HTTP API. Centrifugo decodes it before publishing.
-- `skip_history: bool = False` - skip_history skips adding the publications to the channels' history.
-- `tags: dict[str, str] = {}` - tags is a map of arbitrary string keys and values attached to each publication and delivered to clients.
-- `idempotency_key: str = ''` - idempotency_key drops duplicate publications upon retries. It acts per channel: a broadcast retried with the same key is not published again into the channels which already have it. Results are kept for 5 minutes by default. The memory, Redis and PostgreSQL brokers keep keys; the NATS broker ignores them.
-- `delta: bool = False` - delta tells Centrifugo to construct a delta update, if possible, when broadcasting the publications to subscribers.
-- `version: int = 0` - version, when > 0, is the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
-- `version_epoch: str = ''` - version_epoch is the epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
-
-#### `CancelPushRequest`
-
-CancelPushRequest cancels a delayed push notification (sent with
-send_at). Centrifugo PRO only.
-
-- `uid: str = ''` - uid is the uid of the push notification to cancel. Required.
 
 #### `CancelPushResult`
 
@@ -2720,13 +5313,6 @@ Centrifugo PRO only.
 ChannelInfo is information about an active channel.
 
 - `num_clients: int = 0` - num_clients is the number of connections subscribed to the channel.
-
-#### `ChannelsRequest`
-
-ChannelsRequest returns active channels (with one or more subscribers).
-It can be heavy on large deployments: there is no pagination.
-
-- `pattern: str = ''` - pattern filters channels by name, using gobwas/glob syntax.
 
 #### `ChannelsResult`
 
@@ -2776,28 +5362,12 @@ Centrifugo PRO only.
 - `uid: str = ''` - uid is the unique token ID (jti claim).
 - `issued_at: int = 0` - issued_at is the Unix time in seconds when the token was issued.
 
-#### `ConnectionsRequest`
-
-ConnectionsRequest returns information about active connections, without
-the need to enable presence. At least one of user, expression or
-label_filter must be set. Centrifugo PRO only.
-
-- `user: str = ''` - user returns only the connections of this user ID.
-- `expression: str = ''` - expression is a CEL expression to filter connections.
-- `label_filter: FilterNode | None = None` - label_filter restricts the listing to clients whose labels match this filter. Centrifugo PRO only.
-
 #### `ConnectionsResult`
 
 ConnectionsResult is the result of a connections call.
 Centrifugo PRO only.
 
 - `connections: dict[str, ConnectionInfo] = {}` - connections maps client ID to information about the connection.
-
-#### `DeleteUserStatusRequest`
-
-DeleteUserStatusRequest deletes the status of users. Centrifugo PRO only.
-
-- `users: list[str] = []` - users is the list of user IDs to delete the status for. Required.
 
 #### `DeleteUserStatusResult`
 
@@ -2831,19 +5401,6 @@ DeviceFilter selects devices. Centrifugo PRO only.
 - `providers: list[str] = []` - providers selects devices by token provider.
 - `platforms: list[str] = []` - platforms selects devices by platform.
 
-#### `DeviceListRequest`
-
-DeviceListRequest returns a paginated list of registered devices.
-Centrifugo PRO only.
-
-- `filter: DeviceFilter | None = None` - filter selects the devices to list. Required.
-- `include_total_count: bool = False` - include_total_count includes the total count for the filter in the result.
-- `include_meta: bool = False` - include_meta includes meta of each device.
-- `include_topics: bool = False` - include_topics includes topics of each device.
-- `include_webpush_keys: bool = False` - include_webpush_keys includes webpush_keys of each device (webpush only).
-- `cursor: str = ''` - cursor is the pagination cursor: next_cursor of the previous page, empty for the first page.
-- `limit: int = 0` - limit is the maximum number of devices to return.
-
 #### `DeviceListResult`
 
 DeviceListResult is the result of a device list call.
@@ -2865,35 +5422,12 @@ DeviceMetaUpdate sets the meta of devices. Centrifugo PRO only.
 
 - `meta: dict[str, str] = {}` - meta is the meta to set. Required.
 
-#### `DeviceRegisterRequest`
-
-DeviceRegisterRequest registers a device for push notifications, or
-updates a registered one. Centrifugo PRO only.
-
-- `id: str = ''` - id is the device ID. Omit it on first registration: Centrifugo generates one and returns it. Pass the stored value to update the device.
-- `provider: str = ''` - provider is the provider of the device token: fcm, hms, apns or webpush. Required.
-- `token: str = ''` - token is the push token of the device. For webpush, it is the browser PushSubscription serialized as a JSON string. Required.
-- `platform: str = ''` - platform is the device platform: ios, android or web. Required.
-- `user: str = ''` - user is the user associated with the device.
-- `meta: dict[str, str] = {}` - meta is additional custom metadata of the device.
-- `topics: list[str] = []` - topics is the full list of the device's topic subscriptions, replacing the previous one. The user's topics are attached automatically.
-- `timezone: str = ''` - timezone is the IANA time zone of the device user, for example Europe/Nicosia.
-- `locale: str = ''` - locale is the locale of the device user as an IETF BCP 47 language tag, for example en-US.
-
 #### `DeviceRegisterResult`
 
 DeviceRegisterResult is the result of a device register call.
 Centrifugo PRO only.
 
 - `id: str = ''` - id is the ID of the registered or updated device.
-
-#### `DeviceRemoveRequest`
-
-DeviceRemoveRequest removes devices, selected by ids and/or users.
-Centrifugo PRO only.
-
-- `ids: list[str] = []` - ids selects devices to remove by ID.
-- `users: list[str] = []` - users selects devices to remove by user.
 
 #### `DeviceRemoveResult`
 
@@ -2925,17 +5459,6 @@ DeviceTopicFilter selects device topic subscriptions. Centrifugo PRO only.
 - `topics: list[str] = []` - topics selects by topic.
 - `topic_prefix: str = ''` - topic_prefix selects by topic prefix.
 
-#### `DeviceTopicListRequest`
-
-DeviceTopicListRequest returns a paginated list of device topic
-subscriptions. Centrifugo PRO only.
-
-- `filter: DeviceTopicFilter | None = None` - filter selects the device topics to list.
-- `include_total_count: bool = False` - include_total_count includes the total count for the filter in the result.
-- `include_device: bool = False` - include_device includes the Device of each item.
-- `cursor: str = ''` - cursor is the pagination cursor: next_cursor of the previous page, empty for the first page.
-- `limit: int = 0` - limit is the maximum number of items to return.
-
 #### `DeviceTopicListResult`
 
 DeviceTopicListResult is the result of a device topic list call.
@@ -2944,17 +5467,6 @@ Centrifugo PRO only.
 - `items: list[DeviceTopic] = []` - items are the device topics of this page.
 - `next_cursor: str = ''` - next_cursor is the cursor of the next page. Empty if there is no next page.
 - `total_count: int = 0` - total_count is the total count for the filter, if include_total_count was set.
-
-#### `DeviceTopicUpdateRequest`
-
-DeviceTopicUpdateRequest changes the topics of a device. The device topic
-list is what decides who gets a push sent to a topic.
-Centrifugo PRO only.
-
-- `device_id: str = ''` - device_id is the ID of the device. Required.
-- `op: str = ''` - op is the operation: add, remove or set. Required.
-- `topics: list[str] = []` - topics are the topics for the operation.
-- `user: str = ''` - user is an optional ownership guard: the update is applied only if the device currently belongs to this user. Otherwise the call fails with a conflict error (or not found if there is no such device).
 
 #### `DeviceTopicUpdateResult`
 
@@ -2967,19 +5479,6 @@ DeviceTopicsUpdate changes the topics of devices. Centrifugo PRO only.
 
 - `op: str = ''` - op is the operation: add, remove or set. Required.
 - `topics: list[str] = []` - topics are the topics for the operation.
-
-#### `DeviceUpdateRequest`
-
-DeviceUpdateRequest updates registered devices, selected by ids and/or
-users. Centrifugo PRO only.
-
-- `ids: list[str] = []` - ids selects devices by ID.
-- `users: list[str] = []` - users selects devices by user.
-- `user_update: DeviceUserUpdate | None = None` - user_update changes the user ID of the devices. It does not re-sync user-bound topics; use DeviceRegisterRequest to assign a device to another user.
-- `meta_update: DeviceMetaUpdate | None = None` - meta_update updates the device meta.
-- `topics_update: DeviceTopicsUpdate | None = None` - topics_update updates the device topics.
-- `timezone_update: DeviceTimezoneUpdate | None = None` - timezone_update updates the device timezone.
-- `locale_update: DeviceLocaleUpdate | None = None` - locale_update updates the device locale.
 
 #### `DeviceUpdateResult`
 
@@ -2998,18 +5497,6 @@ Disconnect describes the code and reason clients are disconnected with.
 
 - `code: int = 0` - code is the disconnect code.
 - `reason: str = ''` - reason is the disconnect reason.
-
-#### `DisconnectRequest`
-
-DisconnectRequest disconnects a user's connections.
-
-- `user: str = ''` - user is the ID of the user to disconnect. Required, unless all_users is used in Centrifugo PRO.
-- `disconnect: Disconnect | None = None` - disconnect is a custom disconnect code and reason. If not set, clients are disconnected with a force no-reconnect disconnect.
-- `client: str = ''` - client limits the call to the connection with this client ID. user is still required.
-- `whitelist: list[str] = []` - whitelist is a list of client IDs to keep connected.
-- `session: str = ''` - session limits the call to the connection with this session ID. user is still required.
-- `label_filter: FilterNode | None = None` - label_filter restricts the call to clients whose labels match this filter. Centrifugo PRO only.
-- `all_users: bool = False` - all_users works as SubscribeRequest.all_users. Centrifugo PRO only.
 
 #### `DisconnectResult`
 
@@ -3037,12 +5524,6 @@ Centrifugo OSS parses it but ignores it.
 - `vals: list[str] = []` - vals are the values to compare with, for "in" and "nin".
 - `nodes: list[FilterNode] = []` - nodes are the child nodes of a logical operation.
 
-#### `GetUserStatusRequest`
-
-GetUserStatusRequest returns the status of users. Centrifugo PRO only.
-
-- `users: list[str] = []` - users is the list of user IDs to get the status for. Required.
-
 #### `GetUserStatusResult`
 
 GetUserStatusResult is the result of a get user status call.
@@ -3050,28 +5531,10 @@ Centrifugo PRO only.
 
 - `statuses: list[UserStatus] = []` - statuses are the statuses of the requested users, in the same order.
 
-#### `HistoryRemoveRequest`
-
-HistoryRemoveRequest removes publications from the history of a channel.
-The current top stream position is kept, so clients do not get
-disconnected because of insufficient state.
-
-- `channel: str = ''` - channel is the name of the channel. Required.
-
 #### `HistoryRemoveResult`
 
 HistoryRemoveResult is the result of a history remove call. Empty at the
 moment.
-
-#### `HistoryRequest`
-
-HistoryRequest returns publications from the history of a channel.
-History must be enabled for the channel.
-
-- `channel: str = ''` - channel is the name of the channel. Required.
-- `limit: int = 0` - limit is the maximum number of publications to return; -1 returns all the channel keeps. If not set, only the current stream position is returned, without publications.
-- `since: StreamPosition | None = None` - since returns publications after this stream position.
-- `reverse: bool = False` - reverse iterates in reverse order, from latest to earliest.
 
 #### `HistoryResult`
 
@@ -3087,36 +5550,16 @@ HmsPushNotification is a notification for HMS. Centrifugo PRO only.
 
 - `message: JSON = None` - message is the HMS Message object as JSON. Required.
 
-#### `InfoRequest`
-
-InfoRequest returns information about the running Centrifugo nodes.
-
 #### `InfoResult`
 
 InfoResult is the result of an info call.
 
 - `nodes: list[NodeResult] = []` - nodes is information about all nodes of the cluster.
 
-#### `InvalidateUserTokensRequest`
-
-InvalidateUserTokensRequest revokes all tokens of a user issued before a
-certain time (based on the iat claim of a JWT). Centrifugo PRO only.
-
-- `expire_at: int = 0` - expire_at is the Unix time in seconds when the invalidation expires. Optional, but a value matching the token expiration is recommended.
-- `user: str = ''` - user is the ID of the user whose tokens to invalidate. Required.
-- `issued_before: int = 0` - issued_before is the Unix time in seconds: tokens issued before it are considered revoked. If not set, the current time is used.
-- `channel: str = ''` - channel limits the invalidation to subscription tokens for this channel.
-
 #### `InvalidateUserTokensResult`
 
 InvalidateUserTokensResult is the result of an invalidate user tokens
 call. Empty at the moment. Centrifugo PRO only.
-
-#### `MapClearRequest`
-
-MapClearRequest removes all state and stream data of a map channel.
-
-- `channel: str = ''` - channel is the name of the map channel. Required.
 
 #### `MapClearResult`
 
@@ -3134,24 +5577,6 @@ MapEntry is an entry of a map channel state or stream.
 - `removed: bool = False` - removed is true for a removal event.
 - `time: int = 0` - time is the time of the publication as Unix milliseconds, if known.
 
-#### `MapPublishRequest`
-
-MapPublishRequest publishes or updates a key in a map channel.
-
-- `channel: str = ''` - channel is the name of the map channel. Required.
-- `key: str = ''` - key is the entry key. Required.
-- `data: JSON = None` - data is the entry data. In the HTTP API it is any JSON value; over GRPC it may be binary.
-- `b64data: str = ''` - b64data is data as base64, for binary over the HTTP API. Centrifugo decodes it.
-- `stream_data: JSON = None` - stream_data is currently not used by the server API.
-- `b64stream_data: str = ''` - b64stream_data is currently not used by the server API.
-- `tags: dict[str, str] = {}` - tags are key-value metadata attached to the publication.
-- `idempotency_key: str = ''` - idempotency_key drops duplicate publications upon retries: a publication with a key already used in the channel is not applied again, and its result has the first one's position, with suppressed set and suppress_reason "idempotency". It acts per channel; keys are kept for 5 minutes by default. Every map broker - memory, Redis and PostgreSQL - keeps keys.
-- `delta: bool = False` - delta enables delta compression for this publication.
-- `version: int = 0` - version is a per-key version: publications with a version not higher than the key's current one are suppressed.
-- `version_epoch: str = ''` - version_epoch scopes version. A different epoch resets version comparison.
-- `score: int = 0` - score is currently not used by the server API.
-- `key_mode: str = ''` - key_mode makes the publish conditional: "if_new" writes only if the key does not exist, "if_exists" only if it exists. Empty always writes.
-
 #### `MapPublishResult`
 
 MapPublishResult is the result of a map publish call.
@@ -3160,19 +5585,6 @@ MapPublishResult is the result of a map publish call.
 - `epoch: str = ''` - epoch is the epoch of the channel stream.
 - `suppressed: bool = False` - suppressed is true if the publish was not applied, see suppress_reason.
 - `suppress_reason: str = ''` - suppress_reason explains why the publish was suppressed, for example "idempotency", "version", "key_exists" or "key_not_found".
-
-#### `MapReadStateRequest`
-
-MapReadStateRequest reads the current state of a map channel, with
-optional pagination.
-
-- `channel: str = ''` - channel is the name of the map channel. Required.
-- `cursor: str = ''` - cursor is the pagination cursor from the previous page. Empty starts from the beginning.
-- `limit: int = 0` - limit is the maximum number of entries per page: -1 means no limit, 0 returns only the stream position. Page sizes may exceed it with the Redis map broker.
-- `key: str = ''` - key reads a single entry by exact key. cursor and limit are ignored when it is set.
-- `asc: bool = False` - asc sorts ordered state by score ascending instead of descending. Ignored for unordered channels.
-- `revision_offset: int = 0` - revision_offset is the offset of the position from a previous state read, used with revision_epoch.
-- `revision_epoch: str = ''` - revision_epoch is the epoch of the position from a previous state read. If the epoch changed, the call fails with an unrecoverable position error.
 
 #### `MapReadStateResult`
 
@@ -3183,16 +5595,6 @@ MapReadStateResult is the result of a map read state call.
 - `epoch: str = ''` - epoch is the epoch of the channel stream position.
 - `cursor: str = ''` - cursor is the cursor of the next page. Empty if there are no more entries.
 
-#### `MapReadStreamRequest`
-
-MapReadStreamRequest reads the change stream of a map channel.
-
-- `channel: str = ''` - channel is the name of the map channel. Required.
-- `since_offset: int = 0` - since_offset returns entries after this offset, used with since_epoch.
-- `since_epoch: str = ''` - since_epoch is the epoch of the since position. It must match the current stream epoch.
-- `limit: int = 0` - limit is the maximum number of entries: -1 means no limit, 0 returns only the stream position.
-- `reverse: bool = False` - reverse returns entries newest first.
-
 #### `MapReadStreamResult`
 
 MapReadStreamResult is the result of a map read stream call.
@@ -3200,14 +5602,6 @@ MapReadStreamResult is the result of a map read stream call.
 - `entries: list[MapEntry] = []` - entries are the stream entries.
 - `offset: int = 0` - offset is the top offset of the channel stream.
 - `epoch: str = ''` - epoch is the epoch of the channel stream.
-
-#### `MapRemoveRequest`
-
-MapRemoveRequest removes a key from a map channel.
-
-- `channel: str = ''` - channel is the name of the map channel. Required.
-- `key: str = ''` - key is the key to remove. Required.
-- `idempotency_key: str = ''` - idempotency_key drops duplicate removals upon retries, as it does for MapPublishRequest: a removal with a key already used in the channel is not applied again, and its result is suppressed with suppress_reason "idempotency". Keys are kept for 5 minutes by default.
 
 #### `MapRemoveResult`
 
@@ -3217,12 +5611,6 @@ MapRemoveResult is the result of a map remove call.
 - `epoch: str = ''` - epoch is the epoch of the channel stream.
 - `suppressed: bool = False` - suppressed is true if the removal was not applied, see suppress_reason.
 - `suppress_reason: str = ''` - suppress_reason explains why the removal was suppressed, for example "idempotency" or "key_not_found".
-
-#### `MapStatsRequest`
-
-MapStatsRequest returns statistics about a map channel.
-
-- `channel: str = ''` - channel is the name of the map channel. Required.
 
 #### `MapStatsResult`
 
@@ -3252,26 +5640,11 @@ NodeResult is information about a Centrifugo node.
 - `process: Process | None = None` - process is CPU and memory usage of the node process. Centrifugo PRO only.
 - `num_subs: int = 0` - num_subs is the number of subscriptions on the node.
 
-#### `PresenceRequest`
-
-PresenceRequest returns the online presence of a channel: all clients
-currently subscribed to it. Presence must be enabled for the channel.
-
-- `channel: str = ''` - channel is the name of the channel. Required.
-
 #### `PresenceResult`
 
 PresenceResult is the result of a presence call.
 
 - `presence: dict[str, ClientInfo] = {}` - presence maps client ID to information about the client.
-
-#### `PresenceStatsRequest`
-
-PresenceStatsRequest returns short presence information of a channel: the
-number of clients and of unique users. Presence must be enabled for the
-channel.
-
-- `channel: str = ''` - channel is the name of the channel. Required.
 
 #### `PresenceStatsResult`
 
@@ -3295,20 +5668,6 @@ Publication is a publication in a channel history.
 - `info: ClientInfo | None = None` - info is information about the client that published, if any.
 - `offset: int = 0` - offset is the offset of the publication in the history stream.
 - `tags: dict[str, str] = {}` - tags are the publication tags.
-
-#### `PublishRequest`
-
-PublishRequest publishes data into a channel.
-
-- `channel: str = ''` - channel is the name of the channel to publish into. Required.
-- `data: JSON = None` - data is the payload to publish. Required unless b64data is set. In the HTTP API it is any JSON value; over GRPC it may be binary.
-- `b64data: str = ''` - b64data is a base64-encoded binary payload, an alternative to `data` to send binary over the HTTP API. Centrifugo decodes it before publishing.
-- `skip_history: bool = False` - skip_history skips adding this publication to the channel history.
-- `tags: dict[str, str] = {}` - tags is a map of arbitrary string keys and values attached to the publication and delivered to clients.
-- `idempotency_key: str = ''` - idempotency_key drops duplicate publications upon retries: a publication with a key already used in the channel is not published again, and the first one's result is returned. It acts per channel; results are kept for 5 minutes by default. The memory, Redis and PostgreSQL brokers keep keys; the NATS broker ignores them.
-- `delta: bool = False` - delta tells Centrifugo to construct a delta update, if possible, when broadcasting the publication to subscribers.
-- `version: int = 0` - version, when > 0, is the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
-- `version_epoch: str = ''` - version_epoch is the epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
 
 #### `PublishResult`
 
@@ -3382,55 +5741,14 @@ RateLimitPolicy allows rate pushes per interval_ms. Centrifugo PRO only.
 - `rate: int = 0` - rate is the allowed number of pushes per interval. Required.
 - `interval_ms: int = 0` - interval_ms is the interval in milliseconds. Required.
 
-#### `RefreshRequest`
-
-RefreshRequest refreshes a user's connections, mostly useful with
-unidirectional transports. Without expire_at the connections become
-non-expiring.
-
-- `user: str = ''` - user is the ID of the user to refresh. Required, unless all_users is used in Centrifugo PRO.
-- `client: str = ''` - client limits the call to the connection with this client ID. user is still required.
-- `expired: bool = False` - expired marks the connections as expired and closes them with an expired disconnect reason.
-- `expire_at: int = 0` - expire_at is the Unix time in seconds when the connections expire.
-- `info: JSON = None` - info attaches or replaces the connection info.
-- `session: str = ''` - session limits the call to the connection with this session ID. user is still required.
-- `label_filter: FilterNode | None = None` - label_filter restricts the call to clients whose labels match this filter. Centrifugo PRO only.
-- `all_users: bool = False` - all_users works as SubscribeRequest.all_users. Centrifugo PRO only.
-
 #### `RefreshResult`
 
 RefreshResult is the result of a refresh call. Empty at the moment.
-
-#### `RevokeTokenRequest`
-
-RevokeTokenRequest revokes a token by its unique ID (jti claim of a JWT).
-Clients using the token are disconnected shortly, and can not connect
-with it again. Centrifugo PRO only.
-
-- `expire_at: int = 0` - expire_at is the Unix time in seconds when the revocation expires. Optional, but a value matching the token expiration is recommended.
-- `uid: str = ''` - uid is the unique ID of the token to revoke (jti claim). Required.
 
 #### `RevokeTokenResult`
 
 RevokeTokenResult is the result of a revoke token call. Empty at the
 moment. Centrifugo PRO only.
-
-#### `SendPushNotificationRequest`
-
-SendPushNotificationRequest sends a push notification. The request is
-queued and sent to the provider by Centrifugo workers.
-Centrifugo PRO only.
-
-- `recipient: PushRecipient | None = None` - recipient is who receives the notification. Required.
-- `notification: PushNotification | None = None` - notification is the notification to send. Required.
-- `uid: str = ''` - uid is a unique identifier of the request, can be used to cancel the push. UUID v4 is recommended; different requests must use different uids.
-- `send_at: int = 0` - send_at is the Unix time in seconds when to send the notification. If not set, the notification is sent immediately.
-- `optimize_for_reliability: bool = False` - optimize_for_reliability makes processing heavier, but tolerates edge cases, like not losing inflight pushes when the queue is briefly unavailable.
-- `limit_strategy: PushLimitStrategy | None = None` - limit_strategy sets time constraints and rate limits. Only applies with a filter recipient; devices are then processed one by one instead of in batches.
-- `analytics_uid: str = ''` - analytics_uid is the identifier for push notification analytics. If not set, uid is used.
-- `localizations: dict[str, PushLocalization] = {}` - localizations are optional per language/locale localizations. Setting them enables templating.
-- `use_templating: bool = False` - use_templating enables templating of the notification. Only works with a filter recipient.
-- `use_meta: bool = False` - use_meta additionally loads device meta while sending, making it available in templating.
 
 #### `SendPushNotificationResult`
 
@@ -3438,19 +5756,6 @@ SendPushNotificationResult is the result of a send push notification
 call. Centrifugo PRO only.
 
 - `uid: str = ''` - uid is the unique identifier of the send request (not a provider message ID). Matches the request uid if it was set.
-
-#### `SharedPollPublishRequest`
-
-SharedPollPublishRequest pushes data for a key directly to clients of a
-shared poll channel, without waiting for the next poll cycle. Requires
-versioned mode and publish_enabled on the namespace.
-
-- `channel: str = ''` - channel is the name of the shared poll channel. Required.
-- `key: str = ''` - key is the item key. Required.
-- `data: JSON = None` - data is the item data, delivered to clients as is.
-- `b64data: str = ''` - b64data is data as base64, for binary payloads. Centrifugo decodes it.
-- `version: int = 0` - version is the item version, must be >= 1. Required. A version not higher than the current one within the same epoch is silently dropped.
-- `epoch: str = ''` - epoch is the channel-level publisher epoch. A change resets per-key versions and unsubscribes current subscribers with insufficient state.
 
 #### `SharedPollPublishResult`
 
@@ -3475,26 +5780,6 @@ subscription. Unset fields keep the value from the channel configuration.
 - `force_positioning: bool | None = None` - force_positioning overrides the force_positioning channel option.
 - `force_push_join_leave: bool | None = None` - force_push_join_leave overrides the force_push_join_leave channel option.
 
-#### `SubscribeRequest`
-
-SubscribeRequest subscribes active sessions of a user to a channel
-(server-side subscription). It does not create a streaming subscription
-for the caller.
-
-- `channel: str = ''` - channel is the name of the channel to subscribe to. Required.
-- `user: str = ''` - user is the ID of the user to subscribe. Required, unless all_users is used in Centrifugo PRO.
-- `expire_at: int = 0` - expire_at is the Unix time in seconds when the subscription expires.
-- `info: JSON = None` - info is custom channel info attached to the subscription, used in presence and join/leave messages.
-- `b64info: str = ''` - b64info is info as base64, for binary. Centrifugo decodes it.
-- `client: str = ''` - client limits the call to the connection with this client ID. user is still required.
-- `data: JSON = None` - data is custom subscription data sent to the client in the Subscribe push.
-- `b64data: str = ''` - b64data is data as base64, for binary. Centrifugo decodes it.
-- `recover_since: StreamPosition | None = None` - recover_since is the stream position to recover publications from.
-- `override: SubscribeOptionOverride | None = None` - override dynamically overrides some channel options set in the Centrifugo configuration.
-- `session: str = ''` - session limits the call to the connection with this session ID. user is still required.
-- `label_filter: FilterNode | None = None` - label_filter restricts the call to clients whose labels match this filter. Centrifugo PRO only.
-- `all_users: bool = False` - all_users, when user is empty, targets every connection on every node instead of the anonymous-only bucket. No effect when user is non-empty. Without label_filter it acts on every connection. Centrifugo PRO only.
-
 #### `SubscribeResult`
 
 SubscribeResult is the result of a subscribe call. Empty at the moment.
@@ -3507,55 +5792,20 @@ Centrifugo PRO only.
 - `uid: str = ''` - uid is the unique token ID (jti claim).
 - `issued_at: int = 0` - issued_at is the Unix time in seconds when the token was issued.
 
-#### `UnblockUserRequest`
-
-UnblockUserRequest unblocks a user. Centrifugo PRO only.
-
-- `user: str = ''` - user is the ID of the user to unblock. Required.
-
 #### `UnblockUserResult`
 
 UnblockUserResult is the result of an unblock user call. Empty at the
 moment. Centrifugo PRO only.
-
-#### `UnsubscribeRequest`
-
-UnsubscribeRequest unsubscribes a user from a channel.
-
-- `channel: str = ''` - channel is the name of the channel to unsubscribe from. Required.
-- `user: str = ''` - user is the ID of the user to unsubscribe. Required, unless all_users is used in Centrifugo PRO.
-- `client: str = ''` - client limits the call to the connection with this client ID. user is still required.
-- `session: str = ''` - session limits the call to the connection with this session ID. user is still required.
-- `label_filter: FilterNode | None = None` - label_filter restricts the call to clients whose labels match this filter. Centrifugo PRO only.
-- `all_users: bool = False` - all_users works as SubscribeRequest.all_users. Centrifugo PRO only.
 
 #### `UnsubscribeResult`
 
 UnsubscribeResult is the result of an unsubscribe call. Empty at the
 moment.
 
-#### `UpdatePushStatusRequest`
-
-UpdatePushStatusRequest saves the delivery or interaction status of a
-push notification to analytics. Experimental. Centrifugo PRO only.
-
-- `analytics_uid: str = ''` - analytics_uid is the analytics_uid of the push notification (as in SendPushNotificationRequest). Required.
-- `status: str = ''` - status is the status of the push notification: delivered or interacted. Required.
-- `device_id: str = ''` - device_id is the Centrifugo device ID. Required.
-- `msg_id: str = ''` - msg_id is the message ID issued by the provider.
-
 #### `UpdatePushStatusResult`
 
 UpdatePushStatusResult is the result of an update push status call.
 Empty at the moment. Centrifugo PRO only.
-
-#### `UpdateUserStatusRequest`
-
-UpdateUserStatusRequest marks users as active and online now, and sets
-their state when one is given. Centrifugo PRO only.
-
-- `users: list[str] = []` - users is the list of user IDs to update the status for. Required.
-- `state: str = ''` - state is an optional custom state to store in the user status. It can be restricted by the user_status.state_regex option.
 
 #### `UpdateUserStatusResult`
 
@@ -3587,16 +5837,6 @@ UserTopicFilter selects user topic subscriptions. Centrifugo PRO only.
 - `topics: list[str] = []` - topics selects by topic.
 - `topic_prefix: str = ''` - topic_prefix selects by topic prefix.
 
-#### `UserTopicListRequest`
-
-UserTopicListRequest returns a paginated list of user topic
-subscriptions. Centrifugo PRO only.
-
-- `filter: UserTopicFilter | None = None` - filter selects the user topics to list.
-- `include_total_count: bool = False` - include_total_count includes the total count for the filter in the result.
-- `cursor: str = ''` - cursor is the pagination cursor: next_cursor of the previous page, empty for the first page.
-- `limit: int = 0` - limit is the maximum number of items to return.
-
 #### `UserTopicListResult`
 
 UserTopicListResult is the result of a user topic list call.
@@ -3605,15 +5845,6 @@ Centrifugo PRO only.
 - `items: list[UserTopic] = []` - items are the user topics of this page.
 - `next_cursor: str = ''` - next_cursor is the cursor of the next page. Empty if there is no next page.
 - `total_count: int = 0` - total_count is the total count for the filter, if include_total_count was set.
-
-#### `UserTopicUpdateRequest`
-
-UserTopicUpdateRequest changes the topics of a user. The change is also
-applied to the user's registered devices. Centrifugo PRO only.
-
-- `user: str = ''` - user is the user ID. Required.
-- `op: str = ''` - op is the operation: add, remove or set. Required.
-- `topics: list[str] = []` - topics are the topics for the operation.
 
 #### `UserTopicUpdateResult`
 

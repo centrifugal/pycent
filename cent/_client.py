@@ -242,7 +242,7 @@ class Client(_ClientAPI):
     threads, and meant to be created once and shared:
 
     >>> client = cent.Client("http://localhost:8000/api", api_key=os.environ["CENTRIFUGO_API_KEY"])
-    >>> client.publish(cent.PublishRequest(channel="news", data={"text": "hello"}))
+    >>> client.publish(channel="news", data={"text": "hello"})
 
     Every API method takes its request and returns its result, raising unless
     Centrifugo did everything asked. Each takes ``timeout``, in seconds; without
@@ -421,58 +421,18 @@ class Client(_ClientAPI):
 
     # Broadcast.
 
-    def broadcast(self, request: BroadcastRequest, *, timeout: float | None = None) -> BroadcastResult:
-        """Publishes the same data into many channels in one request.
-
-        Channels succeed or fail on their own. It returns when every channel
-        got the publication. When Centrifugo carried the broadcast out and one
-        or more channels failed - up to all of them - it raises
-        BroadcastFailedChannelsError, whose ``result`` holds every channel's
-        outcome. Any other error means it failed as a whole: no channel got a
-        reply. After a timeout or a network error Centrifugo may still have
-        published it.
-
-        To go on despite some failed channels::
-
-            try:
-                client.broadcast(request)
-            except cent.BroadcastFailedChannelsError as e:
-                log.warning("broadcast failed in %s", e.result.failed())
-
-        Retry it with broadcast_with_retry, which sends again only the
-        channels which may still succeed, with one idempotency_key.
-        """
+    def _broadcast(self, request: BroadcastRequest, timeout: float | None) -> BroadcastResult:
         raw = self._result(request, timeout)
         return _broadcast.check(_broadcast.from_wire(raw, list(request.channels), request.idempotency_key))
 
-    def broadcast_with_retry(
+    def _broadcast_with_retry(
         self,
         request: BroadcastRequest,
-        *,
-        max_attempts: int = DEFAULT_MAX_ATTEMPTS,
-        attempt_timeout: float | None = None,
-        on_attempt_error: BroadcastAttemptCallback | None = None,
-        timeout: float | None = None,
+        max_attempts: int,
+        attempt_timeout: float | None,
+        on_attempt_error: BroadcastAttemptCallback | None,
+        timeout: float | None,
     ) -> BroadcastResult:
-        """Broadcasts as broadcast does, and retries the channels which failed for
-        a temporary reason - see retryable - up to max_attempts (2 by default:
-        one retry).
-
-        - Only the channels which may still succeed are sent again; when only
-          channels which failed for good are left, it stops.
-        - Every attempt carries the same idempotency_key - made for the call
-          when the request has none - so that a channel which got the
-          publication in an earlier attempt does not get it again. The memory,
-          Redis and PostgreSQL brokers keep keys; the NATS broker ignores them,
-          and a retry may publish again.
-        - The result holds every channel's last outcome, and the key: retrying
-          later with it publishes only into the channels which did not get it.
-
-        timeout, when set, bounds the whole call, waits included;
-        attempt_timeout - request_timeout by default - bounds each attempt. on_attempt_error decides the wait
-        between attempts, and may stop them: see BroadcastAttemptCallback. It raises as
-        broadcast does.
-        """
         _retry_options(request, max_attempts, attempt_timeout)
         # Without a timeout the call has no bound of its own: each attempt
         # has attempt_timeout, or request_timeout as a call alone would, so
@@ -489,7 +449,7 @@ class Client(_ClientAPI):
             attempt_req = state.attempt_request(request)
             per = min(left, per_attempt)
             try:
-                res = self.broadcast(attempt_req, timeout=per)
+                res = self._broadcast(attempt_req, per)
                 err: Exception | None = None
             except InvalidRequestError:
                 raise
@@ -563,7 +523,7 @@ class AsyncClient(_AsyncClientAPI):
     the same methods - awaited - options, errors and behaviour.
 
     >>> async with cent.AsyncClient("http://localhost:8000/api", api_key=key) as client:
-    ...     await client.publish(cent.PublishRequest(channel="news", data={"text": "hello"}))
+    ...     await client.publish(channel="news", data={"text": "hello"})
 
     api_endpoint_func and bearer_token_func may be coroutine functions.
     http_client is an httpx2.AsyncClient. A call's timeout bounds it; an
@@ -716,23 +676,18 @@ class AsyncClient(_AsyncClientAPI):
             "batch", lambda: body, commands=n, deadline=time.monotonic() + timeout, parse=parse, auto=True
         )
 
-    async def broadcast(self, request: BroadcastRequest, *, timeout: float | None = None) -> BroadcastResult:
-        """Publishes the same data into many channels in one request, as
-        Client.broadcast does."""
+    async def _broadcast(self, request: BroadcastRequest, timeout: float | None) -> BroadcastResult:
         raw = await self._result(request, timeout)
         return _broadcast.check(_broadcast.from_wire(raw, list(request.channels), request.idempotency_key))
 
-    async def broadcast_with_retry(
+    async def _broadcast_with_retry(
         self,
         request: BroadcastRequest,
-        *,
-        max_attempts: int = DEFAULT_MAX_ATTEMPTS,
-        attempt_timeout: float | None = None,
-        on_attempt_error: BroadcastAttemptCallback | None = None,
-        timeout: float | None = None,
+        max_attempts: int,
+        attempt_timeout: float | None,
+        on_attempt_error: BroadcastAttemptCallback | None,
+        timeout: float | None,
     ) -> BroadcastResult:
-        """Broadcasts and retries the channels which may still succeed, as
-        Client.broadcast_with_retry does."""
         _retry_options(request, max_attempts, attempt_timeout)
         # Without a timeout the call has no bound of its own: each attempt
         # has attempt_timeout, or request_timeout as a call alone would, so
@@ -749,7 +704,7 @@ class AsyncClient(_AsyncClientAPI):
             attempt_req = state.attempt_request(request)
             per = min(left, per_attempt)
             try:
-                res = await self.broadcast(attempt_req, timeout=per)
+                res = await self._broadcast(attempt_req, per)
                 err: Exception | None = None
             except InvalidRequestError:
                 raise

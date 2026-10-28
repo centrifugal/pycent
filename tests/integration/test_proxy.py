@@ -91,9 +91,9 @@ def test_connect_and_refresh(
     assert reply is not None
     assert reply["connect"]["data"] == {"welcome": True}
     assert ch in reply["connect"]["subs"]
-    client.publish(cent.PublishRequest(channel=ch, data={"text": "hello"}))
+    client.publish(channel=ch, data={"text": "hello"})
     assert "hello" in json.dumps(s.next())
-    pres = client.presence(cent.PresenceRequest(channel=ch))
+    pres = client.presence(channel=ch)
     assert [(i.user, i.conn_info) for i in pres.presence.values()] == [(user, {"name": "Alice"})]
 
     # It expires: Centrifugo asks the refresh proxy, which ends it.
