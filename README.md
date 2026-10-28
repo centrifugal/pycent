@@ -23,7 +23,7 @@ pip install cent[crypto]    # RSA, ECDSA and Ed25519 tokens, with cryptography
 
 cent 6 replaces cent 5: see [MIGRATING.md](MIGRATING.md). cent implements the
 [Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/v4_dev/spec.md),
-version 0.1.
+version 0.2.
 
 ## Example
 
