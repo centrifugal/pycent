@@ -1,120 +1,92 @@
-[tool.poetry]
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
 name = "cent"
-version = "5.2.0"
-description = "Python library to communicate with Centrifugo server HTTP API"
-authors = ["Alexander Emelin", "Katant Savelev", "Bogdan Evstratenko"]
+version = "6.0.0.dev0"
+description = "Python SDK for Centrifugo's HTTP server API: API client, tokens, proxy handlers"
+readme = "README.md"
 license = "MIT"
-readme = 'README.md'
+license-files = ["LICENSE"]
+authors = [{ name = "Centrifugal Labs LTD" }]
+requires-python = ">=3.11"
+dependencies = ["httpx2>=2.16"]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
-    "Environment :: Console",
+    "Framework :: AsyncIO",
     "Intended Audience :: Developers",
-    "Intended Audience :: System Administrators",
-    "License :: OSI Approved :: Apache Software License",
     "Topic :: Internet :: WWW/HTTP",
-    "Topic :: Software Development",
-    "Topic :: System :: Networking",
-    "Topic :: Terminals",
-    "Topic :: Text Processing",
-    "Topic :: Utilities",
+    "Topic :: Software Development :: Libraries",
+    "Typing :: Typed",
 ]
 
-[tool.poetry.dependencies]
-python = "^3.9"
-aiohttp = "^3"
-pydantic = "^2.8"
-requests = "^2"
-types-requests = "^2"
+[project.optional-dependencies]
+# RSA, ECDSA and Ed25519 tokens; HMAC tokens need nothing.
+crypto = ["cryptography>=49"]
 
-[tool.poetry.group.dev.dependencies]
-pre-commit = "^3.6.0"
-ruff = "^0.1.15"
-mypy = "^1.8.0"
-pytest = "^8"
-pytest-benchmark = "^4.0.0"
-pytest-asyncio = "^0.23.5"
+[project.urls]
+Homepage = "https://github.com/centrifugal/pycent"
+Documentation = "https://centrifugal.dev/docs/server/server_api"
+Changelog = "https://github.com/centrifugal/pycent/blob/master/CHANGELOG.md"
+
+[dependency-groups]
+dev = [
+    "cryptography>=49",
+    # httpx itself only for the test refusing its clients with the fix.
+    "httpx",
+    "mypy>=1.13",
+    "pytest>=9.0.3",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+]
+
+[tool.hatch.build.targets.sdist]
+include = ["cent", "proto", "gen", "tests", "README.md", "CHANGELOG.md", "LICENSE"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["cent"]
 
 [tool.ruff]
-preview = true
-line-length = 99
-select = [
-    "PL", # pylint
-    "F", # pyflakes
-    "E", # pycodestyle errors
-    "W", # pycodestyle warnings
-    "C90", # mccabe
-    "N", # pep8-naming
-    "YTT", # flake8-2020
-    "S", # flake8-bandit
-    "B", # flake8-bugbear
-    "A", # flake8-builtins
-    "C40", # flake8-comprehensions
-    "T10", # flake8-debugger
-    "EXE", # flake8-executable
-    "ICN", # flake8-import-conventions
-    "G", # flake8-logging-format
-    "PIE", # flake8-pie
-    "T20", # flake8-print
-    "PT", # flake8-pytest-style
-    "SIM", # flake8-simplify
-    "TID", # flake8-tidy-imports
-    "TCH", # flake8-type-checking
-    "ARG", # flake8-unused-arguments
-    "PGH", # pygrep-hooks
-    "RSE", # flake8-raise
-    "RUF", # ruff
-]
+line-length = 120
+target-version = "py311"
+# Generated from the docstrings by gen/api_docs.py: formatting it would make
+# it differ from what `make docs-check` compares it with.
+extend-exclude = ["API.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "C4", "SIM", "RUF", "PT", "ASYNC", "PIE", "RET", "PL"]
 ignore = [
-    "PLR0913", # too-many-arguments
-    "PGH003", # use specific rule code when ignore
-    "T201",
-    "PLR0917",
-    "PLR0904", # Centrifugo has many API methods
+    "PLR0911", # too many returns: decoders and error mapping are flat on purpose
+    "PLR0912", # too many branches
+    "PLR0913", # too many arguments: client options are keyword-only
+    "PLR0915", # too many statements
+    "PLR2004", # magic values: HTTP statuses and error codes read best as numbers
+    # A timeout parameter on async functions: asyncio code cannot read the
+    # deadline of an enclosing asyncio.timeout, so a call takes its own, as in
+    # httpx; an outer asyncio.timeout still ends it sooner.
+    "ASYNC109",
+    "RUF001", "RUF002", "RUF003", # ambiguous characters in strings and docs
 ]
 
-[tool.ruff.per-file-ignores]
-"tests/*" = ["S101", "PT012"]
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "PLC0415", "S311"]
+"cent/_api.py" = ["E501", "RUF100"]
+"gen/**" = ["S101", "PLC0415", "E501"]
 
 [tool.mypy]
 strict = true
-python_version = "3.9"
-show_error_codes = true
-show_error_context = true
-pretty = true
-ignore_missing_imports = false
-warn_unused_configs = true
-disallow_subclassing_any = true
-disallow_any_generics = true
-disallow_untyped_calls = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
-disallow_untyped_decorators = true
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-warn_return_any = true
-follow_imports_for_stubs = true
-namespace_packages = true
-show_absolute_path = true
-plugins = ["pydantic.mypy"]
+python_version = "3.11"
+files = ["cent", "tests", "gen"]
 
-[tool.pydantic-mypy]
-warn_required_dynamic_aliases = true
-
-[[tool.mypy.overrides]]
-module = [
-    "pytest_benchmark.*"
-]
-ignore_missing_imports = true
-
-[build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["integration: needs a running Centrifugo (see testdata/)"]
+addopts = "-m 'not integration'"

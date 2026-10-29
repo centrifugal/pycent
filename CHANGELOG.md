@@ -1,3 +1,23 @@
+v6.0.0
+======
+
+A rewrite to the [Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/master/spec.md).
+Migrating from cent 5: see [MIGRATING.md](MIGRATING.md).
+
+* Python 3.11 or newer. httpx2 - the maintained fork of httpx - is the only dependency; `cryptography` 49 or newer is optional, for RSA, ECDSA and Ed25519 tokens (`pip install cent[crypto]`).
+* Every API method takes its request's fields as keyword arguments - `client.publish(channel="news", data=...)` - on the client, a batch and `cent.command` alike; results are dataclasses. All generated from Centrifugo's `api.proto`, with its documentation: every API method, including the map and shared poll methods and those of Centrifugo PRO. No pydantic.
+* `Client` and `AsyncClient` with the same methods, options and errors. One deadline per call - its `timeout`, or `request_timeout` - over connecting, each read and write and the reply's body. Redirects are not followed. A caller's HTTP client is never changed.
+* A broadcast or batch in which some parts failed raises `BroadcastFailedChannelsError` or `BatchFailedCommandsError`, carrying every part's outcome. cent 5 returned normally.
+* New exceptions: `ApiError` with a subclass per known code, `HTTPError`, `DecodeError`, `InvalidRequestError`, `InvalidConfigError`, `NetworkError`, `CentTimeoutError`, `ClosedError`; `retryable()`; hints in messages; Centrifugo's transport error mode.
+* Payloads: native values or `RawJSON`, sent as the same JSON value; NaN, infinities and bytes refused before sending; a payload from a reply sent back unchanged is the same JSON value.
+* `broadcast_with_retry`, `exponential_backoff`; automatic batching of concurrent calls (`auto_batch`); `on_request` for metrics; `close()` and `aclose()` waiting for calls in progress.
+* `cent.command.publish(...)` and the like for Centrifugo's async consumers.
+* `cent.token`: connection, subscription and Centrifugo PRO server API tokens (HS256, RS256, ES256/384/512, EdDSA), JWKS, `APITokens`.
+* `cent.endpoints`: the token and shared poll signature endpoints client SDKs call, and the JWKS endpoint. `cent.proxy`: a handler for every proxy type, generated from `proxy.proto`. Each is a framework-free core with ASGI and WSGI adapters.
+* `cent.sharedpoll.sign` for shared poll signatures, its expiry required: a datetime, or `token.NEVER`.
+* Fields the protos mark required are required keyword arguments. `cent.to_dict` renders results and errors with Centrifugo's field names. `Pending.resolved` and the public constructors of results and partial-failure errors make test doubles; the README shows a fake transport.
+* An `AsyncClient` used from a second event loop raises `InvalidConfigError`; a `Client` in a forked process starts its own connections.
+
 v4.1.0
 ======
 
@@ -38,7 +58,7 @@ import requests
 
 sess = requests.Session()
 adapter = requests.adapters.HTTPAdapter(pool_connections=5, pool_maxsize=5)
-sess.mount('https://', adapter)
+sess.mount("https://", adapter)
 
 client = Client("https://centrifugo.example.com", "secret", session=sess)
 ```
