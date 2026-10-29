@@ -2001,7 +2001,9 @@ class InvalidateUserTokensRequest:
     """
 
     user: str = ""
-    """user is the ID of the user whose tokens to invalidate. Required."""
+    """user is the ID of the user whose tokens to invalidate. Required. ""
+    invalidates the tokens of anonymous users.
+    """
 
     issued_before: int = 0
     """issued_before is the Unix time in seconds: tokens issued before it are
@@ -5084,7 +5086,8 @@ class _ClientAPI:
         Args:
             expire_at: The Unix time in seconds when the invalidation expires.
                 Optional, but a value matching the token expiration is recommended.
-            user: The ID of the user whose tokens to invalidate. Required.
+            user: The ID of the user whose tokens to invalidate. Required. ""
+                invalidates the tokens of anonymous users.
             issued_before: The Unix time in seconds: tokens issued before it are
                 considered revoked. If not set, the current time is used.
             channel: Limits the invalidation to subscription tokens for this
@@ -6221,7 +6224,8 @@ class _AsyncClientAPI:
         Args:
             expire_at: The Unix time in seconds when the invalidation expires.
                 Optional, but a value matching the token expiration is recommended.
-            user: The ID of the user whose tokens to invalidate. Required.
+            user: The ID of the user whose tokens to invalidate. Required. ""
+                invalidates the tokens of anonymous users.
             issued_before: The Unix time in seconds: tokens issued before it are
                 considered revoked. If not set, the current time is used.
             channel: Limits the invalidation to subscription tokens for this
@@ -7220,7 +7224,8 @@ class _BatchAPI:
         Args:
             expire_at: The Unix time in seconds when the invalidation expires.
                 Optional, but a value matching the token expiration is recommended.
-            user: The ID of the user whose tokens to invalidate. Required.
+            user: The ID of the user whose tokens to invalidate. Required. ""
+                invalidates the tokens of anonymous users.
             issued_before: The Unix time in seconds: tokens issued before it are
                 considered revoked. If not set, the current time is used.
             channel: Limits the invalidation to subscription tokens for this

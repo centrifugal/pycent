@@ -446,7 +446,7 @@ certain time (based on the iat claim of a JWT). Centrifugo PRO only.
 Arguments:
 
 - `expire_at` - The Unix time in seconds when the invalidation expires. Optional, but a value matching the token expiration is recommended.
-- `user` - The ID of the user whose tokens to invalidate. Required.
+- `user` - The ID of the user whose tokens to invalidate. Required. "" invalidates the tokens of anonymous users.
 - `issued_before` - The Unix time in seconds: tokens issued before it are considered revoked. If not set, the current time is used.
 - `channel` - Limits the invalidation to subscription tokens for this channel.
 - `timeout` - Seconds bounding the call: request_timeout when None.
@@ -1274,7 +1274,7 @@ certain time (based on the iat claim of a JWT). Centrifugo PRO only.
 Arguments:
 
 - `expire_at` - The Unix time in seconds when the invalidation expires. Optional, but a value matching the token expiration is recommended.
-- `user` - The ID of the user whose tokens to invalidate. Required.
+- `user` - The ID of the user whose tokens to invalidate. Required. "" invalidates the tokens of anonymous users.
 - `issued_before` - The Unix time in seconds: tokens issued before it are considered revoked. If not set, the current time is used.
 - `channel` - Limits the invalidation to subscription tokens for this channel.
 - `timeout` - Seconds bounding the call: request_timeout when None.
@@ -2024,7 +2024,7 @@ Adds a invalidate_user_tokens command; its outcome is what Client.invalidate_use
 Arguments:
 
 - `expire_at` - The Unix time in seconds when the invalidation expires. Optional, but a value matching the token expiration is recommended.
-- `user` - The ID of the user whose tokens to invalidate. Required.
+- `user` - The ID of the user whose tokens to invalidate. Required. "" invalidates the tokens of anonymous users.
 - `issued_before` - The Unix time in seconds: tokens issued before it are considered revoked. If not set, the current time is used.
 - `channel` - Limits the invalidation to subscription tokens for this channel.
 
@@ -2673,7 +2673,7 @@ Adds a invalidate_user_tokens command; its outcome is what Client.invalidate_use
 Arguments:
 
 - `expire_at` - The Unix time in seconds when the invalidation expires. Optional, but a value matching the token expiration is recommended.
-- `user` - The ID of the user whose tokens to invalidate. Required.
+- `user` - The ID of the user whose tokens to invalidate. Required. "" invalidates the tokens of anonymous users.
 - `issued_before` - The Unix time in seconds: tokens issued before it are considered revoked. If not set, the current time is used.
 - `channel` - Limits the invalidation to subscription tokens for this channel.
 
@@ -3395,7 +3395,7 @@ The invalidate_user_tokens command.
 Arguments:
 
 - `expire_at` - The Unix time in seconds when the invalidation expires. Optional, but a value matching the token expiration is recommended.
-- `user` - The ID of the user whose tokens to invalidate. Required.
+- `user` - The ID of the user whose tokens to invalidate. Required. "" invalidates the tokens of anonymous users.
 - `issued_before` - The Unix time in seconds: tokens issued before it are considered revoked. If not set, the current time is used.
 - `channel` - Limits the invalidation to subscription tokens for this channel.
 
