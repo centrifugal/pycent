@@ -7,6 +7,7 @@ import inspect
 import json
 import os
 import re
+import sys
 import time
 from collections.abc import Callable, Iterator
 from typing import Any
@@ -992,7 +993,10 @@ def test_async_client_belongs_to_one_event_loop(fake: Fake) -> None:
         asyncio.run(c.info())
 
 
-@pytest.mark.skipif(not hasattr(os, "fork"), reason="no fork")
+# macOS's system frameworks are not fork-safe once a process has threads: a
+# child making an HTTP client - which reads the system's proxy settings - may
+# crash. Forking servers run on Linux.
+@pytest.mark.skipif(not hasattr(os, "fork") or sys.platform == "darwin", reason="no fork, or a fork-unsafe macOS")
 def test_client_starts_fresh_after_fork() -> None:
     c = cent.Client(ENDPOINT, auto_batch=cent.AutoBatch(max_in_flight=2))
     http, batcher = c._http, c._batcher
