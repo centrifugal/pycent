@@ -27,7 +27,8 @@ Answering: a function returns a result to accept the request, or raises:
   [4000, 4999] - [4500, 4999] to tell the client not to reconnect. Only the
   proxies which pass a ProxyError to the client honour it.
 - Any other exception, or one a proxy cannot carry, fails the request with
-  HTTP status 500, and is passed to on_error for logging. Centrifugo then
+  HTTP status 500, and is passed to on_error for logging - which must not
+  raise itself. Centrifugo then
   answers the client with its temporary internal error; for refresh and sub
   refresh it keeps the connection or subscription for another minute and
   asks again.
@@ -129,6 +130,19 @@ class Disconnect(Exception):
         return f"disconnect: {self.reason} (code {self.code})"
 
 
+def _type_name(t: type) -> str:
+    """t's name as users import it, so that cent.Disconnect and
+    cent.proxy.Disconnect, say, are told apart."""
+    mod = t.__module__
+    if mod == "builtins":
+        return t.__qualname__
+    if mod.startswith("cent.proxy"):
+        mod = "cent.proxy"
+    elif mod.startswith("cent."):
+        mod = "cent"
+    return f"{mod}.{t.__qualname__}"
+
+
 def _find(err: BaseException | None, cls: type[BaseException]) -> Any:
     """err or its cause, when it is a cls."""
     while err is not None:
@@ -174,10 +188,8 @@ class _ProxyHandler(Handler, Generic[_Req, _Res]):
     def _end(self, req: HTTPRequest, args: tuple[Any, ...], out: Any, error: Exception | None) -> HTTPResponse:
         if error is None:
             if not isinstance(out, self._result):
-                got = type(out).__name__
-                return self._fail(
-                    req, 500, TypeError(f"proxy: the {self._name} function returned {got}, not {self._result.__name__}")
-                )
+                got, want = _type_name(type(out)), _type_name(self._result)
+                return self._fail(req, 500, TypeError(f"proxy: the {self._name} function returned {got}, not {want}"))
             wire: dict[str, Any] = {"result": out._to_wire()}
         else:
             d, e = _find(error, Disconnect), _find(error, ProxyError)

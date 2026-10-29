@@ -4539,7 +4539,7 @@ class _ClientAPI:
     def publish(
         self,
         *,
-        channel: str = "",
+        channel: str,
         data: JSON = None,
         b64data: str = "",
         skip_history: bool = False,
@@ -4594,7 +4594,7 @@ class _ClientAPI:
     def broadcast(
         self,
         *,
-        channels: list[str] | None = None,
+        channels: list[str],
         data: JSON = None,
         b64data: str = "",
         skip_history: bool = False,
@@ -4642,7 +4642,7 @@ class _ClientAPI:
         """
         return self._broadcast(
             BroadcastRequest(
-                channels=channels if channels is not None else [],
+                channels=channels,
                 data=data,
                 b64data=b64data,
                 skip_history=skip_history,
@@ -4658,7 +4658,7 @@ class _ClientAPI:
     def broadcast_with_retry(
         self,
         *,
-        channels: list[str] | None = None,
+        channels: list[str],
         data: JSON = None,
         b64data: str = "",
         skip_history: bool = False,
@@ -4693,7 +4693,7 @@ class _ClientAPI:
         """
         return self._broadcast_with_retry(
             BroadcastRequest(
-                channels=channels if channels is not None else [],
+                channels=channels,
                 data=data,
                 b64data=b64data,
                 skip_history=skip_history,
@@ -4712,7 +4712,7 @@ class _ClientAPI:
     def subscribe(
         self,
         *,
-        channel: str = "",
+        channel: str,
         user: str = "",
         expire_at: int = 0,
         info: JSON = None,
@@ -4779,7 +4779,7 @@ class _ClientAPI:
     def unsubscribe(
         self,
         *,
-        channel: str = "",
+        channel: str,
         user: str = "",
         client: str = "",
         session: str = "",
@@ -4858,7 +4858,7 @@ class _ClientAPI:
             timeout,
         )
 
-    def presence(self, *, channel: str = "", timeout: float | None = None) -> PresenceResult:
+    def presence(self, *, channel: str, timeout: float | None = None) -> PresenceResult:
         """Returns the online presence of a channel: all clients
         currently subscribed to it. Presence must be enabled for the channel.
 
@@ -4868,7 +4868,7 @@ class _ClientAPI:
         """
         return self._invoke(PresenceRequest(channel=channel), PresenceResult, timeout)
 
-    def presence_stats(self, *, channel: str = "", timeout: float | None = None) -> PresenceStatsResult:
+    def presence_stats(self, *, channel: str, timeout: float | None = None) -> PresenceStatsResult:
         """Returns short presence information of a channel: the
         number of clients and of unique users. Presence must be enabled for the
         channel.
@@ -4882,7 +4882,7 @@ class _ClientAPI:
     def history(
         self,
         *,
-        channel: str = "",
+        channel: str,
         limit: int = 0,
         since: StreamPosition | None = None,
         reverse: bool = False,
@@ -4904,7 +4904,7 @@ class _ClientAPI:
             HistoryRequest(channel=channel, limit=limit, since=since, reverse=reverse), HistoryResult, timeout
         )
 
-    def history_remove(self, *, channel: str = "", timeout: float | None = None) -> HistoryRemoveResult:
+    def history_remove(self, *, channel: str, timeout: float | None = None) -> HistoryRemoveResult:
         """Removes publications from the history of a channel.
         The current top stream position is kept, so clients do not get
         disconnected because of insufficient state.
@@ -5005,7 +5005,7 @@ class _ClientAPI:
         )
 
     def update_user_status(
-        self, *, users: list[str] | None = None, state: str = "", timeout: float | None = None
+        self, *, users: list[str], state: str = "", timeout: float | None = None
     ) -> UpdateUserStatusResult:
         """Marks users as active and online now, and sets
         their state when one is given. Centrifugo PRO only.
@@ -5016,37 +5016,27 @@ class _ClientAPI:
                 be restricted by the user_status.state_regex option.
             timeout: Seconds bounding the call: request_timeout when None.
         """
-        return self._invoke(
-            UpdateUserStatusRequest(users=users if users is not None else [], state=state),
-            UpdateUserStatusResult,
-            timeout,
-        )
+        return self._invoke(UpdateUserStatusRequest(users=users, state=state), UpdateUserStatusResult, timeout)
 
-    def get_user_status(self, *, users: list[str] | None = None, timeout: float | None = None) -> GetUserStatusResult:
+    def get_user_status(self, *, users: list[str], timeout: float | None = None) -> GetUserStatusResult:
         """Returns the status of users. Centrifugo PRO only.
 
         Args:
             users: The list of user IDs to get the status for. Required.
             timeout: Seconds bounding the call: request_timeout when None.
         """
-        return self._invoke(
-            GetUserStatusRequest(users=users if users is not None else []), GetUserStatusResult, timeout
-        )
+        return self._invoke(GetUserStatusRequest(users=users), GetUserStatusResult, timeout)
 
-    def delete_user_status(
-        self, *, users: list[str] | None = None, timeout: float | None = None
-    ) -> DeleteUserStatusResult:
+    def delete_user_status(self, *, users: list[str], timeout: float | None = None) -> DeleteUserStatusResult:
         """Deletes the status of users. Centrifugo PRO only.
 
         Args:
             users: The list of user IDs to delete the status for. Required.
             timeout: Seconds bounding the call: request_timeout when None.
         """
-        return self._invoke(
-            DeleteUserStatusRequest(users=users if users is not None else []), DeleteUserStatusResult, timeout
-        )
+        return self._invoke(DeleteUserStatusRequest(users=users), DeleteUserStatusResult, timeout)
 
-    def block_user(self, *, expire_at: int = 0, user: str = "", timeout: float | None = None) -> BlockUserResult:
+    def block_user(self, *, expire_at: int = 0, user: str, timeout: float | None = None) -> BlockUserResult:
         """Blocks a user: the user is disconnected and can not
         connect again until unblocked or the block expires. Centrifugo PRO only.
 
@@ -5059,7 +5049,7 @@ class _ClientAPI:
         """
         return self._invoke(BlockUserRequest(expire_at=expire_at, user=user), BlockUserResult, timeout)
 
-    def unblock_user(self, *, user: str = "", timeout: float | None = None) -> UnblockUserResult:
+    def unblock_user(self, *, user: str, timeout: float | None = None) -> UnblockUserResult:
         """Unblocks a user. Centrifugo PRO only.
 
         Args:
@@ -5068,7 +5058,7 @@ class _ClientAPI:
         """
         return self._invoke(UnblockUserRequest(user=user), UnblockUserResult, timeout)
 
-    def revoke_token(self, *, expire_at: int = 0, uid: str = "", timeout: float | None = None) -> RevokeTokenResult:
+    def revoke_token(self, *, expire_at: int = 0, uid: str, timeout: float | None = None) -> RevokeTokenResult:
         """Revokes a token by its unique ID (jti claim of a JWT).
         Clients using the token are disconnected shortly, and can not connect
         with it again. Centrifugo PRO only.
@@ -5082,13 +5072,7 @@ class _ClientAPI:
         return self._invoke(RevokeTokenRequest(expire_at=expire_at, uid=uid), RevokeTokenResult, timeout)
 
     def invalidate_user_tokens(
-        self,
-        *,
-        expire_at: int = 0,
-        user: str = "",
-        issued_before: int = 0,
-        channel: str = "",
-        timeout: float | None = None,
+        self, *, expire_at: int = 0, user: str, issued_before: int = 0, channel: str = "", timeout: float | None = None
     ) -> InvalidateUserTokensResult:
         """Revokes all tokens of a user issued before a
         certain time (based on the iat claim of a JWT). Centrifugo PRO only.
@@ -5113,9 +5097,9 @@ class _ClientAPI:
         self,
         *,
         id: str = "",
-        provider: str = "",
-        token: str = "",
-        platform: str = "",
+        provider: str,
+        token: str,
+        platform: str,
         user: str = "",
         meta: dict[str, str] | None = None,
         topics: list[str] | None = None,
@@ -5222,7 +5206,7 @@ class _ClientAPI:
     def device_list(
         self,
         *,
-        filter: DeviceFilter | None = None,
+        filter: DeviceFilter,
         include_total_count: bool = False,
         include_meta: bool = False,
         include_topics: bool = False,
@@ -5297,13 +5281,7 @@ class _ClientAPI:
         )
 
     def device_topic_update(
-        self,
-        *,
-        device_id: str = "",
-        op: str = "",
-        topics: list[str] | None = None,
-        user: str = "",
-        timeout: float | None = None,
+        self, *, device_id: str, op: str, topics: list[str] | None = None, user: str = "", timeout: float | None = None
     ) -> DeviceTopicUpdateResult:
         """Changes the topics of a device. The device topic
         list is what decides who gets a push sent to a topic.
@@ -5354,7 +5332,7 @@ class _ClientAPI:
         )
 
     def user_topic_update(
-        self, *, user: str = "", op: str = "", topics: list[str] | None = None, timeout: float | None = None
+        self, *, user: str, op: str, topics: list[str] | None = None, timeout: float | None = None
     ) -> UserTopicUpdateResult:
         """Changes the topics of a user. The change is also
         applied to the user's registered devices. Centrifugo PRO only.
@@ -5374,8 +5352,8 @@ class _ClientAPI:
     def send_push_notification(
         self,
         *,
-        recipient: PushRecipient | None = None,
-        notification: PushNotification | None = None,
+        recipient: PushRecipient,
+        notification: PushNotification,
         uid: str = "",
         send_at: int = 0,
         optimize_for_reliability: bool = False,
@@ -5432,13 +5410,7 @@ class _ClientAPI:
         )
 
     def update_push_status(
-        self,
-        *,
-        analytics_uid: str = "",
-        status: str = "",
-        device_id: str = "",
-        msg_id: str = "",
-        timeout: float | None = None,
+        self, *, analytics_uid: str, status: str, device_id: str, msg_id: str = "", timeout: float | None = None
     ) -> UpdatePushStatusResult:
         """Saves the delivery or interaction status of a
         push notification to analytics. Experimental. Centrifugo PRO only.
@@ -5458,7 +5430,7 @@ class _ClientAPI:
             timeout,
         )
 
-    def cancel_push(self, *, uid: str = "", timeout: float | None = None) -> CancelPushResult:
+    def cancel_push(self, *, uid: str, timeout: float | None = None) -> CancelPushResult:
         """Cancels a delayed push notification (sent with
         send_at). Centrifugo PRO only.
 
@@ -5471,8 +5443,8 @@ class _ClientAPI:
     def map_publish(
         self,
         *,
-        channel: str = "",
-        key: str = "",
+        channel: str,
+        key: str,
         data: JSON = None,
         b64data: str = "",
         stream_data: JSON = None,
@@ -5536,7 +5508,7 @@ class _ClientAPI:
         )
 
     def map_remove(
-        self, *, channel: str = "", key: str = "", idempotency_key: str = "", timeout: float | None = None
+        self, *, channel: str, key: str, idempotency_key: str = "", timeout: float | None = None
     ) -> MapRemoveResult:
         """Removes a key from a map channel.
 
@@ -5556,7 +5528,7 @@ class _ClientAPI:
     def map_read_state(
         self,
         *,
-        channel: str = "",
+        channel: str,
         cursor: str = "",
         limit: int = 0,
         key: str = "",
@@ -5603,7 +5575,7 @@ class _ClientAPI:
     def map_read_stream(
         self,
         *,
-        channel: str = "",
+        channel: str,
         since_offset: int = 0,
         since_epoch: str = "",
         limit: int = 0,
@@ -5631,7 +5603,7 @@ class _ClientAPI:
             timeout,
         )
 
-    def map_stats(self, *, channel: str = "", timeout: float | None = None) -> MapStatsResult:
+    def map_stats(self, *, channel: str, timeout: float | None = None) -> MapStatsResult:
         """Returns statistics about a map channel.
 
         Args:
@@ -5640,7 +5612,7 @@ class _ClientAPI:
         """
         return self._invoke(MapStatsRequest(channel=channel), MapStatsResult, timeout)
 
-    def map_clear(self, *, channel: str = "", timeout: float | None = None) -> MapClearResult:
+    def map_clear(self, *, channel: str, timeout: float | None = None) -> MapClearResult:
         """Removes all state and stream data of a map channel.
 
         Args:
@@ -5652,11 +5624,11 @@ class _ClientAPI:
     def shared_poll_publish(
         self,
         *,
-        channel: str = "",
-        key: str = "",
+        channel: str,
+        key: str,
         data: JSON = None,
         b64data: str = "",
-        version: int = 0,
+        version: int,
         epoch: str = "",
         timeout: float | None = None,
     ) -> SharedPollPublishResult:
@@ -5703,7 +5675,7 @@ class _AsyncClientAPI:
     async def publish(
         self,
         *,
-        channel: str = "",
+        channel: str,
         data: JSON = None,
         b64data: str = "",
         skip_history: bool = False,
@@ -5758,7 +5730,7 @@ class _AsyncClientAPI:
     async def broadcast(
         self,
         *,
-        channels: list[str] | None = None,
+        channels: list[str],
         data: JSON = None,
         b64data: str = "",
         skip_history: bool = False,
@@ -5806,7 +5778,7 @@ class _AsyncClientAPI:
         """
         return await self._broadcast(
             BroadcastRequest(
-                channels=channels if channels is not None else [],
+                channels=channels,
                 data=data,
                 b64data=b64data,
                 skip_history=skip_history,
@@ -5822,7 +5794,7 @@ class _AsyncClientAPI:
     async def broadcast_with_retry(
         self,
         *,
-        channels: list[str] | None = None,
+        channels: list[str],
         data: JSON = None,
         b64data: str = "",
         skip_history: bool = False,
@@ -5857,7 +5829,7 @@ class _AsyncClientAPI:
         """
         return await self._broadcast_with_retry(
             BroadcastRequest(
-                channels=channels if channels is not None else [],
+                channels=channels,
                 data=data,
                 b64data=b64data,
                 skip_history=skip_history,
@@ -5876,7 +5848,7 @@ class _AsyncClientAPI:
     async def subscribe(
         self,
         *,
-        channel: str = "",
+        channel: str,
         user: str = "",
         expire_at: int = 0,
         info: JSON = None,
@@ -5943,7 +5915,7 @@ class _AsyncClientAPI:
     async def unsubscribe(
         self,
         *,
-        channel: str = "",
+        channel: str,
         user: str = "",
         client: str = "",
         session: str = "",
@@ -6022,7 +5994,7 @@ class _AsyncClientAPI:
             timeout,
         )
 
-    async def presence(self, *, channel: str = "", timeout: float | None = None) -> PresenceResult:
+    async def presence(self, *, channel: str, timeout: float | None = None) -> PresenceResult:
         """Returns the online presence of a channel: all clients
         currently subscribed to it. Presence must be enabled for the channel.
 
@@ -6032,7 +6004,7 @@ class _AsyncClientAPI:
         """
         return await self._invoke(PresenceRequest(channel=channel), PresenceResult, timeout)
 
-    async def presence_stats(self, *, channel: str = "", timeout: float | None = None) -> PresenceStatsResult:
+    async def presence_stats(self, *, channel: str, timeout: float | None = None) -> PresenceStatsResult:
         """Returns short presence information of a channel: the
         number of clients and of unique users. Presence must be enabled for the
         channel.
@@ -6046,7 +6018,7 @@ class _AsyncClientAPI:
     async def history(
         self,
         *,
-        channel: str = "",
+        channel: str,
         limit: int = 0,
         since: StreamPosition | None = None,
         reverse: bool = False,
@@ -6068,7 +6040,7 @@ class _AsyncClientAPI:
             HistoryRequest(channel=channel, limit=limit, since=since, reverse=reverse), HistoryResult, timeout
         )
 
-    async def history_remove(self, *, channel: str = "", timeout: float | None = None) -> HistoryRemoveResult:
+    async def history_remove(self, *, channel: str, timeout: float | None = None) -> HistoryRemoveResult:
         """Removes publications from the history of a channel.
         The current top stream position is kept, so clients do not get
         disconnected because of insufficient state.
@@ -6169,7 +6141,7 @@ class _AsyncClientAPI:
         )
 
     async def update_user_status(
-        self, *, users: list[str] | None = None, state: str = "", timeout: float | None = None
+        self, *, users: list[str], state: str = "", timeout: float | None = None
     ) -> UpdateUserStatusResult:
         """Marks users as active and online now, and sets
         their state when one is given. Centrifugo PRO only.
@@ -6180,39 +6152,27 @@ class _AsyncClientAPI:
                 be restricted by the user_status.state_regex option.
             timeout: Seconds bounding the call: request_timeout when None.
         """
-        return await self._invoke(
-            UpdateUserStatusRequest(users=users if users is not None else [], state=state),
-            UpdateUserStatusResult,
-            timeout,
-        )
+        return await self._invoke(UpdateUserStatusRequest(users=users, state=state), UpdateUserStatusResult, timeout)
 
-    async def get_user_status(
-        self, *, users: list[str] | None = None, timeout: float | None = None
-    ) -> GetUserStatusResult:
+    async def get_user_status(self, *, users: list[str], timeout: float | None = None) -> GetUserStatusResult:
         """Returns the status of users. Centrifugo PRO only.
 
         Args:
             users: The list of user IDs to get the status for. Required.
             timeout: Seconds bounding the call: request_timeout when None.
         """
-        return await self._invoke(
-            GetUserStatusRequest(users=users if users is not None else []), GetUserStatusResult, timeout
-        )
+        return await self._invoke(GetUserStatusRequest(users=users), GetUserStatusResult, timeout)
 
-    async def delete_user_status(
-        self, *, users: list[str] | None = None, timeout: float | None = None
-    ) -> DeleteUserStatusResult:
+    async def delete_user_status(self, *, users: list[str], timeout: float | None = None) -> DeleteUserStatusResult:
         """Deletes the status of users. Centrifugo PRO only.
 
         Args:
             users: The list of user IDs to delete the status for. Required.
             timeout: Seconds bounding the call: request_timeout when None.
         """
-        return await self._invoke(
-            DeleteUserStatusRequest(users=users if users is not None else []), DeleteUserStatusResult, timeout
-        )
+        return await self._invoke(DeleteUserStatusRequest(users=users), DeleteUserStatusResult, timeout)
 
-    async def block_user(self, *, expire_at: int = 0, user: str = "", timeout: float | None = None) -> BlockUserResult:
+    async def block_user(self, *, expire_at: int = 0, user: str, timeout: float | None = None) -> BlockUserResult:
         """Blocks a user: the user is disconnected and can not
         connect again until unblocked or the block expires. Centrifugo PRO only.
 
@@ -6225,7 +6185,7 @@ class _AsyncClientAPI:
         """
         return await self._invoke(BlockUserRequest(expire_at=expire_at, user=user), BlockUserResult, timeout)
 
-    async def unblock_user(self, *, user: str = "", timeout: float | None = None) -> UnblockUserResult:
+    async def unblock_user(self, *, user: str, timeout: float | None = None) -> UnblockUserResult:
         """Unblocks a user. Centrifugo PRO only.
 
         Args:
@@ -6234,9 +6194,7 @@ class _AsyncClientAPI:
         """
         return await self._invoke(UnblockUserRequest(user=user), UnblockUserResult, timeout)
 
-    async def revoke_token(
-        self, *, expire_at: int = 0, uid: str = "", timeout: float | None = None
-    ) -> RevokeTokenResult:
+    async def revoke_token(self, *, expire_at: int = 0, uid: str, timeout: float | None = None) -> RevokeTokenResult:
         """Revokes a token by its unique ID (jti claim of a JWT).
         Clients using the token are disconnected shortly, and can not connect
         with it again. Centrifugo PRO only.
@@ -6250,13 +6208,7 @@ class _AsyncClientAPI:
         return await self._invoke(RevokeTokenRequest(expire_at=expire_at, uid=uid), RevokeTokenResult, timeout)
 
     async def invalidate_user_tokens(
-        self,
-        *,
-        expire_at: int = 0,
-        user: str = "",
-        issued_before: int = 0,
-        channel: str = "",
-        timeout: float | None = None,
+        self, *, expire_at: int = 0, user: str, issued_before: int = 0, channel: str = "", timeout: float | None = None
     ) -> InvalidateUserTokensResult:
         """Revokes all tokens of a user issued before a
         certain time (based on the iat claim of a JWT). Centrifugo PRO only.
@@ -6281,9 +6233,9 @@ class _AsyncClientAPI:
         self,
         *,
         id: str = "",
-        provider: str = "",
-        token: str = "",
-        platform: str = "",
+        provider: str,
+        token: str,
+        platform: str,
         user: str = "",
         meta: dict[str, str] | None = None,
         topics: list[str] | None = None,
@@ -6390,7 +6342,7 @@ class _AsyncClientAPI:
     async def device_list(
         self,
         *,
-        filter: DeviceFilter | None = None,
+        filter: DeviceFilter,
         include_total_count: bool = False,
         include_meta: bool = False,
         include_topics: bool = False,
@@ -6465,13 +6417,7 @@ class _AsyncClientAPI:
         )
 
     async def device_topic_update(
-        self,
-        *,
-        device_id: str = "",
-        op: str = "",
-        topics: list[str] | None = None,
-        user: str = "",
-        timeout: float | None = None,
+        self, *, device_id: str, op: str, topics: list[str] | None = None, user: str = "", timeout: float | None = None
     ) -> DeviceTopicUpdateResult:
         """Changes the topics of a device. The device topic
         list is what decides who gets a push sent to a topic.
@@ -6522,7 +6468,7 @@ class _AsyncClientAPI:
         )
 
     async def user_topic_update(
-        self, *, user: str = "", op: str = "", topics: list[str] | None = None, timeout: float | None = None
+        self, *, user: str, op: str, topics: list[str] | None = None, timeout: float | None = None
     ) -> UserTopicUpdateResult:
         """Changes the topics of a user. The change is also
         applied to the user's registered devices. Centrifugo PRO only.
@@ -6542,8 +6488,8 @@ class _AsyncClientAPI:
     async def send_push_notification(
         self,
         *,
-        recipient: PushRecipient | None = None,
-        notification: PushNotification | None = None,
+        recipient: PushRecipient,
+        notification: PushNotification,
         uid: str = "",
         send_at: int = 0,
         optimize_for_reliability: bool = False,
@@ -6600,13 +6546,7 @@ class _AsyncClientAPI:
         )
 
     async def update_push_status(
-        self,
-        *,
-        analytics_uid: str = "",
-        status: str = "",
-        device_id: str = "",
-        msg_id: str = "",
-        timeout: float | None = None,
+        self, *, analytics_uid: str, status: str, device_id: str, msg_id: str = "", timeout: float | None = None
     ) -> UpdatePushStatusResult:
         """Saves the delivery or interaction status of a
         push notification to analytics. Experimental. Centrifugo PRO only.
@@ -6626,7 +6566,7 @@ class _AsyncClientAPI:
             timeout,
         )
 
-    async def cancel_push(self, *, uid: str = "", timeout: float | None = None) -> CancelPushResult:
+    async def cancel_push(self, *, uid: str, timeout: float | None = None) -> CancelPushResult:
         """Cancels a delayed push notification (sent with
         send_at). Centrifugo PRO only.
 
@@ -6639,8 +6579,8 @@ class _AsyncClientAPI:
     async def map_publish(
         self,
         *,
-        channel: str = "",
-        key: str = "",
+        channel: str,
+        key: str,
         data: JSON = None,
         b64data: str = "",
         stream_data: JSON = None,
@@ -6704,7 +6644,7 @@ class _AsyncClientAPI:
         )
 
     async def map_remove(
-        self, *, channel: str = "", key: str = "", idempotency_key: str = "", timeout: float | None = None
+        self, *, channel: str, key: str, idempotency_key: str = "", timeout: float | None = None
     ) -> MapRemoveResult:
         """Removes a key from a map channel.
 
@@ -6724,7 +6664,7 @@ class _AsyncClientAPI:
     async def map_read_state(
         self,
         *,
-        channel: str = "",
+        channel: str,
         cursor: str = "",
         limit: int = 0,
         key: str = "",
@@ -6771,7 +6711,7 @@ class _AsyncClientAPI:
     async def map_read_stream(
         self,
         *,
-        channel: str = "",
+        channel: str,
         since_offset: int = 0,
         since_epoch: str = "",
         limit: int = 0,
@@ -6799,7 +6739,7 @@ class _AsyncClientAPI:
             timeout,
         )
 
-    async def map_stats(self, *, channel: str = "", timeout: float | None = None) -> MapStatsResult:
+    async def map_stats(self, *, channel: str, timeout: float | None = None) -> MapStatsResult:
         """Returns statistics about a map channel.
 
         Args:
@@ -6808,7 +6748,7 @@ class _AsyncClientAPI:
         """
         return await self._invoke(MapStatsRequest(channel=channel), MapStatsResult, timeout)
 
-    async def map_clear(self, *, channel: str = "", timeout: float | None = None) -> MapClearResult:
+    async def map_clear(self, *, channel: str, timeout: float | None = None) -> MapClearResult:
         """Removes all state and stream data of a map channel.
 
         Args:
@@ -6820,11 +6760,11 @@ class _AsyncClientAPI:
     async def shared_poll_publish(
         self,
         *,
-        channel: str = "",
-        key: str = "",
+        channel: str,
+        key: str,
         data: JSON = None,
         b64data: str = "",
-        version: int = 0,
+        version: int,
         epoch: str = "",
         timeout: float | None = None,
     ) -> SharedPollPublishResult:
@@ -6863,7 +6803,7 @@ class _BatchAPI:
     def publish(
         self,
         *,
-        channel: str = "",
+        channel: str,
         data: JSON = None,
         b64data: str = "",
         skip_history: bool = False,
@@ -6915,7 +6855,7 @@ class _BatchAPI:
     def broadcast(
         self,
         *,
-        channels: list[str] | None = None,
+        channels: list[str],
         data: JSON = None,
         b64data: str = "",
         skip_history: bool = False,
@@ -6952,7 +6892,7 @@ class _BatchAPI:
         """
         return self._add_broadcast(
             BroadcastRequest(
-                channels=channels if channels is not None else [],
+                channels=channels,
                 data=data,
                 b64data=b64data,
                 skip_history=skip_history,
@@ -6967,7 +6907,7 @@ class _BatchAPI:
     def subscribe(
         self,
         *,
-        channel: str = "",
+        channel: str,
         user: str = "",
         expire_at: int = 0,
         info: JSON = None,
@@ -7029,7 +6969,7 @@ class _BatchAPI:
     def unsubscribe(
         self,
         *,
-        channel: str = "",
+        channel: str,
         user: str = "",
         client: str = "",
         session: str = "",
@@ -7102,7 +7042,7 @@ class _BatchAPI:
             DisconnectResult,
         )
 
-    def presence(self, *, channel: str = "") -> Pending[PresenceResult]:
+    def presence(self, *, channel: str) -> Pending[PresenceResult]:
         """Adds a presence command; its outcome is what Client.presence would return.
 
         Args:
@@ -7110,7 +7050,7 @@ class _BatchAPI:
         """
         return self._add(PresenceRequest(channel=channel), PresenceResult)
 
-    def presence_stats(self, *, channel: str = "") -> Pending[PresenceStatsResult]:
+    def presence_stats(self, *, channel: str) -> Pending[PresenceStatsResult]:
         """Adds a presence_stats command; its outcome is what Client.presence_stats would return.
 
         Args:
@@ -7119,7 +7059,7 @@ class _BatchAPI:
         return self._add(PresenceStatsRequest(channel=channel), PresenceStatsResult)
 
     def history(
-        self, *, channel: str = "", limit: int = 0, since: StreamPosition | None = None, reverse: bool = False
+        self, *, channel: str, limit: int = 0, since: StreamPosition | None = None, reverse: bool = False
     ) -> Pending[HistoryResult]:
         """Adds a history command; its outcome is what Client.history would return.
 
@@ -7133,7 +7073,7 @@ class _BatchAPI:
         """
         return self._add(HistoryRequest(channel=channel, limit=limit, since=since, reverse=reverse), HistoryResult)
 
-    def history_remove(self, *, channel: str = "") -> Pending[HistoryRemoveResult]:
+    def history_remove(self, *, channel: str) -> Pending[HistoryRemoveResult]:
         """Adds a history_remove command; its outcome is what Client.history_remove would return.
 
         Args:
@@ -7211,7 +7151,7 @@ class _BatchAPI:
             ConnectionsRequest(user=user, expression=expression, label_filter=label_filter), ConnectionsResult
         )
 
-    def update_user_status(self, *, users: list[str] | None = None, state: str = "") -> Pending[UpdateUserStatusResult]:
+    def update_user_status(self, *, users: list[str], state: str = "") -> Pending[UpdateUserStatusResult]:
         """Adds a update_user_status command; its outcome is what Client.update_user_status would return.
 
         Args:
@@ -7219,27 +7159,25 @@ class _BatchAPI:
             state: An optional custom state to store in the user status. It can
                 be restricted by the user_status.state_regex option.
         """
-        return self._add(
-            UpdateUserStatusRequest(users=users if users is not None else [], state=state), UpdateUserStatusResult
-        )
+        return self._add(UpdateUserStatusRequest(users=users, state=state), UpdateUserStatusResult)
 
-    def get_user_status(self, *, users: list[str] | None = None) -> Pending[GetUserStatusResult]:
+    def get_user_status(self, *, users: list[str]) -> Pending[GetUserStatusResult]:
         """Adds a get_user_status command; its outcome is what Client.get_user_status would return.
 
         Args:
             users: The list of user IDs to get the status for. Required.
         """
-        return self._add(GetUserStatusRequest(users=users if users is not None else []), GetUserStatusResult)
+        return self._add(GetUserStatusRequest(users=users), GetUserStatusResult)
 
-    def delete_user_status(self, *, users: list[str] | None = None) -> Pending[DeleteUserStatusResult]:
+    def delete_user_status(self, *, users: list[str]) -> Pending[DeleteUserStatusResult]:
         """Adds a delete_user_status command; its outcome is what Client.delete_user_status would return.
 
         Args:
             users: The list of user IDs to delete the status for. Required.
         """
-        return self._add(DeleteUserStatusRequest(users=users if users is not None else []), DeleteUserStatusResult)
+        return self._add(DeleteUserStatusRequest(users=users), DeleteUserStatusResult)
 
-    def block_user(self, *, expire_at: int = 0, user: str = "") -> Pending[BlockUserResult]:
+    def block_user(self, *, expire_at: int = 0, user: str) -> Pending[BlockUserResult]:
         """Adds a block_user command; its outcome is what Client.block_user would return.
 
         Args:
@@ -7250,7 +7188,7 @@ class _BatchAPI:
         """
         return self._add(BlockUserRequest(expire_at=expire_at, user=user), BlockUserResult)
 
-    def unblock_user(self, *, user: str = "") -> Pending[UnblockUserResult]:
+    def unblock_user(self, *, user: str) -> Pending[UnblockUserResult]:
         """Adds a unblock_user command; its outcome is what Client.unblock_user would return.
 
         Args:
@@ -7258,7 +7196,7 @@ class _BatchAPI:
         """
         return self._add(UnblockUserRequest(user=user), UnblockUserResult)
 
-    def revoke_token(self, *, expire_at: int = 0, uid: str = "") -> Pending[RevokeTokenResult]:
+    def revoke_token(self, *, expire_at: int = 0, uid: str) -> Pending[RevokeTokenResult]:
         """Adds a revoke_token command; its outcome is what Client.revoke_token would return.
 
         Args:
@@ -7269,7 +7207,7 @@ class _BatchAPI:
         return self._add(RevokeTokenRequest(expire_at=expire_at, uid=uid), RevokeTokenResult)
 
     def invalidate_user_tokens(
-        self, *, expire_at: int = 0, user: str = "", issued_before: int = 0, channel: str = ""
+        self, *, expire_at: int = 0, user: str, issued_before: int = 0, channel: str = ""
     ) -> Pending[InvalidateUserTokensResult]:
         """Adds a invalidate_user_tokens command; its outcome is what Client.invalidate_user_tokens would return.
 
@@ -7291,9 +7229,9 @@ class _BatchAPI:
         self,
         *,
         id: str = "",
-        provider: str = "",
-        token: str = "",
-        platform: str = "",
+        provider: str,
+        token: str,
+        platform: str,
         user: str = "",
         meta: dict[str, str] | None = None,
         topics: list[str] | None = None,
@@ -7389,7 +7327,7 @@ class _BatchAPI:
     def device_list(
         self,
         *,
-        filter: DeviceFilter | None = None,
+        filter: DeviceFilter,
         include_total_count: bool = False,
         include_meta: bool = False,
         include_topics: bool = False,
@@ -7456,7 +7394,7 @@ class _BatchAPI:
         )
 
     def device_topic_update(
-        self, *, device_id: str = "", op: str = "", topics: list[str] | None = None, user: str = ""
+        self, *, device_id: str, op: str, topics: list[str] | None = None, user: str = ""
     ) -> Pending[DeviceTopicUpdateResult]:
         """Adds a device_topic_update command; its outcome is what Client.device_topic_update would return.
 
@@ -7499,7 +7437,7 @@ class _BatchAPI:
         )
 
     def user_topic_update(
-        self, *, user: str = "", op: str = "", topics: list[str] | None = None
+        self, *, user: str, op: str, topics: list[str] | None = None
     ) -> Pending[UserTopicUpdateResult]:
         """Adds a user_topic_update command; its outcome is what Client.user_topic_update would return.
 
@@ -7515,8 +7453,8 @@ class _BatchAPI:
     def send_push_notification(
         self,
         *,
-        recipient: PushRecipient | None = None,
-        notification: PushNotification | None = None,
+        recipient: PushRecipient,
+        notification: PushNotification,
         uid: str = "",
         send_at: int = 0,
         optimize_for_reliability: bool = False,
@@ -7568,7 +7506,7 @@ class _BatchAPI:
         )
 
     def update_push_status(
-        self, *, analytics_uid: str = "", status: str = "", device_id: str = "", msg_id: str = ""
+        self, *, analytics_uid: str, status: str, device_id: str, msg_id: str = ""
     ) -> Pending[UpdatePushStatusResult]:
         """Adds a update_push_status command; its outcome is what Client.update_push_status would return.
 
@@ -7585,7 +7523,7 @@ class _BatchAPI:
             UpdatePushStatusResult,
         )
 
-    def cancel_push(self, *, uid: str = "") -> Pending[CancelPushResult]:
+    def cancel_push(self, *, uid: str) -> Pending[CancelPushResult]:
         """Adds a cancel_push command; its outcome is what Client.cancel_push would return.
 
         Args:
@@ -7596,8 +7534,8 @@ class _BatchAPI:
     def map_publish(
         self,
         *,
-        channel: str = "",
-        key: str = "",
+        channel: str,
+        key: str,
         data: JSON = None,
         b64data: str = "",
         stream_data: JSON = None,
@@ -7657,7 +7595,7 @@ class _BatchAPI:
             MapPublishResult,
         )
 
-    def map_remove(self, *, channel: str = "", key: str = "", idempotency_key: str = "") -> Pending[MapRemoveResult]:
+    def map_remove(self, *, channel: str, key: str, idempotency_key: str = "") -> Pending[MapRemoveResult]:
         """Adds a map_remove command; its outcome is what Client.map_remove would return.
 
         Args:
@@ -7673,7 +7611,7 @@ class _BatchAPI:
     def map_read_state(
         self,
         *,
-        channel: str = "",
+        channel: str,
         cursor: str = "",
         limit: int = 0,
         key: str = "",
@@ -7714,7 +7652,7 @@ class _BatchAPI:
         )
 
     def map_read_stream(
-        self, *, channel: str = "", since_offset: int = 0, since_epoch: str = "", limit: int = 0, reverse: bool = False
+        self, *, channel: str, since_offset: int = 0, since_epoch: str = "", limit: int = 0, reverse: bool = False
     ) -> Pending[MapReadStreamResult]:
         """Adds a map_read_stream command; its outcome is what Client.map_read_stream would return.
 
@@ -7735,7 +7673,7 @@ class _BatchAPI:
             MapReadStreamResult,
         )
 
-    def map_stats(self, *, channel: str = "") -> Pending[MapStatsResult]:
+    def map_stats(self, *, channel: str) -> Pending[MapStatsResult]:
         """Adds a map_stats command; its outcome is what Client.map_stats would return.
 
         Args:
@@ -7743,7 +7681,7 @@ class _BatchAPI:
         """
         return self._add(MapStatsRequest(channel=channel), MapStatsResult)
 
-    def map_clear(self, *, channel: str = "") -> Pending[MapClearResult]:
+    def map_clear(self, *, channel: str) -> Pending[MapClearResult]:
         """Adds a map_clear command; its outcome is what Client.map_clear would return.
 
         Args:
@@ -7752,14 +7690,7 @@ class _BatchAPI:
         return self._add(MapClearRequest(channel=channel), MapClearResult)
 
     def shared_poll_publish(
-        self,
-        *,
-        channel: str = "",
-        key: str = "",
-        data: JSON = None,
-        b64data: str = "",
-        version: int = 0,
-        epoch: str = "",
+        self, *, channel: str, key: str, data: JSON = None, b64data: str = "", version: int, epoch: str = ""
     ) -> Pending[SharedPollPublishResult]:
         """Adds a shared_poll_publish command; its outcome is what Client.shared_poll_publish would return.
 

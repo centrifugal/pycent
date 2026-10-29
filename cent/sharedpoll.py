@@ -13,17 +13,19 @@ import time
 from collections.abc import Sequence
 from datetime import datetime
 
+from cent._errors import InvalidRequestError
+from cent.token import NEVER, Never
+
 __all__ = ["sign"]
 
 
-def sign(
-    secret: bytes | str, *, user: str, channel: str, keys: Sequence[str], expires_at: datetime | None = None
-) -> str:
+def sign(secret: bytes | str, *, user: str, channel: str, keys: Sequence[str], expires_at: datetime | Never) -> str:
     """The signature authorizing user to track keys in channel until expires_at,
     as Centrifugo verifies it: "iat:exp:hmac", iat now and exp expires_at in
-    Unix seconds - 0 when expires_at is None, for a signature which does not
-    expire. secret is Centrifugo's shared_poll.hmac_secret_key; user is the ID
-    of the connection's user, empty for an anonymous one.
+    Unix seconds. expires_at is required, as a token's expiry is: an aware
+    datetime, or token.NEVER for a signature which never expires. secret is
+    Centrifugo's shared_poll.hmac_secret_key; user is the ID of the
+    connection's user, empty for an anonymous one.
 
     The signature covers exactly keys, in their order: a client tracking other
     keys, or the same in another order, is refused. The arguments but secret
@@ -35,16 +37,21 @@ def sign(
 
 
 def _sign_at(
-    secret: bytes | str, user: str, channel: str, keys: Sequence[str], expires_at: datetime | None, *, now: int
+    secret: bytes | str, user: str, channel: str, keys: Sequence[str], expires_at: datetime | Never, *, now: int
 ) -> str:
     """sign, at the Unix time now: for the spec's test vectors."""
     s = secret.encode() if isinstance(secret, str) else bytes(secret)
     if not s:
-        raise ValueError("sharedpoll: empty secret")
+        raise InvalidRequestError("sharedpoll: empty secret")
     exp = "0"
-    if expires_at is not None:
+    if expires_at is not NEVER:
+        if not isinstance(expires_at, datetime):
+            raise TypeError(
+                f"sharedpoll: expires_at must be a datetime, or token.NEVER for a signature which never "
+                f"expires - not {type(expires_at).__name__}"
+            )
         if expires_at.tzinfo is None or expires_at.utcoffset() is None:
-            raise ValueError("sharedpoll: expires_at is a naive datetime: give it a time zone")
+            raise InvalidRequestError("sharedpoll: expires_at is a naive datetime: give it a time zone")
         exp = str(int(expires_at.timestamp()))
     iat = str(now)
     keys_hash = hashlib.sha256("\x00".join(keys).encode()).hexdigest()

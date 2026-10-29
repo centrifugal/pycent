@@ -38,9 +38,11 @@ class BatchResult:
         self.replied = replied
         self._failed = failed
 
+    @property
     def failed(self) -> list[FailedCommand]:
         """The commands which failed, with their errors, in the order they were
-        added. When the batch failed as a whole, that is every command."""
+        added - as the error's ``failed`` lists them. When the batch failed as a
+        whole, that is every command."""
         return list(self._failed)
 
     def __repr__(self) -> str:
@@ -52,10 +54,22 @@ class Pending(Generic[_T]):
 
     __slots__ = ("_batch", "_get", "_index")
 
-    def __init__(self, batch: _BatchBase, index: int, get: Callable[[dict[str, Any]], _T]) -> None:
+    def __init__(self, batch: _BatchBase | None, index: int, get: Callable[[dict[str, Any]], _T]) -> None:
         self._batch = batch
         self._index = index
         self._get = get
+
+    @classmethod
+    def resolved(cls, result: _T | None = None, error: Exception | None = None) -> Pending[_T]:
+        """A Pending of no batch, whose result() returns result or raises error:
+        for test doubles of code which reads a batch's outcomes."""
+
+        def get(_: dict[str, Any]) -> _T:
+            if error is not None:
+                raise error
+            return result  # type: ignore[return-value]
+
+        return cls(None, 0, get)
 
     def result(self) -> _T:
         """The command's result, or its error raised: an ApiError for this
@@ -63,6 +77,8 @@ class Pending(Generic[_T]):
         A broadcast raises BroadcastFailedChannelsError, carrying every
         channel's outcome, when any channel failed."""
         b = self._batch
+        if b is None:
+            return self._get({})
         if not b._sent:
             raise BatchNotSentError("batch not sent yet")
         if b._error is not None:

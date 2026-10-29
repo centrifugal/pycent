@@ -3,6 +3,7 @@ replies. No I/O happens here."""
 
 from __future__ import annotations
 
+import inspect
 import json
 import time
 from collections.abc import Callable, Mapping
@@ -181,6 +182,10 @@ class Config:
         self.request_timeout = float(request_timeout)
         if on_request is not None and not callable(on_request):
             raise InvalidConfigError("on_request must be callable")
+        if on_request is not None and inspect.iscoroutinefunction(on_request):
+            raise InvalidConfigError(
+                "on_request must be a plain function: it is called without being awaited, also by AsyncClient"
+            )
         self.on_request = on_request
 
     def deadline(self, timeout: float | None) -> float:

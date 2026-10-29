@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+from collections.abc import MutableMapping
 from typing import Any
 
 import pytest
@@ -179,13 +180,13 @@ async def test_blocking_function_runs_in_a_thread() -> None:
 
 async def asgi_call(h: Handler, method: str, path: str, body: bytes, query: bytes = b"") -> tuple[int, Any, bytes]:
     chunks = [body[: len(body) // 2], body[len(body) // 2 :]]
-    sent: list[dict[str, Any]] = []
+    sent: list[MutableMapping[str, Any]] = []
 
     async def receive() -> dict[str, Any]:
         part = chunks.pop(0)
         return {"type": "http.request", "body": part, "more_body": bool(chunks)}
 
-    async def send(msg: dict[str, Any]) -> None:
+    async def send(msg: MutableMapping[str, Any]) -> None:
         sent.append(msg)
 
     scope = {
@@ -222,12 +223,12 @@ async def test_asgi() -> None:
 
 async def test_asgi_lifespan() -> None:
     msgs = [{"type": "lifespan.startup"}, {"type": "lifespan.shutdown"}]
-    sent: list[dict[str, Any]] = []
+    sent: list[MutableMapping[str, Any]] = []
 
     async def receive() -> dict[str, Any]:
         return msgs.pop(0)
 
-    async def send(m: dict[str, Any]) -> None:
+    async def send(m: MutableMapping[str, Any]) -> None:
         sent.append(m)
 
     await endpoints.ConnectionToken(lambda r: "t").asgi({"type": "lifespan"}, receive, send)
@@ -400,3 +401,16 @@ async def test_async_proxy_function() -> None:
 def test_every_proxy_type_has_a_handler() -> None:
     names = [n for n in proxy.__all__ if n.endswith("Handler")]
     assert len(names) == 11
+
+
+def test_wrong_result_type_is_named_fully() -> None:
+    errors = Errors()
+
+    def subscribe(req: cent.HTTPRequest, r: proxy.SubscribeRequest) -> Any:
+        return cent.Disconnect(code=4500)
+
+    h = proxy.SubscribeHandler(subscribe, on_error=errors)
+    assert call(h, "POST", {"client": "c1", "channel": "news"}).status == 500
+    assert str(errors[0][1]) == (
+        "proxy: the subscribe function returned cent.Disconnect, not cent.proxy.SubscribeResult"
+    )

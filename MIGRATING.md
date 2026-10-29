@@ -72,7 +72,7 @@ client.close()
 ```
 
 - `api_key` is a keyword argument, and `timeout` became `request_timeout`; a
-  call still takes its own: `client.publish(request, timeout=1.0)`.
+  call still takes its own: `client.publish(channel=..., data=..., timeout=1.0)`.
 - A known error code is raised as its own class - `UnknownChannelError` for
   102 - so there is no need to compare `code` by hand. Any Centrifugo error is
   still an `ApiError` with `code` and `message`.
@@ -161,7 +161,7 @@ on its own may want a broadcast with some failed channels to go on, as in cent
 above does. Do this only where failed channels are expected and handled.
 Elsewhere, let the exception through.
 
-**Retries are built for broadcast.** `client.broadcast_with_retry(request)`
+**Retries are built for broadcast.** `client.broadcast_with_retry(channels=..., data=...)`
 retries only the channels which may still succeed, with one `idempotency_key`
 for all attempts - made for the call when the request has none - and returns
 every channel's last outcome. A retry of the whole broadcast would publish
@@ -281,7 +281,7 @@ client = cent.AsyncClient(api_url, api_key=api_key, request_timeout=5.0, http_cl
 
 - `api_key` is a keyword argument. `bearer_token_func` authenticates with
   Centrifugo PRO's API tokens instead - see `cent.token.APITokens`.
-- `timeout` per call stays: `client.publish(request, timeout=1.0)`.
+- `timeout` per call stays: `client.publish(channel=..., data=..., timeout=1.0)`.
 - An `http_client` you pass is never changed - cent 5 set the API key in the
   headers of the session you gave it.
 - Redirects are not followed, so a misconfigured `http://` endpoint fails with

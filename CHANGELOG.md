@@ -14,7 +14,9 @@ Migrating from cent 5: see [MIGRATING.md](MIGRATING.md).
 * `cent.command.publish(...)` and the like for Centrifugo's async consumers.
 * `cent.token`: connection, subscription and Centrifugo PRO server API tokens (HS256, RS256, ES256/384/512, EdDSA), JWKS, `APITokens`.
 * `cent.endpoints`: the token and shared poll signature endpoints client SDKs call, and the JWKS endpoint. `cent.proxy`: a handler for every proxy type, generated from `proxy.proto`. Each is a framework-free core with ASGI and WSGI adapters.
-* `cent.sharedpoll.sign` for shared poll signatures.
+* `cent.sharedpoll.sign` for shared poll signatures, its expiry required: a datetime, or `token.NEVER`.
+* Fields the protos mark required are required keyword arguments. `cent.to_dict` renders results and errors with Centrifugo's field names. `Pending.resolved` and the public constructors of results and partial-failure errors make test doubles; the README shows a fake transport.
+* An `AsyncClient` used from a second event loop raises `InvalidConfigError`; a `Client` in a forked process starts its own connections.
 
 v4.1.0
 ======

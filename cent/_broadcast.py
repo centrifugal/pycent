@@ -50,9 +50,10 @@ class BroadcastResult:
     """True when Centrifugo carried the broadcast out and replied for every
     channel, the failed ones included; False when it failed as a whole."""
 
+    @property
     def failed(self) -> list[ChannelResult]:
         """The channels which did not get the publication, with their errors, in
-        the order of the request."""
+        the order of the request - as the error's ``failed`` lists them."""
         return [ch for ch in self.channels if ch.error is not None]
 
 
@@ -88,7 +89,7 @@ def from_wire(v: Any, channels: list[str], key: str) -> BroadcastResult:
 
 def check(res: BroadcastResult) -> BroadcastResult:
     """res, or BroadcastFailedChannelsError carrying it when any channel failed."""
-    failed = res.failed()
+    failed = res.failed
     if failed:
         raise BroadcastFailedChannelsError(failed, len(res.channels), res)
     return res

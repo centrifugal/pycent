@@ -24,7 +24,7 @@ class RawJSON:
     dates, decimals). It is checked to be valid JSON when created, and sent
     unchanged, number text kept.
 
-    >>> cent.PublishRequest(channel="news", data=cent.RawJSON('{"text":"hi"}'))
+    >>> client.publish(channel="news", data=cent.RawJSON('{"text":"hi"}'))
     """
 
     __slots__ = ("_text",)

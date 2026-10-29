@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from collections.abc import Awaitable, Callable, Iterable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping, MutableMapping
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import parse_qsl
@@ -191,9 +191,15 @@ class Handler:
 
     # The adapters.
 
-    async def asgi(self, scope: dict[str, Any], receive: Callable[[], Awaitable[dict[str, Any]]], send: Any) -> None:
+    async def asgi(
+        self,
+        scope: MutableMapping[str, Any],
+        receive: Callable[[], Awaitable[MutableMapping[str, Any]]],
+        send: Callable[[MutableMapping[str, Any]], Awaitable[None]],
+    ) -> None:
         """The handler as an ASGI app: app.mount("/centrifugo/connect", handler.asgi)
-        in FastAPI or Starlette, say."""
+        in Starlette, say. Mounted, it answers on the path with a trailing
+        slash, /centrifugo/connect/: Centrifugo's endpoint must have it."""
         if scope["type"] == "lifespan":
             while True:
                 msg = await receive()

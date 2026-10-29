@@ -53,8 +53,9 @@ Options:
 - http_client: the httpx2.Client sending requests - httpx2 is the maintained
   fork of httpx, with the same API. It is never changed:
   credentials and headers go on each request. Without one, the client
-  keeps up to 256 connections to a host alive, never follows redirects,
-  and closes idle connections after 50 seconds.
+  keeps its connections alive between calls, never follows redirects, and
+  starts its own after a fork - gunicorn --preload, Celery's prefork pool.
+  A client you pass is the process's: create it after forking.
 - request_timeout: seconds bounding a call without a timeout of its own,
   10 by default.
 - headers: extra headers for every request, for a proxy in front of
@@ -62,14 +63,15 @@ Options:
   replaces cent's.
 - on_request: called after every HTTP request with a RequestInfo, for
   metrics without a dependency of cent's. It runs in the calling thread,
-  and the call waits for it.
+  and the call waits for it. It must not raise: an exception it raises
+  goes to the caller in place of the call's outcome.
 - auto_batch: sends calls made concurrently in batches - see AutoBatch.
 - batch_context: with auto_batch, makes the context of a batch's request
   from its callers' - for a tracing span linking every caller's - see
   BatchContext. Without it, a batch runs in a context of its own, carrying
   no caller's values.
 
-#### `block_user(*, expire_at: int = 0, user: str = '', timeout: float | None = None) -> BlockUserResult`
+#### `block_user(*, expire_at: int = 0, user: str, timeout: float | None = None) -> BlockUserResult`
 
 Blocks a user: the user is disconnected and can not
 connect again until unblocked or the block expires. Centrifugo PRO only.
@@ -82,7 +84,7 @@ Arguments:
 
 #### `broadcast(
     *,
-    channels: list[str] | None = None,
+    channels: list[str],
     data: JSON = None,
     b64data: str = '',
     skip_history: bool = False,
@@ -120,7 +122,7 @@ Arguments:
 
 #### `broadcast_with_retry(
     *,
-    channels: list[str] | None = None,
+    channels: list[str],
     data: JSON = None,
     b64data: str = '',
     skip_history: bool = False,
@@ -154,7 +156,7 @@ attempt_timeout - request_timeout by default - bounds each attempt.
 on_attempt_error decides the wait between attempts, and may stop them:
 see BroadcastAttemptCallback. It raises as broadcast does.
 
-#### `cancel_push(*, uid: str = '', timeout: float | None = None) -> CancelPushResult`
+#### `cancel_push(*, uid: str, timeout: float | None = None) -> CancelPushResult`
 
 Cancels a delayed push notification (sent with
 send_at). Centrifugo PRO only.
@@ -206,11 +208,7 @@ Arguments:
 - `label_filter` - Restricts the listing to clients whose labels match this filter. Centrifugo PRO only.
 - `timeout` - Seconds bounding the call: request_timeout when None.
 
-#### `delete_user_status(
-    *,
-    users: list[str] | None = None,
-    timeout: float | None = None,
-) -> DeleteUserStatusResult`
+#### `delete_user_status(*, users: list[str], timeout: float | None = None) -> DeleteUserStatusResult`
 
 Deletes the status of users. Centrifugo PRO only.
 
@@ -221,7 +219,7 @@ Arguments:
 
 #### `device_list(
     *,
-    filter: DeviceFilter | None = None,
+    filter: DeviceFilter,
     include_total_count: bool = False,
     include_meta: bool = False,
     include_topics: bool = False,
@@ -248,9 +246,9 @@ Arguments:
 #### `device_register(
     *,
     id: str = '',
-    provider: str = '',
-    token: str = '',
-    platform: str = '',
+    provider: str,
+    token: str,
+    platform: str,
     user: str = '',
     meta: dict[str, str] | None = None,
     topics: list[str] | None = None,
@@ -315,8 +313,8 @@ Arguments:
 
 #### `device_topic_update(
     *,
-    device_id: str = '',
-    op: str = '',
+    device_id: str,
+    op: str,
     topics: list[str] | None = None,
     user: str = '',
     timeout: float | None = None,
@@ -385,11 +383,7 @@ Arguments:
 - `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
 - `timeout` - Seconds bounding the call: request_timeout when None.
 
-#### `get_user_status(
-    *,
-    users: list[str] | None = None,
-    timeout: float | None = None,
-) -> GetUserStatusResult`
+#### `get_user_status(*, users: list[str], timeout: float | None = None) -> GetUserStatusResult`
 
 Returns the status of users. Centrifugo PRO only.
 
@@ -400,7 +394,7 @@ Arguments:
 
 #### `history(
     *,
-    channel: str = '',
+    channel: str,
     limit: int = 0,
     since: StreamPosition | None = None,
     reverse: bool = False,
@@ -418,7 +412,7 @@ Arguments:
 - `reverse` - Iterates in reverse order, from latest to earliest.
 - `timeout` - Seconds bounding the call: request_timeout when None.
 
-#### `history_remove(*, channel: str = '', timeout: float | None = None) -> HistoryRemoveResult`
+#### `history_remove(*, channel: str, timeout: float | None = None) -> HistoryRemoveResult`
 
 Removes publications from the history of a channel.
 The current top stream position is kept, so clients do not get
@@ -440,7 +434,7 @@ Arguments:
 #### `invalidate_user_tokens(
     *,
     expire_at: int = 0,
-    user: str = '',
+    user: str,
     issued_before: int = 0,
     channel: str = '',
     timeout: float | None = None,
@@ -457,7 +451,7 @@ Arguments:
 - `channel` - Limits the invalidation to subscription tokens for this channel.
 - `timeout` - Seconds bounding the call: request_timeout when None.
 
-#### `map_clear(*, channel: str = '', timeout: float | None = None) -> MapClearResult`
+#### `map_clear(*, channel: str, timeout: float | None = None) -> MapClearResult`
 
 Removes all state and stream data of a map channel.
 
@@ -468,8 +462,8 @@ Arguments:
 
 #### `map_publish(
     *,
-    channel: str = '',
-    key: str = '',
+    channel: str,
+    key: str,
     data: JSON = None,
     b64data: str = '',
     stream_data: JSON = None,
@@ -505,7 +499,7 @@ Arguments:
 
 #### `map_read_state(
     *,
-    channel: str = '',
+    channel: str,
     cursor: str = '',
     limit: int = 0,
     key: str = '',
@@ -531,7 +525,7 @@ Arguments:
 
 #### `map_read_stream(
     *,
-    channel: str = '',
+    channel: str,
     since_offset: int = 0,
     since_epoch: str = '',
     limit: int = 0,
@@ -552,8 +546,8 @@ Arguments:
 
 #### `map_remove(
     *,
-    channel: str = '',
-    key: str = '',
+    channel: str,
+    key: str,
     idempotency_key: str = '',
     timeout: float | None = None,
 ) -> MapRemoveResult`
@@ -567,7 +561,7 @@ Arguments:
 - `idempotency_key` - Drops duplicate removals upon retries, as it does for MapPublishRequest: a removal with a key already used in the channel is not applied again, and its result is suppressed with suppress_reason "idempotency". Keys are kept for 5 minutes by default.
 - `timeout` - Seconds bounding the call: request_timeout when None.
 
-#### `map_stats(*, channel: str = '', timeout: float | None = None) -> MapStatsResult`
+#### `map_stats(*, channel: str, timeout: float | None = None) -> MapStatsResult`
 
 Returns statistics about a map channel.
 
@@ -585,7 +579,7 @@ effect in order, publications into different channels may not, unless
 the namespace sets publication_grouping_disabled. With parallel,
 Centrifugo runs them concurrently, with no order.
 
-#### `presence(*, channel: str = '', timeout: float | None = None) -> PresenceResult`
+#### `presence(*, channel: str, timeout: float | None = None) -> PresenceResult`
 
 Returns the online presence of a channel: all clients
 currently subscribed to it. Presence must be enabled for the channel.
@@ -595,7 +589,7 @@ Arguments:
 - `channel` - The name of the channel. Required.
 - `timeout` - Seconds bounding the call: request_timeout when None.
 
-#### `presence_stats(*, channel: str = '', timeout: float | None = None) -> PresenceStatsResult`
+#### `presence_stats(*, channel: str, timeout: float | None = None) -> PresenceStatsResult`
 
 Returns short presence information of a channel: the
 number of clients and of unique users. Presence must be enabled for the
@@ -608,7 +602,7 @@ Arguments:
 
 #### `publish(
     *,
-    channel: str = '',
+    channel: str,
     data: JSON = None,
     b64data: str = '',
     skip_history: bool = False,
@@ -664,12 +658,7 @@ Arguments:
 - `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
 - `timeout` - Seconds bounding the call: request_timeout when None.
 
-#### `revoke_token(
-    *,
-    expire_at: int = 0,
-    uid: str = '',
-    timeout: float | None = None,
-) -> RevokeTokenResult`
+#### `revoke_token(*, expire_at: int = 0, uid: str, timeout: float | None = None) -> RevokeTokenResult`
 
 Revokes a token by its unique ID (jti claim of a JWT).
 Clients using the token are disconnected shortly, and can not connect
@@ -683,8 +672,8 @@ Arguments:
 
 #### `send_push_notification(
     *,
-    recipient: PushRecipient | None = None,
-    notification: PushNotification | None = None,
+    recipient: PushRecipient,
+    notification: PushNotification,
     uid: str = '',
     send_at: int = 0,
     optimize_for_reliability: bool = False,
@@ -716,11 +705,11 @@ Arguments:
 
 #### `shared_poll_publish(
     *,
-    channel: str = '',
-    key: str = '',
+    channel: str,
+    key: str,
     data: JSON = None,
     b64data: str = '',
-    version: int = 0,
+    version: int,
     epoch: str = '',
     timeout: float | None = None,
 ) -> SharedPollPublishResult`
@@ -741,7 +730,7 @@ Arguments:
 
 #### `subscribe(
     *,
-    channel: str = '',
+    channel: str,
     user: str = '',
     expire_at: int = 0,
     info: JSON = None,
@@ -778,7 +767,7 @@ Arguments:
 - `all_users` - When user is empty, targets every connection on every node instead of the anonymous-only bucket. No effect when user is non-empty. Without label_filter it acts on every connection. Centrifugo PRO only.
 - `timeout` - Seconds bounding the call: request_timeout when None.
 
-#### `unblock_user(*, user: str = '', timeout: float | None = None) -> UnblockUserResult`
+#### `unblock_user(*, user: str, timeout: float | None = None) -> UnblockUserResult`
 
 Unblocks a user. Centrifugo PRO only.
 
@@ -789,7 +778,7 @@ Arguments:
 
 #### `unsubscribe(
     *,
-    channel: str = '',
+    channel: str,
     user: str = '',
     client: str = '',
     session: str = '',
@@ -812,9 +801,9 @@ Arguments:
 
 #### `update_push_status(
     *,
-    analytics_uid: str = '',
-    status: str = '',
-    device_id: str = '',
+    analytics_uid: str,
+    status: str,
+    device_id: str,
     msg_id: str = '',
     timeout: float | None = None,
 ) -> UpdatePushStatusResult`
@@ -832,7 +821,7 @@ Arguments:
 
 #### `update_user_status(
     *,
-    users: list[str] | None = None,
+    users: list[str],
     state: str = '',
     timeout: float | None = None,
 ) -> UpdateUserStatusResult`
@@ -868,8 +857,8 @@ Arguments:
 
 #### `user_topic_update(
     *,
-    user: str = '',
-    op: str = '',
+    user: str,
+    op: str,
     topics: list[str] | None = None,
     timeout: float | None = None,
 ) -> UserTopicUpdateResult`
@@ -919,12 +908,7 @@ asyncio.timeout around it, or cancelling its task, ends it sooner.
 Stops the client and waits for the calls in progress, as Client.close
 does.
 
-#### `async block_user(
-    *,
-    expire_at: int = 0,
-    user: str = '',
-    timeout: float | None = None,
-) -> BlockUserResult`
+#### `async block_user(*, expire_at: int = 0, user: str, timeout: float | None = None) -> BlockUserResult`
 
 Blocks a user: the user is disconnected and can not
 connect again until unblocked or the block expires. Centrifugo PRO only.
@@ -937,7 +921,7 @@ Arguments:
 
 #### `async broadcast(
     *,
-    channels: list[str] | None = None,
+    channels: list[str],
     data: JSON = None,
     b64data: str = '',
     skip_history: bool = False,
@@ -975,7 +959,7 @@ Arguments:
 
 #### `async broadcast_with_retry(
     *,
-    channels: list[str] | None = None,
+    channels: list[str],
     data: JSON = None,
     b64data: str = '',
     skip_history: bool = False,
@@ -1009,7 +993,7 @@ attempt_timeout - request_timeout by default - bounds each attempt.
 on_attempt_error decides the wait between attempts, and may stop them:
 see BroadcastAttemptCallback. It raises as broadcast does.
 
-#### `async cancel_push(*, uid: str = '', timeout: float | None = None) -> CancelPushResult`
+#### `async cancel_push(*, uid: str, timeout: float | None = None) -> CancelPushResult`
 
 Cancels a delayed push notification (sent with
 send_at). Centrifugo PRO only.
@@ -1050,7 +1034,7 @@ Arguments:
 
 #### `async delete_user_status(
     *,
-    users: list[str] | None = None,
+    users: list[str],
     timeout: float | None = None,
 ) -> DeleteUserStatusResult`
 
@@ -1063,7 +1047,7 @@ Arguments:
 
 #### `async device_list(
     *,
-    filter: DeviceFilter | None = None,
+    filter: DeviceFilter,
     include_total_count: bool = False,
     include_meta: bool = False,
     include_topics: bool = False,
@@ -1090,9 +1074,9 @@ Arguments:
 #### `async device_register(
     *,
     id: str = '',
-    provider: str = '',
-    token: str = '',
-    platform: str = '',
+    provider: str,
+    token: str,
+    platform: str,
     user: str = '',
     meta: dict[str, str] | None = None,
     topics: list[str] | None = None,
@@ -1157,8 +1141,8 @@ Arguments:
 
 #### `async device_topic_update(
     *,
-    device_id: str = '',
-    op: str = '',
+    device_id: str,
+    op: str,
     topics: list[str] | None = None,
     user: str = '',
     timeout: float | None = None,
@@ -1227,11 +1211,7 @@ Arguments:
 - `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
 - `timeout` - Seconds bounding the call: request_timeout when None.
 
-#### `async get_user_status(
-    *,
-    users: list[str] | None = None,
-    timeout: float | None = None,
-) -> GetUserStatusResult`
+#### `async get_user_status(*, users: list[str], timeout: float | None = None) -> GetUserStatusResult`
 
 Returns the status of users. Centrifugo PRO only.
 
@@ -1242,7 +1222,7 @@ Arguments:
 
 #### `async history(
     *,
-    channel: str = '',
+    channel: str,
     limit: int = 0,
     since: StreamPosition | None = None,
     reverse: bool = False,
@@ -1260,7 +1240,7 @@ Arguments:
 - `reverse` - Iterates in reverse order, from latest to earliest.
 - `timeout` - Seconds bounding the call: request_timeout when None.
 
-#### `async history_remove(*, channel: str = '', timeout: float | None = None) -> HistoryRemoveResult`
+#### `async history_remove(*, channel: str, timeout: float | None = None) -> HistoryRemoveResult`
 
 Removes publications from the history of a channel.
 The current top stream position is kept, so clients do not get
@@ -1282,7 +1262,7 @@ Arguments:
 #### `async invalidate_user_tokens(
     *,
     expire_at: int = 0,
-    user: str = '',
+    user: str,
     issued_before: int = 0,
     channel: str = '',
     timeout: float | None = None,
@@ -1299,7 +1279,7 @@ Arguments:
 - `channel` - Limits the invalidation to subscription tokens for this channel.
 - `timeout` - Seconds bounding the call: request_timeout when None.
 
-#### `async map_clear(*, channel: str = '', timeout: float | None = None) -> MapClearResult`
+#### `async map_clear(*, channel: str, timeout: float | None = None) -> MapClearResult`
 
 Removes all state and stream data of a map channel.
 
@@ -1310,8 +1290,8 @@ Arguments:
 
 #### `async map_publish(
     *,
-    channel: str = '',
-    key: str = '',
+    channel: str,
+    key: str,
     data: JSON = None,
     b64data: str = '',
     stream_data: JSON = None,
@@ -1347,7 +1327,7 @@ Arguments:
 
 #### `async map_read_state(
     *,
-    channel: str = '',
+    channel: str,
     cursor: str = '',
     limit: int = 0,
     key: str = '',
@@ -1373,7 +1353,7 @@ Arguments:
 
 #### `async map_read_stream(
     *,
-    channel: str = '',
+    channel: str,
     since_offset: int = 0,
     since_epoch: str = '',
     limit: int = 0,
@@ -1394,8 +1374,8 @@ Arguments:
 
 #### `async map_remove(
     *,
-    channel: str = '',
-    key: str = '',
+    channel: str,
+    key: str,
     idempotency_key: str = '',
     timeout: float | None = None,
 ) -> MapRemoveResult`
@@ -1409,7 +1389,7 @@ Arguments:
 - `idempotency_key` - Drops duplicate removals upon retries, as it does for MapPublishRequest: a removal with a key already used in the channel is not applied again, and its result is suppressed with suppress_reason "idempotency". Keys are kept for 5 minutes by default.
 - `timeout` - Seconds bounding the call: request_timeout when None.
 
-#### `async map_stats(*, channel: str = '', timeout: float | None = None) -> MapStatsResult`
+#### `async map_stats(*, channel: str, timeout: float | None = None) -> MapStatsResult`
 
 Returns statistics about a map channel.
 
@@ -1418,7 +1398,7 @@ Arguments:
 - `channel` - The name of the map channel. Required.
 - `timeout` - Seconds bounding the call: request_timeout when None.
 
-#### `async presence(*, channel: str = '', timeout: float | None = None) -> PresenceResult`
+#### `async presence(*, channel: str, timeout: float | None = None) -> PresenceResult`
 
 Returns the online presence of a channel: all clients
 currently subscribed to it. Presence must be enabled for the channel.
@@ -1428,7 +1408,7 @@ Arguments:
 - `channel` - The name of the channel. Required.
 - `timeout` - Seconds bounding the call: request_timeout when None.
 
-#### `async presence_stats(*, channel: str = '', timeout: float | None = None) -> PresenceStatsResult`
+#### `async presence_stats(*, channel: str, timeout: float | None = None) -> PresenceStatsResult`
 
 Returns short presence information of a channel: the
 number of clients and of unique users. Presence must be enabled for the
@@ -1441,7 +1421,7 @@ Arguments:
 
 #### `async publish(
     *,
-    channel: str = '',
+    channel: str,
     data: JSON = None,
     b64data: str = '',
     skip_history: bool = False,
@@ -1500,7 +1480,7 @@ Arguments:
 #### `async revoke_token(
     *,
     expire_at: int = 0,
-    uid: str = '',
+    uid: str,
     timeout: float | None = None,
 ) -> RevokeTokenResult`
 
@@ -1516,8 +1496,8 @@ Arguments:
 
 #### `async send_push_notification(
     *,
-    recipient: PushRecipient | None = None,
-    notification: PushNotification | None = None,
+    recipient: PushRecipient,
+    notification: PushNotification,
     uid: str = '',
     send_at: int = 0,
     optimize_for_reliability: bool = False,
@@ -1549,11 +1529,11 @@ Arguments:
 
 #### `async shared_poll_publish(
     *,
-    channel: str = '',
-    key: str = '',
+    channel: str,
+    key: str,
     data: JSON = None,
     b64data: str = '',
-    version: int = 0,
+    version: int,
     epoch: str = '',
     timeout: float | None = None,
 ) -> SharedPollPublishResult`
@@ -1574,7 +1554,7 @@ Arguments:
 
 #### `async subscribe(
     *,
-    channel: str = '',
+    channel: str,
     user: str = '',
     expire_at: int = 0,
     info: JSON = None,
@@ -1611,7 +1591,7 @@ Arguments:
 - `all_users` - When user is empty, targets every connection on every node instead of the anonymous-only bucket. No effect when user is non-empty. Without label_filter it acts on every connection. Centrifugo PRO only.
 - `timeout` - Seconds bounding the call: request_timeout when None.
 
-#### `async unblock_user(*, user: str = '', timeout: float | None = None) -> UnblockUserResult`
+#### `async unblock_user(*, user: str, timeout: float | None = None) -> UnblockUserResult`
 
 Unblocks a user. Centrifugo PRO only.
 
@@ -1622,7 +1602,7 @@ Arguments:
 
 #### `async unsubscribe(
     *,
-    channel: str = '',
+    channel: str,
     user: str = '',
     client: str = '',
     session: str = '',
@@ -1645,9 +1625,9 @@ Arguments:
 
 #### `async update_push_status(
     *,
-    analytics_uid: str = '',
-    status: str = '',
-    device_id: str = '',
+    analytics_uid: str,
+    status: str,
+    device_id: str,
     msg_id: str = '',
     timeout: float | None = None,
 ) -> UpdatePushStatusResult`
@@ -1665,7 +1645,7 @@ Arguments:
 
 #### `async update_user_status(
     *,
-    users: list[str] | None = None,
+    users: list[str],
     state: str = '',
     timeout: float | None = None,
 ) -> UpdateUserStatusResult`
@@ -1701,8 +1681,8 @@ Arguments:
 
 #### `async user_topic_update(
     *,
-    user: str = '',
-    op: str = '',
+    user: str,
+    op: str,
     topics: list[str] | None = None,
     timeout: float | None = None,
 ) -> UserTopicUpdateResult`
@@ -1774,7 +1754,7 @@ pub.result()
 
 A batch is sent once, and is not safe for concurrent use.
 
-#### `block_user(*, expire_at: int = 0, user: str = '') -> Pending[BlockUserResult]`
+#### `block_user(*, expire_at: int = 0, user: str) -> Pending[BlockUserResult]`
 
 Adds a block_user command; its outcome is what Client.block_user would return.
 
@@ -1785,7 +1765,7 @@ Arguments:
 
 #### `broadcast(
     *,
-    channels: list[str] | None = None,
+    channels: list[str],
     data: JSON = None,
     b64data: str = '',
     skip_history: bool = False,
@@ -1810,7 +1790,7 @@ Arguments:
 - `version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
 - `version_epoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
 
-#### `cancel_push(*, uid: str = '') -> Pending[CancelPushResult]`
+#### `cancel_push(*, uid: str) -> Pending[CancelPushResult]`
 
 Adds a cancel_push command; its outcome is what Client.cancel_push would return.
 
@@ -1841,7 +1821,7 @@ Arguments:
 - `expression` - A CEL expression to filter connections.
 - `label_filter` - Restricts the listing to clients whose labels match this filter. Centrifugo PRO only.
 
-#### `delete_user_status(*, users: list[str] | None = None) -> Pending[DeleteUserStatusResult]`
+#### `delete_user_status(*, users: list[str]) -> Pending[DeleteUserStatusResult]`
 
 Adds a delete_user_status command; its outcome is what Client.delete_user_status would return.
 
@@ -1851,7 +1831,7 @@ Arguments:
 
 #### `device_list(
     *,
-    filter: DeviceFilter | None = None,
+    filter: DeviceFilter,
     include_total_count: bool = False,
     include_meta: bool = False,
     include_topics: bool = False,
@@ -1875,9 +1855,9 @@ Arguments:
 #### `device_register(
     *,
     id: str = '',
-    provider: str = '',
-    token: str = '',
-    platform: str = '',
+    provider: str,
+    token: str,
+    platform: str,
     user: str = '',
     meta: dict[str, str] | None = None,
     topics: list[str] | None = None,
@@ -1933,8 +1913,8 @@ Arguments:
 
 #### `device_topic_update(
     *,
-    device_id: str = '',
-    op: str = '',
+    device_id: str,
+    op: str,
     topics: list[str] | None = None,
     user: str = '',
 ) -> Pending[DeviceTopicUpdateResult]`
@@ -1994,7 +1974,7 @@ Arguments:
 - `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
 
-#### `get_user_status(*, users: list[str] | None = None) -> Pending[GetUserStatusResult]`
+#### `get_user_status(*, users: list[str]) -> Pending[GetUserStatusResult]`
 
 Adds a get_user_status command; its outcome is what Client.get_user_status would return.
 
@@ -2004,7 +1984,7 @@ Arguments:
 
 #### `history(
     *,
-    channel: str = '',
+    channel: str,
     limit: int = 0,
     since: StreamPosition | None = None,
     reverse: bool = False,
@@ -2019,7 +1999,7 @@ Arguments:
 - `since` - Returns publications after this stream position.
 - `reverse` - Iterates in reverse order, from latest to earliest.
 
-#### `history_remove(*, channel: str = '') -> Pending[HistoryRemoveResult]`
+#### `history_remove(*, channel: str) -> Pending[HistoryRemoveResult]`
 
 Adds a history_remove command; its outcome is what Client.history_remove would return.
 
@@ -2034,7 +2014,7 @@ Adds a info command; its outcome is what Client.info would return.
 #### `invalidate_user_tokens(
     *,
     expire_at: int = 0,
-    user: str = '',
+    user: str,
     issued_before: int = 0,
     channel: str = '',
 ) -> Pending[InvalidateUserTokensResult]`
@@ -2048,7 +2028,7 @@ Arguments:
 - `issued_before` - The Unix time in seconds: tokens issued before it are considered revoked. If not set, the current time is used.
 - `channel` - Limits the invalidation to subscription tokens for this channel.
 
-#### `map_clear(*, channel: str = '') -> Pending[MapClearResult]`
+#### `map_clear(*, channel: str) -> Pending[MapClearResult]`
 
 Adds a map_clear command; its outcome is what Client.map_clear would return.
 
@@ -2058,8 +2038,8 @@ Arguments:
 
 #### `map_publish(
     *,
-    channel: str = '',
-    key: str = '',
+    channel: str,
+    key: str,
     data: JSON = None,
     b64data: str = '',
     stream_data: JSON = None,
@@ -2093,7 +2073,7 @@ Arguments:
 
 #### `map_read_state(
     *,
-    channel: str = '',
+    channel: str,
     cursor: str = '',
     limit: int = 0,
     key: str = '',
@@ -2116,7 +2096,7 @@ Arguments:
 
 #### `map_read_stream(
     *,
-    channel: str = '',
+    channel: str,
     since_offset: int = 0,
     since_epoch: str = '',
     limit: int = 0,
@@ -2133,12 +2113,7 @@ Arguments:
 - `limit` - The maximum number of entries: -1 means no limit, 0 returns only the stream position.
 - `reverse` - Returns entries newest first.
 
-#### `map_remove(
-    *,
-    channel: str = '',
-    key: str = '',
-    idempotency_key: str = '',
-) -> Pending[MapRemoveResult]`
+#### `map_remove(*, channel: str, key: str, idempotency_key: str = '') -> Pending[MapRemoveResult]`
 
 Adds a map_remove command; its outcome is what Client.map_remove would return.
 
@@ -2148,7 +2123,7 @@ Arguments:
 - `key` - The key to remove. Required.
 - `idempotency_key` - Drops duplicate removals upon retries, as it does for MapPublishRequest: a removal with a key already used in the channel is not applied again, and its result is suppressed with suppress_reason "idempotency". Keys are kept for 5 minutes by default.
 
-#### `map_stats(*, channel: str = '') -> Pending[MapStatsResult]`
+#### `map_stats(*, channel: str) -> Pending[MapStatsResult]`
 
 Adds a map_stats command; its outcome is what Client.map_stats would return.
 
@@ -2156,7 +2131,7 @@ Arguments:
 
 - `channel` - The name of the map channel. Required.
 
-#### `presence(*, channel: str = '') -> Pending[PresenceResult]`
+#### `presence(*, channel: str) -> Pending[PresenceResult]`
 
 Adds a presence command; its outcome is what Client.presence would return.
 
@@ -2164,7 +2139,7 @@ Arguments:
 
 - `channel` - The name of the channel. Required.
 
-#### `presence_stats(*, channel: str = '') -> Pending[PresenceStatsResult]`
+#### `presence_stats(*, channel: str) -> Pending[PresenceStatsResult]`
 
 Adds a presence_stats command; its outcome is what Client.presence_stats would return.
 
@@ -2174,7 +2149,7 @@ Arguments:
 
 #### `publish(
     *,
-    channel: str = '',
+    channel: str,
     data: JSON = None,
     b64data: str = '',
     skip_history: bool = False,
@@ -2224,7 +2199,7 @@ Arguments:
 - `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
 
-#### `revoke_token(*, expire_at: int = 0, uid: str = '') -> Pending[RevokeTokenResult]`
+#### `revoke_token(*, expire_at: int = 0, uid: str) -> Pending[RevokeTokenResult]`
 
 Adds a revoke_token command; its outcome is what Client.revoke_token would return.
 
@@ -2246,8 +2221,8 @@ batch before anything is sent. An empty batch sends nothing.
 
 #### `send_push_notification(
     *,
-    recipient: PushRecipient | None = None,
-    notification: PushNotification | None = None,
+    recipient: PushRecipient,
+    notification: PushNotification,
     uid: str = '',
     send_at: int = 0,
     optimize_for_reliability: bool = False,
@@ -2275,11 +2250,11 @@ Arguments:
 
 #### `shared_poll_publish(
     *,
-    channel: str = '',
-    key: str = '',
+    channel: str,
+    key: str,
     data: JSON = None,
     b64data: str = '',
-    version: int = 0,
+    version: int,
     epoch: str = '',
 ) -> Pending[SharedPollPublishResult]`
 
@@ -2296,7 +2271,7 @@ Arguments:
 
 #### `subscribe(
     *,
-    channel: str = '',
+    channel: str,
     user: str = '',
     expire_at: int = 0,
     info: JSON = None,
@@ -2329,7 +2304,7 @@ Arguments:
 - `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `all_users` - When user is empty, targets every connection on every node instead of the anonymous-only bucket. No effect when user is non-empty. Without label_filter it acts on every connection. Centrifugo PRO only.
 
-#### `unblock_user(*, user: str = '') -> Pending[UnblockUserResult]`
+#### `unblock_user(*, user: str) -> Pending[UnblockUserResult]`
 
 Adds a unblock_user command; its outcome is what Client.unblock_user would return.
 
@@ -2339,7 +2314,7 @@ Arguments:
 
 #### `unsubscribe(
     *,
-    channel: str = '',
+    channel: str,
     user: str = '',
     client: str = '',
     session: str = '',
@@ -2360,9 +2335,9 @@ Arguments:
 
 #### `update_push_status(
     *,
-    analytics_uid: str = '',
-    status: str = '',
-    device_id: str = '',
+    analytics_uid: str,
+    status: str,
+    device_id: str,
     msg_id: str = '',
 ) -> Pending[UpdatePushStatusResult]`
 
@@ -2375,11 +2350,7 @@ Arguments:
 - `device_id` - The Centrifugo device ID. Required.
 - `msg_id` - The message ID issued by the provider.
 
-#### `update_user_status(
-    *,
-    users: list[str] | None = None,
-    state: str = '',
-) -> Pending[UpdateUserStatusResult]`
+#### `update_user_status(*, users: list[str], state: str = '') -> Pending[UpdateUserStatusResult]`
 
 Adds a update_user_status command; its outcome is what Client.update_user_status would return.
 
@@ -2407,8 +2378,8 @@ Arguments:
 
 #### `user_topic_update(
     *,
-    user: str = '',
-    op: str = '',
+    user: str,
+    op: str,
     topics: list[str] | None = None,
 ) -> Pending[UserTopicUpdateResult]`
 
@@ -2432,7 +2403,7 @@ A batch of an AsyncClient: as Batch, with ``await batch.send()``.
 
 Sends the batch, as Batch.send does.
 
-#### `block_user(*, expire_at: int = 0, user: str = '') -> Pending[BlockUserResult]`
+#### `block_user(*, expire_at: int = 0, user: str) -> Pending[BlockUserResult]`
 
 Adds a block_user command; its outcome is what Client.block_user would return.
 
@@ -2443,7 +2414,7 @@ Arguments:
 
 #### `broadcast(
     *,
-    channels: list[str] | None = None,
+    channels: list[str],
     data: JSON = None,
     b64data: str = '',
     skip_history: bool = False,
@@ -2468,7 +2439,7 @@ Arguments:
 - `version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
 - `version_epoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
 
-#### `cancel_push(*, uid: str = '') -> Pending[CancelPushResult]`
+#### `cancel_push(*, uid: str) -> Pending[CancelPushResult]`
 
 Adds a cancel_push command; its outcome is what Client.cancel_push would return.
 
@@ -2499,7 +2470,7 @@ Arguments:
 - `expression` - A CEL expression to filter connections.
 - `label_filter` - Restricts the listing to clients whose labels match this filter. Centrifugo PRO only.
 
-#### `delete_user_status(*, users: list[str] | None = None) -> Pending[DeleteUserStatusResult]`
+#### `delete_user_status(*, users: list[str]) -> Pending[DeleteUserStatusResult]`
 
 Adds a delete_user_status command; its outcome is what Client.delete_user_status would return.
 
@@ -2509,7 +2480,7 @@ Arguments:
 
 #### `device_list(
     *,
-    filter: DeviceFilter | None = None,
+    filter: DeviceFilter,
     include_total_count: bool = False,
     include_meta: bool = False,
     include_topics: bool = False,
@@ -2533,9 +2504,9 @@ Arguments:
 #### `device_register(
     *,
     id: str = '',
-    provider: str = '',
-    token: str = '',
-    platform: str = '',
+    provider: str,
+    token: str,
+    platform: str,
     user: str = '',
     meta: dict[str, str] | None = None,
     topics: list[str] | None = None,
@@ -2591,8 +2562,8 @@ Arguments:
 
 #### `device_topic_update(
     *,
-    device_id: str = '',
-    op: str = '',
+    device_id: str,
+    op: str,
     topics: list[str] | None = None,
     user: str = '',
 ) -> Pending[DeviceTopicUpdateResult]`
@@ -2652,7 +2623,7 @@ Arguments:
 - `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
 
-#### `get_user_status(*, users: list[str] | None = None) -> Pending[GetUserStatusResult]`
+#### `get_user_status(*, users: list[str]) -> Pending[GetUserStatusResult]`
 
 Adds a get_user_status command; its outcome is what Client.get_user_status would return.
 
@@ -2662,7 +2633,7 @@ Arguments:
 
 #### `history(
     *,
-    channel: str = '',
+    channel: str,
     limit: int = 0,
     since: StreamPosition | None = None,
     reverse: bool = False,
@@ -2677,7 +2648,7 @@ Arguments:
 - `since` - Returns publications after this stream position.
 - `reverse` - Iterates in reverse order, from latest to earliest.
 
-#### `history_remove(*, channel: str = '') -> Pending[HistoryRemoveResult]`
+#### `history_remove(*, channel: str) -> Pending[HistoryRemoveResult]`
 
 Adds a history_remove command; its outcome is what Client.history_remove would return.
 
@@ -2692,7 +2663,7 @@ Adds a info command; its outcome is what Client.info would return.
 #### `invalidate_user_tokens(
     *,
     expire_at: int = 0,
-    user: str = '',
+    user: str,
     issued_before: int = 0,
     channel: str = '',
 ) -> Pending[InvalidateUserTokensResult]`
@@ -2706,7 +2677,7 @@ Arguments:
 - `issued_before` - The Unix time in seconds: tokens issued before it are considered revoked. If not set, the current time is used.
 - `channel` - Limits the invalidation to subscription tokens for this channel.
 
-#### `map_clear(*, channel: str = '') -> Pending[MapClearResult]`
+#### `map_clear(*, channel: str) -> Pending[MapClearResult]`
 
 Adds a map_clear command; its outcome is what Client.map_clear would return.
 
@@ -2716,8 +2687,8 @@ Arguments:
 
 #### `map_publish(
     *,
-    channel: str = '',
-    key: str = '',
+    channel: str,
+    key: str,
     data: JSON = None,
     b64data: str = '',
     stream_data: JSON = None,
@@ -2751,7 +2722,7 @@ Arguments:
 
 #### `map_read_state(
     *,
-    channel: str = '',
+    channel: str,
     cursor: str = '',
     limit: int = 0,
     key: str = '',
@@ -2774,7 +2745,7 @@ Arguments:
 
 #### `map_read_stream(
     *,
-    channel: str = '',
+    channel: str,
     since_offset: int = 0,
     since_epoch: str = '',
     limit: int = 0,
@@ -2791,12 +2762,7 @@ Arguments:
 - `limit` - The maximum number of entries: -1 means no limit, 0 returns only the stream position.
 - `reverse` - Returns entries newest first.
 
-#### `map_remove(
-    *,
-    channel: str = '',
-    key: str = '',
-    idempotency_key: str = '',
-) -> Pending[MapRemoveResult]`
+#### `map_remove(*, channel: str, key: str, idempotency_key: str = '') -> Pending[MapRemoveResult]`
 
 Adds a map_remove command; its outcome is what Client.map_remove would return.
 
@@ -2806,7 +2772,7 @@ Arguments:
 - `key` - The key to remove. Required.
 - `idempotency_key` - Drops duplicate removals upon retries, as it does for MapPublishRequest: a removal with a key already used in the channel is not applied again, and its result is suppressed with suppress_reason "idempotency". Keys are kept for 5 minutes by default.
 
-#### `map_stats(*, channel: str = '') -> Pending[MapStatsResult]`
+#### `map_stats(*, channel: str) -> Pending[MapStatsResult]`
 
 Adds a map_stats command; its outcome is what Client.map_stats would return.
 
@@ -2814,7 +2780,7 @@ Arguments:
 
 - `channel` - The name of the map channel. Required.
 
-#### `presence(*, channel: str = '') -> Pending[PresenceResult]`
+#### `presence(*, channel: str) -> Pending[PresenceResult]`
 
 Adds a presence command; its outcome is what Client.presence would return.
 
@@ -2822,7 +2788,7 @@ Arguments:
 
 - `channel` - The name of the channel. Required.
 
-#### `presence_stats(*, channel: str = '') -> Pending[PresenceStatsResult]`
+#### `presence_stats(*, channel: str) -> Pending[PresenceStatsResult]`
 
 Adds a presence_stats command; its outcome is what Client.presence_stats would return.
 
@@ -2832,7 +2798,7 @@ Arguments:
 
 #### `publish(
     *,
-    channel: str = '',
+    channel: str,
     data: JSON = None,
     b64data: str = '',
     skip_history: bool = False,
@@ -2882,7 +2848,7 @@ Arguments:
 - `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
 
-#### `revoke_token(*, expire_at: int = 0, uid: str = '') -> Pending[RevokeTokenResult]`
+#### `revoke_token(*, expire_at: int = 0, uid: str) -> Pending[RevokeTokenResult]`
 
 Adds a revoke_token command; its outcome is what Client.revoke_token would return.
 
@@ -2893,8 +2859,8 @@ Arguments:
 
 #### `send_push_notification(
     *,
-    recipient: PushRecipient | None = None,
-    notification: PushNotification | None = None,
+    recipient: PushRecipient,
+    notification: PushNotification,
     uid: str = '',
     send_at: int = 0,
     optimize_for_reliability: bool = False,
@@ -2922,11 +2888,11 @@ Arguments:
 
 #### `shared_poll_publish(
     *,
-    channel: str = '',
-    key: str = '',
+    channel: str,
+    key: str,
     data: JSON = None,
     b64data: str = '',
-    version: int = 0,
+    version: int,
     epoch: str = '',
 ) -> Pending[SharedPollPublishResult]`
 
@@ -2943,7 +2909,7 @@ Arguments:
 
 #### `subscribe(
     *,
-    channel: str = '',
+    channel: str,
     user: str = '',
     expire_at: int = 0,
     info: JSON = None,
@@ -2976,7 +2942,7 @@ Arguments:
 - `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `all_users` - When user is empty, targets every connection on every node instead of the anonymous-only bucket. No effect when user is non-empty. Without label_filter it acts on every connection. Centrifugo PRO only.
 
-#### `unblock_user(*, user: str = '') -> Pending[UnblockUserResult]`
+#### `unblock_user(*, user: str) -> Pending[UnblockUserResult]`
 
 Adds a unblock_user command; its outcome is what Client.unblock_user would return.
 
@@ -2986,7 +2952,7 @@ Arguments:
 
 #### `unsubscribe(
     *,
-    channel: str = '',
+    channel: str,
     user: str = '',
     client: str = '',
     session: str = '',
@@ -3007,9 +2973,9 @@ Arguments:
 
 #### `update_push_status(
     *,
-    analytics_uid: str = '',
-    status: str = '',
-    device_id: str = '',
+    analytics_uid: str,
+    status: str,
+    device_id: str,
     msg_id: str = '',
 ) -> Pending[UpdatePushStatusResult]`
 
@@ -3022,11 +2988,7 @@ Arguments:
 - `device_id` - The Centrifugo device ID. Required.
 - `msg_id` - The message ID issued by the provider.
 
-#### `update_user_status(
-    *,
-    users: list[str] | None = None,
-    state: str = '',
-) -> Pending[UpdateUserStatusResult]`
+#### `update_user_status(*, users: list[str], state: str = '') -> Pending[UpdateUserStatusResult]`
 
 Adds a update_user_status command; its outcome is what Client.update_user_status would return.
 
@@ -3054,8 +3016,8 @@ Arguments:
 
 #### `user_topic_update(
     *,
-    user: str = '',
-    op: str = '',
+    user: str,
+    op: str,
     topics: list[str] | None = None,
 ) -> Pending[UserTopicUpdateResult]`
 
@@ -3070,10 +3032,15 @@ Arguments:
 ### `Pending`
 
 ```python
-Pending(batch: _BatchBase, index: int, get: Callable[[dict[str, Any]], _T]) -> None
+Pending(batch: _BatchBase | None, index: int, get: Callable[[dict[str, Any]], _T]) -> None
 ```
 
 The outcome of one command of a batch, available once the batch is sent.
+
+#### `resolved(result: _T | None = None, error: Exception | None = None) -> Pending[_T]`
+
+A Pending of no batch, whose result() returns result or raises error:
+for test doubles of code which reads a batch's outcomes.
 
 #### `result() -> _T`
 
@@ -3091,10 +3058,11 @@ BatchResult(replied: bool, failed: list[FailedCommand]) -> None
 The outcome of a sent batch as a whole. Each command's own outcome is in
 the Pending its method returned.
 
-#### `failed() -> list[FailedCommand]`
+#### `failed  (property)`
 
 The commands which failed, with their errors, in the order they were
-added. When the batch failed as a whole, that is every command.
+added - as the error's ``failed`` lists them. When the batch failed as a
+whole, that is every command.
 
 ### `BroadcastAttempt`
 
@@ -3116,10 +3084,10 @@ request listed them.
 - `attempts: int = 0` - How many times the broadcast was tried: 1 from broadcast, up to max_attempts from broadcast_with_retry, 0 when it was refused before sending.
 - `replied: bool = False` - True when Centrifugo carried the broadcast out and replied for every channel, the failed ones included; False when it failed as a whole.
 
-#### `failed() -> list[ChannelResult]`
+#### `failed  (property)`
 
 The channels which did not get the publication, with their errors, in
-the order of the request.
+the order of the request - as the error's ``failed`` lists them.
 
 ### `ChannelResult`
 
@@ -3161,7 +3129,7 @@ cent.command:
 cmd = cent.command.publish(channel="news", data={"text": "hi"})
 ```
 
-#### `block_user(*, expire_at: int = 0, user: str = '') -> Command`
+#### `block_user(*, expire_at: int = 0, user: str) -> Command`
 
 The block_user command.
 
@@ -3172,7 +3140,7 @@ Arguments:
 
 #### `broadcast(
     *,
-    channels: list[str] | None = None,
+    channels: list[str],
     data: JSON = None,
     b64data: str = '',
     skip_history: bool = False,
@@ -3197,7 +3165,7 @@ Arguments:
 - `version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
 - `version_epoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
 
-#### `cancel_push(*, uid: str = '') -> Command`
+#### `cancel_push(*, uid: str) -> Command`
 
 The cancel_push command.
 
@@ -3228,7 +3196,7 @@ Arguments:
 - `expression` - A CEL expression to filter connections.
 - `label_filter` - Restricts the listing to clients whose labels match this filter. Centrifugo PRO only.
 
-#### `delete_user_status(*, users: list[str] | None = None) -> Command`
+#### `delete_user_status(*, users: list[str]) -> Command`
 
 The delete_user_status command.
 
@@ -3238,7 +3206,7 @@ Arguments:
 
 #### `device_list(
     *,
-    filter: DeviceFilter | None = None,
+    filter: DeviceFilter,
     include_total_count: bool = False,
     include_meta: bool = False,
     include_topics: bool = False,
@@ -3262,9 +3230,9 @@ Arguments:
 #### `device_register(
     *,
     id: str = '',
-    provider: str = '',
-    token: str = '',
-    platform: str = '',
+    provider: str,
+    token: str,
+    platform: str,
     user: str = '',
     meta: dict[str, str] | None = None,
     topics: list[str] | None = None,
@@ -3316,8 +3284,8 @@ Arguments:
 
 #### `device_topic_update(
     *,
-    device_id: str = '',
-    op: str = '',
+    device_id: str,
+    op: str,
     topics: list[str] | None = None,
     user: str = '',
 ) -> Command`
@@ -3377,7 +3345,7 @@ Arguments:
 - `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
 
-#### `get_user_status(*, users: list[str] | None = None) -> Command`
+#### `get_user_status(*, users: list[str]) -> Command`
 
 The get_user_status command.
 
@@ -3387,7 +3355,7 @@ Arguments:
 
 #### `history(
     *,
-    channel: str = '',
+    channel: str,
     limit: int = 0,
     since: StreamPosition | None = None,
     reverse: bool = False,
@@ -3402,7 +3370,7 @@ Arguments:
 - `since` - Returns publications after this stream position.
 - `reverse` - Iterates in reverse order, from latest to earliest.
 
-#### `history_remove(*, channel: str = '') -> Command`
+#### `history_remove(*, channel: str) -> Command`
 
 The history_remove command.
 
@@ -3417,7 +3385,7 @@ The info command.
 #### `invalidate_user_tokens(
     *,
     expire_at: int = 0,
-    user: str = '',
+    user: str,
     issued_before: int = 0,
     channel: str = '',
 ) -> Command`
@@ -3431,7 +3399,7 @@ Arguments:
 - `issued_before` - The Unix time in seconds: tokens issued before it are considered revoked. If not set, the current time is used.
 - `channel` - Limits the invalidation to subscription tokens for this channel.
 
-#### `map_clear(*, channel: str = '') -> Command`
+#### `map_clear(*, channel: str) -> Command`
 
 The map_clear command.
 
@@ -3441,8 +3409,8 @@ Arguments:
 
 #### `map_publish(
     *,
-    channel: str = '',
-    key: str = '',
+    channel: str,
+    key: str,
     data: JSON = None,
     b64data: str = '',
     stream_data: JSON = None,
@@ -3476,7 +3444,7 @@ Arguments:
 
 #### `map_read_state(
     *,
-    channel: str = '',
+    channel: str,
     cursor: str = '',
     limit: int = 0,
     key: str = '',
@@ -3499,7 +3467,7 @@ Arguments:
 
 #### `map_read_stream(
     *,
-    channel: str = '',
+    channel: str,
     since_offset: int = 0,
     since_epoch: str = '',
     limit: int = 0,
@@ -3516,7 +3484,7 @@ Arguments:
 - `limit` - The maximum number of entries: -1 means no limit, 0 returns only the stream position.
 - `reverse` - Returns entries newest first.
 
-#### `map_remove(*, channel: str = '', key: str = '', idempotency_key: str = '') -> Command`
+#### `map_remove(*, channel: str, key: str, idempotency_key: str = '') -> Command`
 
 The map_remove command.
 
@@ -3526,7 +3494,7 @@ Arguments:
 - `key` - The key to remove. Required.
 - `idempotency_key` - Drops duplicate removals upon retries, as it does for MapPublishRequest: a removal with a key already used in the channel is not applied again, and its result is suppressed with suppress_reason "idempotency". Keys are kept for 5 minutes by default.
 
-#### `map_stats(*, channel: str = '') -> Command`
+#### `map_stats(*, channel: str) -> Command`
 
 The map_stats command.
 
@@ -3534,7 +3502,7 @@ Arguments:
 
 - `channel` - The name of the map channel. Required.
 
-#### `presence(*, channel: str = '') -> Command`
+#### `presence(*, channel: str) -> Command`
 
 The presence command.
 
@@ -3542,7 +3510,7 @@ Arguments:
 
 - `channel` - The name of the channel. Required.
 
-#### `presence_stats(*, channel: str = '') -> Command`
+#### `presence_stats(*, channel: str) -> Command`
 
 The presence_stats command.
 
@@ -3552,7 +3520,7 @@ Arguments:
 
 #### `publish(
     *,
-    channel: str = '',
+    channel: str,
     data: JSON = None,
     b64data: str = '',
     skip_history: bool = False,
@@ -3602,7 +3570,7 @@ Arguments:
 - `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
 
-#### `revoke_token(*, expire_at: int = 0, uid: str = '') -> Command`
+#### `revoke_token(*, expire_at: int = 0, uid: str) -> Command`
 
 The revoke_token command.
 
@@ -3613,8 +3581,8 @@ Arguments:
 
 #### `send_push_notification(
     *,
-    recipient: PushRecipient | None = None,
-    notification: PushNotification | None = None,
+    recipient: PushRecipient,
+    notification: PushNotification,
     uid: str = '',
     send_at: int = 0,
     optimize_for_reliability: bool = False,
@@ -3642,11 +3610,11 @@ Arguments:
 
 #### `shared_poll_publish(
     *,
-    channel: str = '',
-    key: str = '',
+    channel: str,
+    key: str,
     data: JSON = None,
     b64data: str = '',
-    version: int = 0,
+    version: int,
     epoch: str = '',
 ) -> Command`
 
@@ -3663,7 +3631,7 @@ Arguments:
 
 #### `subscribe(
     *,
-    channel: str = '',
+    channel: str,
     user: str = '',
     expire_at: int = 0,
     info: JSON = None,
@@ -3696,7 +3664,7 @@ Arguments:
 - `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `all_users` - When user is empty, targets every connection on every node instead of the anonymous-only bucket. No effect when user is non-empty. Without label_filter it acts on every connection. Centrifugo PRO only.
 
-#### `unblock_user(*, user: str = '') -> Command`
+#### `unblock_user(*, user: str) -> Command`
 
 The unblock_user command.
 
@@ -3706,7 +3674,7 @@ Arguments:
 
 #### `unsubscribe(
     *,
-    channel: str = '',
+    channel: str,
     user: str = '',
     client: str = '',
     session: str = '',
@@ -3725,13 +3693,7 @@ Arguments:
 - `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
 
-#### `update_push_status(
-    *,
-    analytics_uid: str = '',
-    status: str = '',
-    device_id: str = '',
-    msg_id: str = '',
-) -> Command`
+#### `update_push_status(*, analytics_uid: str, status: str, device_id: str, msg_id: str = '') -> Command`
 
 The update_push_status command.
 
@@ -3742,7 +3704,7 @@ Arguments:
 - `device_id` - The Centrifugo device ID. Required.
 - `msg_id` - The message ID issued by the provider.
 
-#### `update_user_status(*, users: list[str] | None = None, state: str = '') -> Command`
+#### `update_user_status(*, users: list[str], state: str = '') -> Command`
 
 The update_user_status command.
 
@@ -3768,7 +3730,7 @@ Arguments:
 - `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
 - `limit` - The maximum number of items to return.
 
-#### `user_topic_update(*, user: str = '', op: str = '', topics: list[str] | None = None) -> Command`
+#### `user_topic_update(*, user: str, op: str, topics: list[str] | None = None) -> Command`
 
 The user_topic_update command.
 
@@ -3816,7 +3778,7 @@ dates, decimals). It is checked to be valid JSON when created, and sent
 unchanged, number text kept.
 
 ```python
-cent.PublishRequest(channel="news", data=cent.RawJSON('{"text":"hi"}'))
+client.publish(channel="news", data=cent.RawJSON('{"text":"hi"}'))
 ```
 
 #### `text  (property)`
@@ -3853,7 +3815,7 @@ idempotency_key:
 backoff = cent.exponential_backoff(0.1, 2.0)
 for attempt in itertools.count(1):
     try:
-        return client.publish(request)
+        return client.publish(channel="news", data=data, idempotency_key=key)
     except cent.CentError as e:
         if not cent.retryable(e) or attempt == 3:
             raise
@@ -3882,6 +3844,21 @@ A retryable error does not mean nothing was done: retry a publication
 only with the same idempotency_key. Retry a broadcast with
 broadcast_with_retry, or only its retryable_channels(): repeating the call
 resends to the channels which already got it.
+
+### `to_dict(value: Any) -> Any`
+
+value - a result, a command, or anything holding them - as the plain
+dicts, lists and values ``json.dumps`` and web frameworks encode, by the
+wire names Centrifugo uses:
+
+```python
+return JSONResponse(cent.to_dict(client.history(channel="news", limit=10)))
+```
+
+An error in a result - a channel's in a broadcast, a command's in a batch -
+is ``{"code": ..., "message": ...}`` for an ApiError and ``{"message": ...}``
+for any other. A command's payload is the JSON object, not its text.
+Payloads are as they are.
 
 ## cent: types
 
@@ -4049,6 +4026,14 @@ out.
 ### `CentError`
 
 The base of every exception cent raises.
+
+idempotency_key is set on the error broadcast_with_retry raises when no
+attempt got a reply - a timeout, say - to the key its attempts carried,
+made for the call when the request had none: Centrifugo may have
+published, and a retry with this key does not publish twice. It is None
+on other errors.
+
+- `idempotency_key: str | None = None`
 
 ### `CentTimeoutError`
 
@@ -4420,7 +4405,7 @@ An endpoint answers a JSON object, never cached; Unauthorized - also as the
 cause of another exception - with 403, on which client SDKs stop asking, and
 disconnect or unsubscribe; any other exception with 500, which they retry.
 A malformed request gets 400, a wrong method 405. on_error, when set, is told
-of every 500 and 400, with the exception.
+of every 500 and 400, with the exception; it must not raise.
 
 ### `JWKS`
 
@@ -4447,13 +4432,14 @@ Answers a request, awaiting an async function. A blocking one runs in
 a thread, so that it does not block the event loop.
 
 #### `async asgi(
-    scope: dict[str, Any],
-    receive: Callable[[], Awaitable[dict[str, Any]]],
-    send: Any,
+    scope: MutableMapping[str, Any],
+    receive: Callable[[], Awaitable[MutableMapping[str, Any]]],
+    send: Callable[[MutableMapping[str, Any]], Awaitable[None]],
 ) -> None`
 
 The handler as an ASGI app: app.mount("/centrifugo/connect", handler.asgi)
-in FastAPI or Starlette, say.
+in Starlette, say. Mounted, it answers on the path with a trailing
+slash, /centrifugo/connect/: Centrifugo's endpoint must have it.
 
 #### `handle(
     method: str,
@@ -4502,13 +4488,14 @@ Answers a request, awaiting an async function. A blocking one runs in
 a thread, so that it does not block the event loop.
 
 #### `async asgi(
-    scope: dict[str, Any],
-    receive: Callable[[], Awaitable[dict[str, Any]]],
-    send: Any,
+    scope: MutableMapping[str, Any],
+    receive: Callable[[], Awaitable[MutableMapping[str, Any]]],
+    send: Callable[[MutableMapping[str, Any]], Awaitable[None]],
 ) -> None`
 
 The handler as an ASGI app: app.mount("/centrifugo/connect", handler.asgi)
-in FastAPI or Starlette, say.
+in Starlette, say. Mounted, it answers on the path with a trailing
+slash, /centrifugo/connect/: Centrifugo's endpoint must have it.
 
 #### `handle(
     method: str,
@@ -4564,13 +4551,14 @@ Answers a request, awaiting an async function. A blocking one runs in
 a thread, so that it does not block the event loop.
 
 #### `async asgi(
-    scope: dict[str, Any],
-    receive: Callable[[], Awaitable[dict[str, Any]]],
-    send: Any,
+    scope: MutableMapping[str, Any],
+    receive: Callable[[], Awaitable[MutableMapping[str, Any]]],
+    send: Callable[[MutableMapping[str, Any]], Awaitable[None]],
 ) -> None`
 
 The handler as an ASGI app: app.mount("/centrifugo/connect", handler.asgi)
-in FastAPI or Starlette, say.
+in Starlette, say. Mounted, it answers on the path with a trailing
+slash, /centrifugo/connect/: Centrifugo's endpoint must have it.
 
 #### `handle(
     method: str,
@@ -4620,13 +4608,14 @@ Answers a request, awaiting an async function. A blocking one runs in
 a thread, so that it does not block the event loop.
 
 #### `async asgi(
-    scope: dict[str, Any],
-    receive: Callable[[], Awaitable[dict[str, Any]]],
-    send: Any,
+    scope: MutableMapping[str, Any],
+    receive: Callable[[], Awaitable[MutableMapping[str, Any]]],
+    send: Callable[[MutableMapping[str, Any]], Awaitable[None]],
 ) -> None`
 
 The handler as an ASGI app: app.mount("/centrifugo/connect", handler.asgi)
-in FastAPI or Starlette, say.
+in Starlette, say. Mounted, it answers on the path with a trailing
+slash, /centrifugo/connect/: Centrifugo's endpoint must have it.
 
 #### `handle(
     method: str,
@@ -4668,14 +4657,15 @@ changes.
     user: str,
     channel: str,
     keys: Sequence[str],
-    expires_at: datetime | None = None,
+    expires_at: datetime | Never,
 ) -> str`
 
 The signature authorizing user to track keys in channel until expires_at,
 as Centrifugo verifies it: "iat:exp:hmac", iat now and exp expires_at in
-Unix seconds - 0 when expires_at is None, for a signature which does not
-expire. secret is Centrifugo's shared_poll.hmac_secret_key; user is the ID
-of the connection's user, empty for an anonymous one.
+Unix seconds. expires_at is required, as a token's expiry is: an aware
+datetime, or token.NEVER for a signature which never expires. secret is
+Centrifugo's shared_poll.hmac_secret_key; user is the ID of the
+connection's user, empty for an anonymous one.
 
 The signature covers exactly keys, in their order: a client tracking other
 keys, or the same in another order, is refused. The arguments but secret
@@ -4718,7 +4708,8 @@ Answering: a function returns a result to accept the request, or raises:
   [4000, 4999] - [4500, 4999] to tell the client not to reconnect. Only the
   proxies which pass a ProxyError to the client honour it.
 - Any other exception, or one a proxy cannot carry, fails the request with
-  HTTP status 500, and is passed to on_error for logging. Centrifugo then
+  HTTP status 500, and is passed to on_error for logging - which must not
+  raise itself. Centrifugo then
   answers the client with its temporary internal error; for refresh and sub
   refresh it keeps the connection or subscription for another minute and
   asks again.
@@ -4773,13 +4764,14 @@ Answers a request, awaiting an async function. A blocking one runs in
 a thread, so that it does not block the event loop.
 
 #### `async asgi(
-    scope: dict[str, Any],
-    receive: Callable[[], Awaitable[dict[str, Any]]],
-    send: Any,
+    scope: MutableMapping[str, Any],
+    receive: Callable[[], Awaitable[MutableMapping[str, Any]]],
+    send: Callable[[MutableMapping[str, Any]], Awaitable[None]],
 ) -> None`
 
 The handler as an ASGI app: app.mount("/centrifugo/connect", handler.asgi)
-in FastAPI or Starlette, say.
+in Starlette, say. Mounted, it answers on the path with a trailing
+slash, /centrifugo/connect/: Centrifugo's endpoint must have it.
 
 #### `handle(
     method: str,
@@ -4828,13 +4820,14 @@ Answers a request, awaiting an async function. A blocking one runs in
 a thread, so that it does not block the event loop.
 
 #### `async asgi(
-    scope: dict[str, Any],
-    receive: Callable[[], Awaitable[dict[str, Any]]],
-    send: Any,
+    scope: MutableMapping[str, Any],
+    receive: Callable[[], Awaitable[MutableMapping[str, Any]]],
+    send: Callable[[MutableMapping[str, Any]], Awaitable[None]],
 ) -> None`
 
 The handler as an ASGI app: app.mount("/centrifugo/connect", handler.asgi)
-in FastAPI or Starlette, say.
+in Starlette, say. Mounted, it answers on the path with a trailing
+slash, /centrifugo/connect/: Centrifugo's endpoint must have it.
 
 #### `handle(
     method: str,
@@ -4873,13 +4866,14 @@ Answers a request, awaiting an async function. A blocking one runs in
 a thread, so that it does not block the event loop.
 
 #### `async asgi(
-    scope: dict[str, Any],
-    receive: Callable[[], Awaitable[dict[str, Any]]],
-    send: Any,
+    scope: MutableMapping[str, Any],
+    receive: Callable[[], Awaitable[MutableMapping[str, Any]]],
+    send: Callable[[MutableMapping[str, Any]], Awaitable[None]],
 ) -> None`
 
 The handler as an ASGI app: app.mount("/centrifugo/connect", handler.asgi)
-in FastAPI or Starlette, say.
+in Starlette, say. Mounted, it answers on the path with a trailing
+slash, /centrifugo/connect/: Centrifugo's endpoint must have it.
 
 #### `handle(
     method: str,
@@ -4921,13 +4915,14 @@ Answers a request, awaiting an async function. A blocking one runs in
 a thread, so that it does not block the event loop.
 
 #### `async asgi(
-    scope: dict[str, Any],
-    receive: Callable[[], Awaitable[dict[str, Any]]],
-    send: Any,
+    scope: MutableMapping[str, Any],
+    receive: Callable[[], Awaitable[MutableMapping[str, Any]]],
+    send: Callable[[MutableMapping[str, Any]], Awaitable[None]],
 ) -> None`
 
 The handler as an ASGI app: app.mount("/centrifugo/connect", handler.asgi)
-in FastAPI or Starlette, say.
+in Starlette, say. Mounted, it answers on the path with a trailing
+slash, /centrifugo/connect/: Centrifugo's endpoint must have it.
 
 #### `handle(
     method: str,
@@ -4967,13 +4962,14 @@ Answers a request, awaiting an async function. A blocking one runs in
 a thread, so that it does not block the event loop.
 
 #### `async asgi(
-    scope: dict[str, Any],
-    receive: Callable[[], Awaitable[dict[str, Any]]],
-    send: Any,
+    scope: MutableMapping[str, Any],
+    receive: Callable[[], Awaitable[MutableMapping[str, Any]]],
+    send: Callable[[MutableMapping[str, Any]], Awaitable[None]],
 ) -> None`
 
 The handler as an ASGI app: app.mount("/centrifugo/connect", handler.asgi)
-in FastAPI or Starlette, say.
+in Starlette, say. Mounted, it answers on the path with a trailing
+slash, /centrifugo/connect/: Centrifugo's endpoint must have it.
 
 #### `handle(
     method: str,
@@ -5023,13 +5019,14 @@ Answers a request, awaiting an async function. A blocking one runs in
 a thread, so that it does not block the event loop.
 
 #### `async asgi(
-    scope: dict[str, Any],
-    receive: Callable[[], Awaitable[dict[str, Any]]],
-    send: Any,
+    scope: MutableMapping[str, Any],
+    receive: Callable[[], Awaitable[MutableMapping[str, Any]]],
+    send: Callable[[MutableMapping[str, Any]], Awaitable[None]],
 ) -> None`
 
 The handler as an ASGI app: app.mount("/centrifugo/connect", handler.asgi)
-in FastAPI or Starlette, say.
+in Starlette, say. Mounted, it answers on the path with a trailing
+slash, /centrifugo/connect/: Centrifugo's endpoint must have it.
 
 #### `handle(
     method: str,
@@ -5068,13 +5065,14 @@ Answers a request, awaiting an async function. A blocking one runs in
 a thread, so that it does not block the event loop.
 
 #### `async asgi(
-    scope: dict[str, Any],
-    receive: Callable[[], Awaitable[dict[str, Any]]],
-    send: Any,
+    scope: MutableMapping[str, Any],
+    receive: Callable[[], Awaitable[MutableMapping[str, Any]]],
+    send: Callable[[MutableMapping[str, Any]], Awaitable[None]],
 ) -> None`
 
 The handler as an ASGI app: app.mount("/centrifugo/connect", handler.asgi)
-in FastAPI or Starlette, say.
+in Starlette, say. Mounted, it answers on the path with a trailing
+slash, /centrifugo/connect/: Centrifugo's endpoint must have it.
 
 #### `handle(
     method: str,
@@ -5115,13 +5113,14 @@ Answers a request, awaiting an async function. A blocking one runs in
 a thread, so that it does not block the event loop.
 
 #### `async asgi(
-    scope: dict[str, Any],
-    receive: Callable[[], Awaitable[dict[str, Any]]],
-    send: Any,
+    scope: MutableMapping[str, Any],
+    receive: Callable[[], Awaitable[MutableMapping[str, Any]]],
+    send: Callable[[MutableMapping[str, Any]], Awaitable[None]],
 ) -> None`
 
 The handler as an ASGI app: app.mount("/centrifugo/connect", handler.asgi)
-in FastAPI or Starlette, say.
+in Starlette, say. Mounted, it answers on the path with a trailing
+slash, /centrifugo/connect/: Centrifugo's endpoint must have it.
 
 #### `handle(
     method: str,
@@ -5162,13 +5161,14 @@ Answers a request, awaiting an async function. A blocking one runs in
 a thread, so that it does not block the event loop.
 
 #### `async asgi(
-    scope: dict[str, Any],
-    receive: Callable[[], Awaitable[dict[str, Any]]],
-    send: Any,
+    scope: MutableMapping[str, Any],
+    receive: Callable[[], Awaitable[MutableMapping[str, Any]]],
+    send: Callable[[MutableMapping[str, Any]], Awaitable[None]],
 ) -> None`
 
 The handler as an ASGI app: app.mount("/centrifugo/connect", handler.asgi)
-in FastAPI or Starlette, say.
+in Starlette, say. Mounted, it answers on the path with a trailing
+slash, /centrifugo/connect/: Centrifugo's endpoint must have it.
 
 #### `handle(
     method: str,
@@ -5209,13 +5209,14 @@ Answers a request, awaiting an async function. A blocking one runs in
 a thread, so that it does not block the event loop.
 
 #### `async asgi(
-    scope: dict[str, Any],
-    receive: Callable[[], Awaitable[dict[str, Any]]],
-    send: Any,
+    scope: MutableMapping[str, Any],
+    receive: Callable[[], Awaitable[MutableMapping[str, Any]]],
+    send: Callable[[MutableMapping[str, Any]], Awaitable[None]],
 ) -> None`
 
 The handler as an ASGI app: app.mount("/centrifugo/connect", handler.asgi)
-in FastAPI or Starlette, say.
+in Starlette, say. Mounted, it answers on the path with a trailing
+slash, /centrifugo/connect/: Centrifugo's endpoint must have it.
 
 #### `handle(
     method: str,
@@ -5255,13 +5256,14 @@ Answers a request, awaiting an async function. A blocking one runs in
 a thread, so that it does not block the event loop.
 
 #### `async asgi(
-    scope: dict[str, Any],
-    receive: Callable[[], Awaitable[dict[str, Any]]],
-    send: Any,
+    scope: MutableMapping[str, Any],
+    receive: Callable[[], Awaitable[MutableMapping[str, Any]]],
+    send: Callable[[MutableMapping[str, Any]], Awaitable[None]],
 ) -> None`
 
 The handler as an ASGI app: app.mount("/centrifugo/connect", handler.asgi)
-in FastAPI or Starlette, say.
+in Starlette, say. Mounted, it answers on the path with a trailing
+slash, /centrifugo/connect/: Centrifugo's endpoint must have it.
 
 #### `handle(
     method: str,

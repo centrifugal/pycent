@@ -51,7 +51,7 @@ def test_spec_shared_poll_vectors() -> None:
     assert sharedpoll._sign_at("shared_poll_secret", "42", "poll:prices", ["AAPL", "GOOG"], EXP, now=1700000000) == (
         "1700000000:1700003600:c61dbf52085a6973537e71644fa30a3bbfc29a52d7ce9f1b7618531596ce587d"
     )
-    assert sharedpoll._sign_at("shared_poll_secret", "", "poll:prices", [], None, now=1700000000) == (
+    assert sharedpoll._sign_at("shared_poll_secret", "", "poll:prices", [], token.NEVER, now=1700000000) == (
         "1700000000:0:92dd64af5612afde06cad03bb63435d951e037cb55a087af05c2a1399abade0e"
     )
 
@@ -64,13 +64,20 @@ def test_shared_poll_sign() -> None:
     assert int(exp) - int(iat) in (59, 60)
     assert len(mac) == 64
     # A colon cannot move between user and channel.
-    assert sharedpoll._sign_at("s", "alice", "news:tech", [], None, now=1) != sharedpoll._sign_at(
-        "s", "alice:news", "tech", [], None, now=1
+    assert sharedpoll._sign_at("s", "alice", "news:tech", [], token.NEVER, now=1) != sharedpoll._sign_at(
+        "s", "alice:news", "tech", [], token.NEVER, now=1
     )
     with pytest.raises(ValueError, match="naive"):
         sharedpoll.sign("s", user="u", channel="c", keys=[], expires_at=datetime(2030, 1, 1))
-    with pytest.raises(ValueError, match="empty secret"):
-        sharedpoll.sign("", user="u", channel="c", keys=[])
+    with pytest.raises(cent.InvalidRequestError, match="empty secret"):
+        sharedpoll.sign("", user="u", channel="c", keys=[], expires_at=token.NEVER)
+    # The expiry is chosen explicitly: never is spelled, a number or a duration refused.
+    assert sharedpoll.sign("s", user="u", channel="c", keys=[], expires_at=token.NEVER).split(":")[1] == "0"
+    with pytest.raises(TypeError, match="missing 1 required keyword-only argument: 'expires_at'"):
+        sharedpoll.sign("s", user="u", channel="c", keys=[])  # type: ignore[call-arg]
+    for bad in (None, 1700000000, timedelta(hours=1)):
+        with pytest.raises(TypeError, match=r"token\.NEVER"):
+            sharedpoll.sign("s", user="u", channel="c", keys=[], expires_at=bad)  # type: ignore[arg-type]
 
 
 # Claims.

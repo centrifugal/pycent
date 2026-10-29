@@ -165,6 +165,12 @@ def decoder(f: Field, owner: str) -> str:
     return f"_w.message(d, {key}, {where}, {conv})"
 
 
+def required(f: Field) -> bool:
+    """Whether the proto marks the field "Required." without a condition -
+    "Required unless b64data is set." stays optional (spec 3.3)."""
+    return re.search(r"\bRequired\.", " ".join(f.doc)) is not None
+
+
 def kwargs(m: Message) -> tuple[list[str], list[str]]:
     """The keyword parameters of a request's method, and the arguments building
     the request from them. Lists and maps default to None, made empty."""
@@ -173,7 +179,12 @@ def kwargs(m: Message) -> tuple[list[str], list[str]]:
         if keyword.iskeyword(f.name):
             raise SystemExit(f"api.proto: {m.name}.{f.name} is a Python keyword: no keyword argument can carry it")
         ann, default = field_type(f)
-        if default.startswith("field("):
+        if required(f):
+            # No default: a call without it fails as Python fails it, and type
+            # checkers and editors show it.
+            params.append(f"{f.name}: {ann.removesuffix(' | None')}")
+            args.append(f"{f.name}={f.name}")
+        elif default.startswith("field("):
             params.append(f"{f.name}: {ann} | None = None")
             empty = "[]" if ann.startswith("list") else "{}"
             args.append(f"{f.name}={f.name} if {f.name} is not None else {empty}")

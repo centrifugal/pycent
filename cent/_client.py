@@ -6,6 +6,7 @@ import asyncio
 import dataclasses
 import inspect
 import math
+import os
 import secrets
 import threading
 import time
@@ -25,6 +26,7 @@ from cent._core import RequestInfo
 from cent._errors import (
     ApiError,
     BroadcastFailedChannelsError,
+    CentError,
     CentTimeoutError,
     ClosedError,
     DecodeError,
@@ -131,6 +133,8 @@ class _RetryState:
         if not self.replied:
             if last is None:  # pragma: no cover - an attempt which failed as a whole leaves its error
                 raise RuntimeError("cent: broadcast_with_retry: no reply and no error")
+            if isinstance(last, CentError):
+                last.idempotency_key = self.key
             raise last
         return _broadcast.check(self.final)
 
@@ -183,10 +187,21 @@ class _AsyncCalls:
         self._active = 0
         self._idle: asyncio.Event | None = None
         self.closed = False
+        # The event loop of the first call: an AsyncClient's connections belong
+        # to it.
+        self._loop: asyncio.AbstractEventLoop | None = None
 
     def __enter__(self) -> None:
         if self.closed:
             raise ClosedError("client closed")
+        loop = asyncio.get_running_loop()
+        if self._loop is None:
+            self._loop = loop
+        elif self._loop is not loop:
+            raise InvalidConfigError(
+                "an AsyncClient belongs to the event loop of its first call: create one per event loop "
+                "(each asyncio.run starts a new loop), or use cent.Client in code which is not async"
+            )
         self._active += 1
 
     def __exit__(self, *exc: object) -> None:
@@ -263,8 +278,9 @@ class Client(_ClientAPI):
     - http_client: the httpx2.Client sending requests - httpx2 is the maintained
       fork of httpx, with the same API. It is never changed:
       credentials and headers go on each request. Without one, the client
-      keeps up to 256 connections to a host alive, never follows redirects,
-      and closes idle connections after 50 seconds.
+      keeps its connections alive between calls, never follows redirects, and
+      starts its own after a fork - gunicorn --preload, Celery's prefork pool.
+      A client you pass is the process's: create it after forking.
     - request_timeout: seconds bounding a call without a timeout of its own,
       10 by default.
     - headers: extra headers for every request, for a proxy in front of
@@ -272,7 +288,8 @@ class Client(_ClientAPI):
       replaces cent's.
     - on_request: called after every HTTP request with a RequestInfo, for
       metrics without a dependency of cent's. It runs in the calling thread,
-      and the call waits for it.
+      and the call waits for it. It must not raise: an exception it raises
+      goes to the caller in place of the call's outcome.
     - auto_batch: sends calls made concurrently in batches - see AutoBatch.
     - batch_context: with auto_batch, makes the context of a batch's request
       from its callers' - for a tracing span linking every caller's - see
@@ -308,7 +325,25 @@ class Client(_ClientAPI):
         self._http = http_client if http_client is not None else _core.default_http_client()
         self._calls = _Calls()
         ab = _auto_batch(auto_batch)
+        self._auto_batch = (ab, _callable(batch_context))
         self._batcher = SyncBatcher(self, ab, _callable(batch_context)) if ab is not None else None
+        # The process the client was made in: a forked child must not share
+        # the parent's connections, nor wait for its batch threads.
+        self._pid = os.getpid()
+
+    def _check_fork(self) -> None:
+        """Starts fresh after a fork: the connections and threads are the
+        parent's."""
+        if self._pid == os.getpid():
+            return
+        self._pid = os.getpid()
+        self._calls = _Calls()
+        if self._own_http:
+            # Not closed: its sockets are the parent's too.
+            self._http = _core.default_http_client()
+        ab, batch_context = self._auto_batch
+        if ab is not None:
+            self._batcher = SyncBatcher(self, ab, batch_context)
 
     # Sending.
 
@@ -361,6 +396,7 @@ class Client(_ClientAPI):
         return out
 
     def _result(self, request: Any, timeout: float | None) -> dict[str, Any]:
+        self._check_fork()
         method = method_of(request)
         validate(request)
         deadline = self._cfg.deadline(timeout)
@@ -400,6 +436,7 @@ class Client(_ClientAPI):
         parse: Callable[[bytes], tuple[list[dict[str, Any]], int]],
         timeout: float | None,
     ) -> list[dict[str, Any]]:
+        self._check_fork()
         with self._calls:
             if body is None:
                 return []

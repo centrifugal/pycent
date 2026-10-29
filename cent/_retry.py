@@ -23,7 +23,7 @@ def exponential_backoff(base: float, limit: float) -> Callable[[int], float]:
         backoff = cent.exponential_backoff(0.1, 2.0)
         for attempt in itertools.count(1):
             try:
-                return client.publish(request)
+                return client.publish(channel="news", data=data, idempotency_key=key)
             except cent.CentError as e:
                 if not cent.retryable(e) or attempt == 3:
                     raise

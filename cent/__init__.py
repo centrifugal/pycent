@@ -16,6 +16,7 @@ from cent._client import AsyncClient, BroadcastAttemptCallback, Client
 from cent._command import Command
 from cent._commands import Commands, command
 from cent._core import RequestInfo
+from cent._dict import to_dict
 from cent._errors import (
     ApiError,
     BadRequestError,
@@ -92,5 +93,6 @@ __all__ = [
     "command",
     "exponential_backoff",
     "retryable",
+    "to_dict",
 ]
 __all__ += _api.__all__

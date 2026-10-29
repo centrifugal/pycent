@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, Any, Final
 
 from cent import _wire as _w
 from cent._api import FilterNode, SubscribeOptionOverride
+from cent._errors import InvalidRequestError
 from cent._payload import JSON
 
 if TYPE_CHECKING:
@@ -119,7 +120,7 @@ class Key:
         a key to another: Centrifugo caches keys by ID, and would refuse the
         other key's tokens until its cache expires."""
         if not isinstance(kid, str) or not kid:
-            raise ValueError("token: a key ID must be a non-empty str")
+            raise InvalidRequestError("token: a key ID must be a non-empty str")
         return Key(self._alg, self._sign, self._jwk, kid)
 
     def __repr__(self) -> str:
@@ -131,7 +132,7 @@ class Key:
         client.token.hmac_secret_key."""
         s = secret.encode() if isinstance(secret, str) else bytes(secret)
         if not s:
-            raise ValueError("token: empty HMAC secret")
+            raise InvalidRequestError("token: empty HMAC secret")
         return Key("HS256", lambda data: _hmac.new(s, data, hashlib.sha256).digest(), None)
 
     @staticmethod
@@ -158,7 +159,7 @@ class Key:
             raise TypeError("token: Key.ecdsa takes an EllipticCurvePrivateKey")
         curve = private_key.curve.name
         if curve not in _EC_ALGS:
-            raise ValueError(f"token: ECDSA curve {curve}, want P-256, P-384 or P-521")
+            raise InvalidRequestError(f"token: ECDSA curve {curve}, want P-256, P-384 or P-521")
         alg, crv, size = _EC_ALGS[curve]
         digest = {"ES256": hashes.SHA256, "ES384": hashes.SHA384, "ES512": hashes.SHA512}[alg]()
         pub = private_key.public_key().public_numbers()
@@ -195,14 +196,14 @@ class Key:
             return Key.ecdsa(k)
         if isinstance(k, ed_mod.Ed25519PrivateKey):
             return Key.ed25519(k)
-        raise ValueError(f"token: unsupported private key type {type(k).__name__}")
+        raise InvalidRequestError(f"token: unsupported private key type {type(k).__name__}")
 
 
 def _unix(dt: datetime, name: str) -> int:
     if not isinstance(dt, datetime):
         raise TypeError(f"token: {name} must be a datetime, not {type(dt).__name__}")
     if dt.tzinfo is None or dt.utcoffset() is None:
-        raise ValueError(f"token: {name} is a naive datetime: give it a time zone, datetime.now(UTC) say")
+        raise InvalidRequestError(f"token: {name} is a naive datetime: give it a time zone, datetime.now(UTC) say")
     return int(dt.timestamp())
 
 
@@ -211,7 +212,7 @@ def _expiry(expires_at: datetime | Never, name: str) -> int | None:
     if expires_at is NEVER:
         return None
     if expires_at is None:
-        raise ValueError(f"token: {name} is required: a datetime, or token.NEVER for a token accepted forever")
+        raise InvalidRequestError(f"token: {name} is required: a datetime, or token.NEVER for a token accepted forever")
     return _unix(expires_at, name)  # type: ignore[arg-type]
 
 
@@ -435,7 +436,7 @@ def connection(key: Key, claims: ConnectionClaims) -> str:
     c = claims
     exp = _expiry(c.expires_at, "expires_at")
     if c.channels and c.subs:
-        raise ValueError("token: set channels or subs, not both: Centrifugo ignores channels when subs is set")
+        raise InvalidRequestError("token: set channels or subs, not both: Centrifugo ignores channels when subs is set")
     w = _registered(c.user, exp, issued_at=c.issued_at, id_=c.id, audience=c.audience, issuer=c.issuer)
     if (at := _session_expiry(c.connection_expires_at, "connection_expires_at")) is not None:
         w["expire_at"] = at
@@ -460,7 +461,7 @@ def subscription(key: Key, claims: SubscriptionClaims) -> str:
     """A subscription token with claims, signed with key."""
     c = claims
     if not c.channel:
-        raise ValueError("token: a subscription token needs a channel")
+        raise InvalidRequestError("token: a subscription token needs a channel")
     exp = _expiry(c.expires_at, "expires_at")
     w = _registered(c.user, exp, issued_at=c.issued_at, id_=c.id, audience=c.audience, issuer=c.issuer)
     w["channel"] = c.channel
@@ -513,18 +514,18 @@ def jwks(*keys: Key) -> str:
     set passes Centrifugo's signature check.
     """
     if not keys:
-        raise ValueError("token: a JWKS without keys")
+        raise InvalidRequestError("token: a JWKS without keys")
     out = []
     seen: set[str] = set()
     for i, k in enumerate(keys):
         if not isinstance(k, Key):
             raise TypeError(f"token: JWKS key #{i} is not a token.Key")
         if k._jwk is None:
-            raise ValueError(f"token: JWKS key #{i} has no public key to publish: an HMAC key")
+            raise InvalidRequestError(f"token: JWKS key #{i} has no public key to publish: an HMAC key")
         if not k.kid:
-            raise ValueError(f"token: JWKS key #{i} has no key ID: set one with with_key_id")
+            raise InvalidRequestError(f"token: JWKS key #{i} has no key ID: set one with with_key_id")
         if k.kid in seen:
-            raise ValueError(f"token: JWKS key ID {k.kid!r} used twice")
+            raise InvalidRequestError(f"token: JWKS key ID {k.kid!r} used twice")
         seen.add(k.kid)
         jwk = {"kty": k._jwk["kty"], "kid": k.kid, "use": "sig", "alg": k.alg}
         jwk.update({f: v for f, v in k._jwk.items() if f != "kty"})
@@ -585,24 +586,26 @@ def api(key: Key, claims: APIClaims) -> str:
     if not isinstance(key, Key):
         raise TypeError("token: key must be a token.Key")
     if key._jwk is None:
-        raise ValueError(
+        raise InvalidRequestError(
             "token: an API token needs an RSA, ECDSA or Ed25519 key: "
             "Centrifugo PRO verifies it with the public keys of its JWKS endpoint"
         )
     if not key.kid:
-        raise ValueError("token: an API token needs a key ID, by which Centrifugo PRO finds the key: use with_key_id")
+        raise InvalidRequestError(
+            "token: an API token needs a key ID, by which Centrifugo PRO finds the key: use with_key_id"
+        )
     if not c.audience and not c.scope:
-        raise ValueError(
+        raise InvalidRequestError(
             "token: set audience or scope, required by http_api.jwks, "
             "so that client tokens signed with the same keys can't call the server API"
         )
     if c.expires_at is None:
-        raise ValueError(
+        raise InvalidRequestError(
             "token: set expires_at: Centrifugo PRO accepts an API token without one while its key is published"
         )
     for s in c.scope:
         if not s or any(ch in s for ch in " \t\n"):
-            raise ValueError("token: a scope is empty or has a space")
+            raise InvalidRequestError("token: a scope is empty or has a space")
     w = _registered(
         c.subject,
         _unix(c.expires_at, "expires_at"),
@@ -642,11 +645,13 @@ class APITokens:
         ttl: float = 300.0,
     ) -> None:
         if (key is None) == (current_key is None):
-            raise ValueError("token: APITokens takes key or current_key, one of them")
+            raise InvalidRequestError("token: APITokens takes key or current_key, one of them")
         if claims.expires_at is not None or claims.issued_at is not None:
-            raise ValueError("token: APITokens sets expires_at and issued_at itself: leave them unset, and set ttl")
+            raise InvalidRequestError(
+                "token: APITokens sets expires_at and issued_at itself: leave them unset, and set ttl"
+            )
         if isinstance(ttl, bool) or not isinstance(ttl, (int, float)) or ttl <= 0:
-            raise ValueError("token: APITokens ttl must be a positive number of seconds")
+            raise InvalidRequestError("token: APITokens ttl must be a positive number of seconds")
         self._claims = claims
         self._key = key
         self._current_key = current_key
@@ -664,7 +669,7 @@ class APITokens:
                 return self._token
             key = self._current_key() if self._current_key is not None else self._key
             if key is None:  # pragma: no cover - one of them is set, see __init__
-                raise ValueError("token: APITokens without a key")
+                raise InvalidRequestError("token: APITokens without a key")
             issued = datetime.fromtimestamp(now, UTC)
             c = APIClaims(
                 audience=self._claims.audience,

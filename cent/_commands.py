@@ -76,7 +76,7 @@ class Commands:
     def publish(
         self,
         *,
-        channel: str = "",
+        channel: str,
         data: JSON = None,
         b64data: str = "",
         skip_history: bool = False,
@@ -127,7 +127,7 @@ class Commands:
     def broadcast(
         self,
         *,
-        channels: list[str] | None = None,
+        channels: list[str],
         data: JSON = None,
         b64data: str = "",
         skip_history: bool = False,
@@ -164,7 +164,7 @@ class Commands:
         """
         return new_command(
             BroadcastRequest(
-                channels=channels if channels is not None else [],
+                channels=channels,
                 data=data,
                 b64data=b64data,
                 skip_history=skip_history,
@@ -179,7 +179,7 @@ class Commands:
     def subscribe(
         self,
         *,
-        channel: str = "",
+        channel: str,
         user: str = "",
         expire_at: int = 0,
         info: JSON = None,
@@ -240,7 +240,7 @@ class Commands:
     def unsubscribe(
         self,
         *,
-        channel: str = "",
+        channel: str,
         user: str = "",
         client: str = "",
         session: str = "",
@@ -311,7 +311,7 @@ class Commands:
             )
         )
 
-    def presence(self, *, channel: str = "") -> Command:
+    def presence(self, *, channel: str) -> Command:
         """The presence command.
 
         Args:
@@ -319,7 +319,7 @@ class Commands:
         """
         return new_command(PresenceRequest(channel=channel))
 
-    def presence_stats(self, *, channel: str = "") -> Command:
+    def presence_stats(self, *, channel: str) -> Command:
         """The presence_stats command.
 
         Args:
@@ -328,7 +328,7 @@ class Commands:
         return new_command(PresenceStatsRequest(channel=channel))
 
     def history(
-        self, *, channel: str = "", limit: int = 0, since: StreamPosition | None = None, reverse: bool = False
+        self, *, channel: str, limit: int = 0, since: StreamPosition | None = None, reverse: bool = False
     ) -> Command:
         """The history command.
 
@@ -342,7 +342,7 @@ class Commands:
         """
         return new_command(HistoryRequest(channel=channel, limit=limit, since=since, reverse=reverse))
 
-    def history_remove(self, *, channel: str = "") -> Command:
+    def history_remove(self, *, channel: str) -> Command:
         """The history_remove command.
 
         Args:
@@ -415,7 +415,7 @@ class Commands:
         """
         return new_command(ConnectionsRequest(user=user, expression=expression, label_filter=label_filter))
 
-    def update_user_status(self, *, users: list[str] | None = None, state: str = "") -> Command:
+    def update_user_status(self, *, users: list[str], state: str = "") -> Command:
         """The update_user_status command.
 
         Args:
@@ -423,25 +423,25 @@ class Commands:
             state: An optional custom state to store in the user status. It can
                 be restricted by the user_status.state_regex option.
         """
-        return new_command(UpdateUserStatusRequest(users=users if users is not None else [], state=state))
+        return new_command(UpdateUserStatusRequest(users=users, state=state))
 
-    def get_user_status(self, *, users: list[str] | None = None) -> Command:
+    def get_user_status(self, *, users: list[str]) -> Command:
         """The get_user_status command.
 
         Args:
             users: The list of user IDs to get the status for. Required.
         """
-        return new_command(GetUserStatusRequest(users=users if users is not None else []))
+        return new_command(GetUserStatusRequest(users=users))
 
-    def delete_user_status(self, *, users: list[str] | None = None) -> Command:
+    def delete_user_status(self, *, users: list[str]) -> Command:
         """The delete_user_status command.
 
         Args:
             users: The list of user IDs to delete the status for. Required.
         """
-        return new_command(DeleteUserStatusRequest(users=users if users is not None else []))
+        return new_command(DeleteUserStatusRequest(users=users))
 
-    def block_user(self, *, expire_at: int = 0, user: str = "") -> Command:
+    def block_user(self, *, expire_at: int = 0, user: str) -> Command:
         """The block_user command.
 
         Args:
@@ -452,7 +452,7 @@ class Commands:
         """
         return new_command(BlockUserRequest(expire_at=expire_at, user=user))
 
-    def unblock_user(self, *, user: str = "") -> Command:
+    def unblock_user(self, *, user: str) -> Command:
         """The unblock_user command.
 
         Args:
@@ -460,7 +460,7 @@ class Commands:
         """
         return new_command(UnblockUserRequest(user=user))
 
-    def revoke_token(self, *, expire_at: int = 0, uid: str = "") -> Command:
+    def revoke_token(self, *, expire_at: int = 0, uid: str) -> Command:
         """The revoke_token command.
 
         Args:
@@ -471,7 +471,7 @@ class Commands:
         return new_command(RevokeTokenRequest(expire_at=expire_at, uid=uid))
 
     def invalidate_user_tokens(
-        self, *, expire_at: int = 0, user: str = "", issued_before: int = 0, channel: str = ""
+        self, *, expire_at: int = 0, user: str, issued_before: int = 0, channel: str = ""
     ) -> Command:
         """The invalidate_user_tokens command.
 
@@ -492,9 +492,9 @@ class Commands:
         self,
         *,
         id: str = "",
-        provider: str = "",
-        token: str = "",
-        platform: str = "",
+        provider: str,
+        token: str,
+        platform: str,
         user: str = "",
         meta: dict[str, str] | None = None,
         topics: list[str] | None = None,
@@ -585,7 +585,7 @@ class Commands:
     def device_list(
         self,
         *,
-        filter: DeviceFilter | None = None,
+        filter: DeviceFilter,
         include_total_count: bool = False,
         include_meta: bool = False,
         include_topics: bool = False,
@@ -650,7 +650,7 @@ class Commands:
         )
 
     def device_topic_update(
-        self, *, device_id: str = "", op: str = "", topics: list[str] | None = None, user: str = ""
+        self, *, device_id: str, op: str, topics: list[str] | None = None, user: str = ""
     ) -> Command:
         """The device_topic_update command.
 
@@ -688,7 +688,7 @@ class Commands:
             UserTopicListRequest(filter=filter, include_total_count=include_total_count, cursor=cursor, limit=limit)
         )
 
-    def user_topic_update(self, *, user: str = "", op: str = "", topics: list[str] | None = None) -> Command:
+    def user_topic_update(self, *, user: str, op: str, topics: list[str] | None = None) -> Command:
         """The user_topic_update command.
 
         Args:
@@ -701,8 +701,8 @@ class Commands:
     def send_push_notification(
         self,
         *,
-        recipient: PushRecipient | None = None,
-        notification: PushNotification | None = None,
+        recipient: PushRecipient,
+        notification: PushNotification,
         uid: str = "",
         send_at: int = 0,
         optimize_for_reliability: bool = False,
@@ -752,9 +752,7 @@ class Commands:
             )
         )
 
-    def update_push_status(
-        self, *, analytics_uid: str = "", status: str = "", device_id: str = "", msg_id: str = ""
-    ) -> Command:
+    def update_push_status(self, *, analytics_uid: str, status: str, device_id: str, msg_id: str = "") -> Command:
         """The update_push_status command.
 
         Args:
@@ -769,7 +767,7 @@ class Commands:
             UpdatePushStatusRequest(analytics_uid=analytics_uid, status=status, device_id=device_id, msg_id=msg_id)
         )
 
-    def cancel_push(self, *, uid: str = "") -> Command:
+    def cancel_push(self, *, uid: str) -> Command:
         """The cancel_push command.
 
         Args:
@@ -780,8 +778,8 @@ class Commands:
     def map_publish(
         self,
         *,
-        channel: str = "",
-        key: str = "",
+        channel: str,
+        key: str,
         data: JSON = None,
         b64data: str = "",
         stream_data: JSON = None,
@@ -840,7 +838,7 @@ class Commands:
             )
         )
 
-    def map_remove(self, *, channel: str = "", key: str = "", idempotency_key: str = "") -> Command:
+    def map_remove(self, *, channel: str, key: str, idempotency_key: str = "") -> Command:
         """The map_remove command.
 
         Args:
@@ -856,7 +854,7 @@ class Commands:
     def map_read_state(
         self,
         *,
-        channel: str = "",
+        channel: str,
         cursor: str = "",
         limit: int = 0,
         key: str = "",
@@ -896,7 +894,7 @@ class Commands:
         )
 
     def map_read_stream(
-        self, *, channel: str = "", since_offset: int = 0, since_epoch: str = "", limit: int = 0, reverse: bool = False
+        self, *, channel: str, since_offset: int = 0, since_epoch: str = "", limit: int = 0, reverse: bool = False
     ) -> Command:
         """The map_read_stream command.
 
@@ -916,7 +914,7 @@ class Commands:
             )
         )
 
-    def map_stats(self, *, channel: str = "") -> Command:
+    def map_stats(self, *, channel: str) -> Command:
         """The map_stats command.
 
         Args:
@@ -924,7 +922,7 @@ class Commands:
         """
         return new_command(MapStatsRequest(channel=channel))
 
-    def map_clear(self, *, channel: str = "") -> Command:
+    def map_clear(self, *, channel: str) -> Command:
         """The map_clear command.
 
         Args:
@@ -933,14 +931,7 @@ class Commands:
         return new_command(MapClearRequest(channel=channel))
 
     def shared_poll_publish(
-        self,
-        *,
-        channel: str = "",
-        key: str = "",
-        data: JSON = None,
-        b64data: str = "",
-        version: int = 0,
-        epoch: str = "",
+        self, *, channel: str, key: str, data: JSON = None, b64data: str = "", version: int, epoch: str = ""
     ) -> Command:
         """The shared_poll_publish command.
 

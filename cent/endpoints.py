@@ -15,7 +15,7 @@ An endpoint answers a JSON object, never cached; Unauthorized - also as the
 cause of another exception - with 403, on which client SDKs stop asking, and
 disconnect or unsubscribe; any other exception with 500, which they retry.
 A malformed request gets 400, a wrong method 405. on_error, when set, is told
-of every 500 and 400, with the exception.
+of every 500 and 400, with the exception; it must not raise.
 """
 
 from __future__ import annotations

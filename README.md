@@ -48,7 +48,15 @@ Every API method takes its request's fields as keyword arguments - generated
 from Centrifugo's `api.proto`, each documented - and returns its result, a
 dataclass, raising unless Centrifugo did everything asked. A batch and
 commands have the same methods: `batch.publish(...)`, `cent.command.publish(...)`.
-Create the client once and share it: it is safe for concurrent use.
+Create the client once and share it: it is safe for concurrent use. An
+`AsyncClient` belongs to the event loop of its first call - one per loop, so
+not across `asyncio.run` calls; in code which is not async use `Client`. A
+`Client` used in a process forked after its first call, under a pre-forking
+server say, starts its own connections there.
+
+`cent.to_dict(res)` turns a result - a broadcast's, a batch's or an error, too
+- into a dict of JSON values with Centrifugo's field names, for a response of
+your own: `json.dumps(cent.to_dict(res))`.
 
 ## Payloads
 
@@ -179,9 +187,9 @@ channel - use `publish` for one channel. To go on despite some failed parts:
 
 ```python
 try:
-    client.broadcast(request)
+    client.broadcast(channels=channels, data=data)
 except cent.BroadcastFailedChannelsError as e:
-    log.warning("broadcast failed in %s", e.result.failed())
+    log.warning("broadcast failed in %s", e.result.failed)
 ```
 
 Retrying:
@@ -192,7 +200,7 @@ Retrying:
   last outcome, as `broadcast` does:
 
   ```python
-  res = client.broadcast_with_retry(request, max_attempts=5, attempt_timeout=2, timeout=10)
+  res = client.broadcast_with_retry(channels=channels, data=data, max_attempts=5, attempt_timeout=2, timeout=10)
   ```
 
   By default it retries once, after about 100 milliseconds. `on_attempt_error`
@@ -316,7 +324,8 @@ client = cent.Client(endpoint, api_key=key, http_client=http)
 ```
 
 `on_request` is told of every request - method, commands and how many failed,
-duration, status, error - for metrics without a dependency of cent's.
+duration, status, error - for metrics without a dependency of cent's. It is a
+plain function, also for `AsyncClient`, and must not raise.
 
 ## Shutdown
 
@@ -336,7 +345,18 @@ Each function receives a `cent.HTTPRequest`: the method, headers, query and the
 server's own request object in `raw` - the ASGI scope or the WSGI environ.
 
 ```python
-# FastAPI, Starlette
+# FastAPI: a route calling the core
+@app.post("/centrifugo/connect")
+async def connect(request: Request) -> Response:
+    res = await connect_handler.ahandle(
+        request.method, request.headers, await request.body(), query=dict(request.query_params), raw=request
+    )
+    return Response(res.body, status_code=res.status, headers=dict(res.headers))
+
+
+# Starlette, or any ASGI framework: mounted, the handler answers on the path
+# with a trailing slash - point Centrifugo at .../centrifugo/connect/, or each
+# call gets a 307 redirect first.
 app.mount("/centrifugo/connect", connect_handler.asgi)
 
 # Flask
@@ -395,7 +415,8 @@ subscribe_handler = proxy.SubscribeHandler(subscribe, on_error=log_proxy_error)
 Return a result to accept the request, raise `proxy.ProxyError` to reject it
 with an error the client receives, or `proxy.Disconnect` to close the client's
 connection; any other exception fails the request, and goes to `on_error` to
-be logged. Keep proxy endpoints reachable by Centrifugo only: whoever can call
+be logged - `on_error` itself must not raise. Error codes are in [400, 1999],
+disconnect codes in [4000, 4999], and a disconnect reason is at most 32 bytes. Keep proxy endpoints reachable by Centrifugo only: whoever can call
 them can claim to be any user.
 
 ## Tokens
@@ -537,6 +558,46 @@ and recovery, from one task - each publish waiting for the previous one - in
 chunks of what arrived every 50 ms or so, not a publication per token. See
 [Centrifugo for AI apps](https://centrifugal.dev/docs/getting-started/ai_apps),
 which also covers sizing history for a whole response.
+
+## Testing
+
+Test code which uses cent without Centrifugo: give the client an `http_client`
+whose transport answers as Centrifugo does - each method at `/api/<method>`,
+its reply `{"result": {...}}` or `{"error": {"code": ..., "message": ...}}`:
+
+```python
+REPLIES = {
+    "/api/publish": {"result": {"offset": 1, "epoch": "e"}},
+    # One response per channel, in order.
+    "/api/broadcast": {
+        "result": {"responses": [{"result": {"offset": 1}}, {"error": {"code": 102, "message": "unknown channel"}}]}
+    },
+    # One reply per command, in order.
+    "/api/batch": {"replies": [{"publish": {"offset": 1}}, {"error": {"code": 102, "message": "unknown channel"}}]},
+}
+
+
+def centrifugo(request: httpx2.Request) -> httpx2.Response:
+    return httpx2.Response(200, json=REPLIES[request.url.path])
+
+
+client = cent.Client("http://centrifugo/api", http_client=httpx2.Client(transport=httpx2.MockTransport(centrifugo)))
+```
+
+`cent.AsyncClient` takes an `httpx2.AsyncClient` with the same transport. A
+test double of your own returns cent's results and raises its errors, partial
+failures included:
+
+```python
+ok = cent.ChannelResult(channel="news", result=cent.PublishResult(offset=1))
+bad = cent.ChannelResult(channel="unknown:x", error=cent.ApiError.from_wire(102, "unknown channel"))
+raise cent.BroadcastFailedChannelsError([bad], 2, cent.BroadcastResult(channels=[ok, bad], replied=True))
+```
+
+and for a batch, `cent.Pending.resolved(result)` or
+`cent.Pending.resolved(error=...)` as each command's outcome, with
+`cent.BatchFailedCommandsError(failed, total, cent.BatchResult(True, failed))`
+of `cent.FailedCommand(index, method, error)`.
 
 ## More
 

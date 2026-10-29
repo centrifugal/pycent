@@ -16,7 +16,15 @@ _MAX_ERROR_ITEMS = 3
 
 
 class CentError(Exception):
-    """The base of every exception cent raises."""
+    """The base of every exception cent raises.
+
+    idempotency_key is set on the error broadcast_with_retry raises when no
+    attempt got a reply - a timeout, say - to the key its attempts carried,
+    made for the call when the request had none: Centrifugo may have
+    published, and a retry with this key does not publish twice. It is None
+    on other errors."""
+
+    idempotency_key: str | None = None
 
 
 class ApiError(CentError):

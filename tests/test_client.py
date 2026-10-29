@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
+import os
 import re
 import time
 from collections.abc import Callable, Iterator
@@ -92,10 +94,23 @@ def test_publish(api: Api, fake: Fake) -> None:
     assert json.loads(req.content) == {"channel": "news", "data": {"text": "hi"}, "idempotency_key": "k1"}
 
 
+def required_args(method: str) -> dict[str, Any]:
+    """Values for the required arguments of an API method."""
+    out: dict[str, Any] = {}
+    for name, p in inspect.signature(getattr(cent.Client, method)).parameters.items():
+        if name == "self" or p.default is not inspect.Parameter.empty:
+            continue
+        ann = str(p.annotation)
+        out[name] = {"str": "x", "int": 1, "list[str]": ["x"]}.get(ann) or getattr(cent, ann)()
+    if method == "publish":
+        out["data"] = 1
+    return out
+
+
 def test_every_method_reaches_its_endpoint(api: Api, fake: Fake) -> None:
     methods = [m for m in cent._api.METHODS if m not in ("batch", "broadcast")]
     for m in methods:
-        getattr(api, m)(**({"channel": "ch", "data": 1} if m == "publish" else {}))
+        getattr(api, m)(**required_args(m))
     paths = [r.url.path.rsplit("/", 1)[-1] for r in fake.requests]
     assert paths == methods
 
@@ -266,9 +281,10 @@ def test_timeout_bounds_the_call(new_api: Callable[..., Api], kind: str, fake: F
 
 def test_validation(api: Api, fake: Fake) -> None:
     cases: list[tuple[str, dict[str, Any], str]] = [
-        ("publish", {"data": 1}, "channel is required"),
+        ("publish", {"channel": "", "data": 1}, "channel is required"),
         ("publish", {"channel": "x"}, "data or b64data is required"),
-        ("broadcast", {"data": 1}, "channels is required"),
+        ("publish", {"channel": "x", "data": None}, "to publish JSON null, pass data=cent.RawJSON('null')"),
+        ("broadcast", {"channels": [], "data": 1}, "channels is required"),
         ("broadcast", {"channels": ["a", ""], "data": 1}, "channels[1] is empty"),
     ]
     for method, fields, msg in cases:
@@ -284,6 +300,9 @@ def test_fields_are_keyword_only(api: Api) -> None:
         api.publish({"channel": "x"})
     with pytest.raises(TypeError, match="chanel"):
         api.publish(chanel="x", data=1)
+    # A field the proto marks "Required." is a required argument.
+    with pytest.raises(TypeError, match="missing 1 required keyword-only argument: 'channel'"):
+        api.publish(data=1)
 
 
 # Payloads.
@@ -375,7 +394,7 @@ def test_broadcast(api: Api) -> None:
     assert res.idempotency_key == "k"
     assert [c.channel for c in res.channels] == ["a", "b"]
     assert all(c.result == cent.PublishResult(offset=1, epoch="e1") and c.error is None for c in res.channels)
-    assert res.failed() == []
+    assert res.failed == []
 
 
 def test_broadcast_partial_failure(api: Api) -> None:
@@ -490,9 +509,15 @@ def test_broadcast_with_retry_stopped_by_callback(api: Api) -> None:
 
 def test_broadcast_with_retry_whole_failure(api: Api, fake: Fake) -> None:
     fake.on("broadcast", httpx2.Response(503))
-    with pytest.raises(cent.HTTPError):
+    with pytest.raises(cent.HTTPError) as e:
         api.broadcast_with_retry(channels=["a"], data=1, on_attempt_error=lambda a: 0.0)
     assert len(fake.requests) == 2
+    # The key its attempts carried, for a retry which does not publish twice.
+    sent = {json.loads(r.content)["idempotency_key"] for r in fake.requests}
+    assert sent == {e.value.idempotency_key}
+    with pytest.raises(cent.HTTPError) as e:
+        api.broadcast_with_retry(channels=["a"], data=1, idempotency_key="k1", max_attempts=1)
+    assert e.value.idempotency_key == "k1"
 
 
 @pytest.mark.parametrize("opts", [{"max_attempts": 0}, {"attempt_timeout": -1}])
@@ -524,7 +549,7 @@ def test_batch(api: Api, fake: Fake) -> None:
         pub.result()
     res = api.send(b)
     assert res.replied
-    assert res.failed() == []
+    assert res.failed == []
     assert pub.result() == cent.PublishResult(offset=1, epoch="e1")
     assert stats.result() == cent.PresenceStatsResult()
     assert len(bc.result().channels) == 2
@@ -632,7 +657,7 @@ def test_new_command() -> None:
     assert cmd.payload == '{"channel":"news","data":{"n": 1.0}}'
     assert json.loads(cmd.to_json()) == {"method": "publish", "payload": {"channel": "news", "data": {"n": 1.0}}}
     with pytest.raises(cent.InvalidRequestError):
-        cent.command.publish(data=1)
+        cent.command.publish(channel="", data=1)
 
 
 # Configuration.
@@ -746,6 +771,15 @@ def test_endpoint_func_error_propagates(new_api: Callable[..., Api], kind: str, 
 
 
 # Observability.
+
+
+def test_async_on_request_refused() -> None:
+    async def on_request(info: cent.RequestInfo) -> None:
+        pass
+
+    for cls in (cent.Client, cent.AsyncClient):
+        with pytest.raises(cent.InvalidConfigError, match="plain function"):
+            cls(ENDPOINT, on_request=on_request)  # type: ignore[arg-type]
 
 
 def test_on_request(new_api: Callable[..., Api], kind: str, fake: Fake) -> None:
@@ -921,3 +955,90 @@ def test_broadcast_with_retry_retries_a_hung_attempt() -> None:
     res = c.broadcast_with_retry(channels=["a"], data=1, on_attempt_error=lambda a: 0.0)
     assert calls[0] == 2
     assert res.attempts == 2
+
+
+# Results as JSON.
+
+
+def test_to_dict(api: Api, fake: Fake) -> None:
+    with pytest.raises(cent.BroadcastFailedChannelsError) as e:
+        api.broadcast(channels=["a", "bad:1"], data=1, idempotency_key="k")
+    out = cent.to_dict(e.value.result)
+    assert json.loads(json.dumps(out)) == out
+    assert out["channels"][0]["result"] == {"offset": 1, "epoch": "e1"}
+    assert out["channels"][1]["error"] == {"code": 102, "message": "unknown channel"}
+    assert out["idempotency_key"] == "k"
+    assert out["replied"] is True
+    fake.on("publish", cent.ApiError.from_wire(102, "unknown channel"))
+    b = api.client.new_batch()
+    b.publish(channel="c", data=1)
+    with pytest.raises(cent.BatchFailedCommandsError) as be:
+        api.send(b)
+    assert cent.to_dict(be.value.result) == {
+        "replied": True,
+        "failed": [{"index": 0, "method": "publish", "error": {"code": 102, "message": "unknown channel"}}],
+    }
+    # A command's payload is the object, not its text.
+    cmd = cent.command.publish(channel="news", data={"x": 1})
+    assert cent.to_dict({"cmd": cmd}) == {
+        "cmd": {"method": "publish", "payload": {"channel": "news", "data": {"x": 1}}}
+    }
+
+
+def test_async_client_belongs_to_one_event_loop(fake: Fake) -> None:
+    c = cent.AsyncClient(ENDPOINT, http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(fake)))
+    asyncio.run(c.info())
+    with pytest.raises(cent.InvalidConfigError, match="one per event loop"):
+        asyncio.run(c.info())
+
+
+@pytest.mark.skipif(not hasattr(os, "fork"), reason="no fork")
+def test_client_starts_fresh_after_fork() -> None:
+    c = cent.Client(ENDPOINT, auto_batch=cent.AutoBatch(max_in_flight=2))
+    http, batcher = c._http, c._batcher
+    pid = os.fork()
+    if pid == 0:  # the child: its own connections and batch threads
+        c._check_fork()
+        os._exit(0 if c._http is not http and c._batcher is not batcher else 1)
+    _, status = os.waitpid(pid, 0)
+    assert status == 0
+    c._check_fork()
+    assert c._http is http  # the parent's are untouched
+    c.close()
+
+
+def test_readme_testing_section() -> None:
+    replies = {
+        "/api/publish": {"result": {"offset": 1, "epoch": "e"}},
+        "/api/broadcast": {
+            "result": {"responses": [{"result": {"offset": 1}}, {"error": {"code": 102, "message": "unknown channel"}}]}
+        },
+        "/api/batch": {"replies": [{"publish": {"offset": 1}}, {"error": {"code": 102, "message": "unknown channel"}}]},
+    }
+
+    def centrifugo(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, json=replies[request.url.path])
+
+    client = cent.Client("http://centrifugo/api", http_client=httpx2.Client(transport=httpx2.MockTransport(centrifugo)))
+    assert client.publish(channel="news", data={"text": "hi"}).offset == 1
+    with pytest.raises(cent.BroadcastFailedChannelsError) as be:
+        client.broadcast(channels=["news", "unknown:x"], data={})
+    assert [c.channel for c in be.value.failed] == ["unknown:x"]
+    b = client.new_batch()
+    p1, p2 = b.publish(channel="news", data=1), b.publish(channel="unknown:x", data=1)
+    with pytest.raises(cent.BatchFailedCommandsError):
+        b.send()
+    assert p1.result().offset == 1
+    with pytest.raises(cent.UnknownChannelError):
+        p2.result()
+
+    # Test doubles.
+    ok = cent.ChannelResult(channel="news", result=cent.PublishResult(offset=1))
+    bad = cent.ChannelResult(channel="unknown:x", error=cent.ApiError.from_wire(102, "unknown channel"))
+    err = cent.BroadcastFailedChannelsError([bad], 2, cent.BroadcastResult(channels=[ok, bad], replied=True))
+    assert err.result.failed == [bad]
+    assert cent.Pending.resolved(cent.PublishResult(offset=1)).result().offset == 1
+    with pytest.raises(cent.UnknownChannelError):
+        cent.Pending.resolved(error=cent.ApiError.from_wire(102, "unknown channel")).result()
+    failed = [cent.FailedCommand(1, "publish", cent.ApiError.from_wire(102, "unknown channel"))]
+    assert cent.BatchFailedCommandsError(failed, 2, cent.BatchResult(True, failed)).failed == failed
