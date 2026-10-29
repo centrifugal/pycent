@@ -1,7 +1,7 @@
 # Migrating from cent 5 to cent 6
 
 cent 6 is a rewrite to the [Centrifugo server SDK
-specification](https://github.com/centrifugal/gocent/blob/v4_dev/spec.md). Four
+specification](https://github.com/centrifugal/gocent/blob/master/spec.md). Four
 complete programs below, as written with cent 5 and with cent 6: publishing,
 broadcasting, a batch, and the same from asyncio code. Each pair does the same
 thing. The sections after them map every client option, call and error.

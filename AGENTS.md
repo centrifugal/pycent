@@ -1,7 +1,7 @@
 # Working on cent
 
 cent is the Python SDK for Centrifugo's HTTP server API, written to the
-[Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/v4_dev/spec.md),
+[Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/master/spec.md),
 whose reference implementation is gocent. Applications use it on their hot
 paths and from both threads and asyncio, so it has to be correct under
 concurrency and hard to misuse. Read this before changing code.

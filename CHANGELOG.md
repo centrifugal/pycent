@@ -1,7 +1,7 @@
 v6.0.0
 ======
 
-A rewrite to the [Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/v4_dev/spec.md).
+A rewrite to the [Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/master/spec.md).
 Migrating from cent 5: see [MIGRATING.md](MIGRATING.md).
 
 * Python 3.11 or newer. httpx2 - the maintained fork of httpx - is the only dependency; `cryptography` 49 or newer is optional, for RSA, ECDSA and Ed25519 tokens (`pip install cent[crypto]`).

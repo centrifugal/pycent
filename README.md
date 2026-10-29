@@ -22,7 +22,7 @@ pip install cent[crypto]    # RSA, ECDSA and Ed25519 tokens, with cryptography
 | Methods marked "Centrifugo PRO only" | Centrifugo PRO v6 |
 
 cent 6 replaces cent 5: see [MIGRATING.md](MIGRATING.md). cent implements the
-[Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/v4_dev/spec.md),
+[Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/master/spec.md),
 version 0.2.
 
 ## Example
@@ -240,10 +240,8 @@ client = cent.AsyncClient(endpoint, api_key=key, auto_batch=cent.AutoBatch(max_i
 Set `max_in_flight` to about half the tasks or threads which call the client
 at once. It batches only calls made while that many requests are in flight:
 above the concurrency, it never does; just below, it batches calls one at a
-time, and only limits them. Measured with the Ruby SDK - the same design - and
-16 threads publishing nonstop against Centrifugo PRO with Redis, half the
-concurrency sent 2,800 requests instead of 8,000, for twice the publications a
-second, with Centrifugo and Redis doing about half the work per publication.
+time, and only limits them. Under heavy publishing it sends a fraction of the
+requests, and Centrifugo does about half the work per publication.
 
 Every call still gets its own result or error, and keeps its own timeout. Calls
 sharing a batch share its request, though: if the request itself fails - the
@@ -301,8 +299,8 @@ Rejected credentials make every call raise `cent.UnauthorizedError`.
 
 cent sends requests with [httpx2](https://pypi.org/project/httpx2/), the
 maintained fork of httpx: the same API, imported as `httpx2`. Without
-`http_client`, a client keeps up to 256 connections to a host alive, never
-follows redirects, and closes idle connections after 50 seconds. A client you
+`http_client`, a client keeps its connections alive between calls and never
+follows redirects. A client you
 pass - an `httpx2.Client`, or `httpx2.AsyncClient` for `AsyncClient` - is used
 as it is, and never changed: credentials and headers go on each request. An
 `httpx.Client` is refused, with the fix. Tracing comes from the HTTP client -
@@ -312,7 +310,7 @@ with OpenTelemetry (opentelemetry-instrumentation-httpx 0.65b0 or newer):
 import httpx2
 from opentelemetry.instrumentation.httpx import HTTPX2ClientInstrumentor
 
-http = httpx2.Client(limits=httpx2.Limits(max_connections=256, max_keepalive_connections=256))
+http = httpx2.Client()
 HTTPX2ClientInstrumentor.instrument_client(http)
 client = cent.Client(endpoint, api_key=key, http_client=http)
 ```
