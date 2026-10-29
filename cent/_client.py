@@ -497,6 +497,8 @@ class Client(_ClientAPI):
         closing it."""
         if not self._calls.close(timeout):
             raise CentTimeoutError("close: calls still in progress")
+        if self._batcher is not None:
+            self._batcher.close()
         if self._own_http:
             self._http.close()
 

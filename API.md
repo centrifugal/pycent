@@ -1745,9 +1745,11 @@ Centrifugo (nginx refuses bodies over 1 MB by default) - every call in it
 fails with that error. Each call keeps its own timeout: the batch lasts
 until the latest of its calls'.
 
-A smaller max_in_flight batches more: a value above the concurrency the
-load needs leaves nearly every call sent alone. Something like 8 suits
-most applications.
+It is for processes which publish a lot at once - many asyncio tasks, a
+thread pool fanning publications out - and does nothing for a sync web
+worker of a few threads. Set max_in_flight to about half the tasks or
+threads which call the client at once: above that, it never batches; just
+below, it batches calls one at a time, and only limits them.
 
 - `max_in_flight: int` - How many requests may be in flight before calls start to wait and be batched.
 - `max_batch_size: int = _core.DEFAULT_MAX_BATCH_SIZE` - The most calls one batch carries.

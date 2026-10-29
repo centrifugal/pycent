@@ -7,6 +7,7 @@ import asyncio
 import contextlib
 import contextvars
 import copy
+import queue
 import threading
 import time
 from collections import deque
@@ -46,9 +47,11 @@ class AutoBatch:
     fails with that error. Each call keeps its own timeout: the batch lasts
     until the latest of its calls'.
 
-    A smaller max_in_flight batches more: a value above the concurrency the
-    load needs leaves nearly every call sent alone. Something like 8 suits
-    most applications.
+    It is for processes which publish a lot at once - many asyncio tasks, a
+    thread pool fanning publications out - and does nothing for a sync web
+    worker of a few threads. Set max_in_flight to about half the tasks or
+    threads which call the client at once: above that, it never batches; just
+    below, it batches calls one at a time, and only limits them.
     """
 
     max_in_flight: int
@@ -143,6 +146,10 @@ def _batch_body(items: list[_Queued]) -> bytes:
     return ('{"commands":[' + ",".join(q.command for q in items) + '],"parallel":true}').encode("utf-8")
 
 
+# Seconds a thread sending batches waits for the next before it ends.
+_WORKER_IDLE = 10.0
+
+
 def _batch_deadline(items: list[_Queued], request_timeout: float) -> float:
     """The latest deadline of the calls, never less than request_timeout from now."""
     return max([time.monotonic() + request_timeout, *(q.deadline for q in items)])
@@ -159,6 +166,20 @@ class SyncBatcher:
         self._lock = threading.Lock()
         self._in_flight = 0
         self._queue: deque[_Queued] = deque()
+        # The threads sending batches, started as needed and kept while busy:
+        # at most one per slot, since a batch holds one, each ending after
+        # _WORKER_IDLE seconds without a batch. Starting a thread per batch
+        # cost more than a small batch saved.
+        self._jobs: queue.SimpleQueue[list[_Queued] | None] = queue.SimpleQueue()
+        self._workers = 0
+        self._idle = 0
+
+    def close(self) -> None:
+        """Stops the threads sending batches, once those in progress are sent."""
+        with self._lock:
+            n = self._workers
+        for _ in range(n):
+            self._jobs.put(None)
 
     def call(self, method: str, request: Any, deadline: float, alone: Callable[[], _T]) -> tuple[bool, Any]:
         """(True, what alone returned) when a slot was free and the call went
@@ -216,10 +237,40 @@ class SyncBatcher:
                 self._in_flight -= 1
                 return
             items = _take(self._queue, self._max_batch)
-        # Sent from a thread of its own, so that no caller's thread does work
-        # for others. Counted as a call: close waits for it.
+        # Sent from a thread of the batcher's, so that no caller's thread does
+        # work for others. Counted as a call: close waits for it.
         self._client._calls.add()
-        threading.Thread(target=self._flush, args=(items,), name="pycent-autobatch", daemon=True).start()
+        with self._lock:
+            # Put under the lock which a sender ending idle takes: it sees the
+            # batch, and stays for it.
+            self._jobs.put(items)
+            start = self._idle == 0 and self._workers < self._max_in_flight
+            if start:
+                self._workers += 1
+                self._idle += 1
+        if start:
+            threading.Thread(target=self._work, name="pycent-autobatch", daemon=True).start()
+
+    def _work(self) -> None:
+        while True:
+            try:
+                items = self._jobs.get(timeout=_WORKER_IDLE)
+            except queue.Empty:
+                with self._lock:
+                    if self._jobs.empty():
+                        self._workers -= 1
+                        self._idle -= 1
+                        return
+                continue
+            with self._lock:
+                self._idle -= 1
+            if items is None:
+                with self._lock:
+                    self._workers -= 1
+                return
+            self._flush(items)
+            with self._lock:
+                self._idle += 1
 
     def _flush(self, items: list[_Queued]) -> None:
         try:

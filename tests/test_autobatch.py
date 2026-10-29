@@ -202,6 +202,91 @@ def test_auto_batch_config(opts: dict[str, int], msg: str) -> None:
         cent.Client(ENDPOINT, auto_batch={"max_in_flight": 2})  # type: ignore[arg-type]
 
 
+def test_batches_are_sent_by_kept_threads_which_close_stops() -> None:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        time.sleep(0.001)
+        body = json.loads(request.content)
+        if request.url.path.endswith("/batch"):
+            return httpx2.Response(200, json={"replies": [{"info": {}} for _ in body["commands"]]})
+        return httpx2.Response(200, json={"result": {}})
+
+    batches = []
+    c = cent.Client(
+        ENDPOINT,
+        http_client=httpx2.Client(transport=httpx2.MockTransport(handler)),
+        auto_batch=cent.AutoBatch(max_in_flight=2),
+        on_request=lambda i: batches.append(i) if i.auto_batch else None,
+    )
+
+    before = {t.ident for t in threading.enumerate()}
+
+    def senders() -> int:
+        return sum(1 for t in threading.enumerate() if t.name == "pycent-autobatch" and t.ident not in before)
+
+    peak = 0
+    stop = threading.Event()
+
+    def sample() -> None:
+        nonlocal peak
+        while not stop.is_set():
+            peak = max(peak, senders())
+            time.sleep(0.001)
+
+    sampler = threading.Thread(target=sample)
+    sampler.start()
+    callers = [threading.Thread(target=lambda: [c.info() for _ in range(30)]) for _ in range(12)]
+    for t in callers:
+        t.start()
+    for t in callers:
+        t.join()
+    stop.set()
+    sampler.join()
+    assert batches
+    assert 1 <= peak <= 2  # at most one sender per slot, however many batches
+    c.close(timeout=5)
+    deadline = time.monotonic() + 5
+    while senders() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert senders() == 0
+
+
+def test_idle_senders_end(monkeypatch: pytest.MonkeyPatch) -> None:
+    from cent import _autobatch
+
+    monkeypatch.setattr(_autobatch, "_WORKER_IDLE", 0.05)
+    gate = threading.Event()
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        gate.wait(5)
+        body = json.loads(request.content)
+        if request.url.path.endswith("/batch"):
+            return httpx2.Response(200, json={"replies": [{"info": {}} for _ in body["commands"]]})
+        return httpx2.Response(200, json={"result": {}})
+
+    before = {t.ident for t in threading.enumerate()}
+
+    def senders() -> int:
+        return sum(1 for t in threading.enumerate() if t.name == "pycent-autobatch" and t.ident not in before)
+
+    c = cent.Client(
+        ENDPOINT, http_client=httpx2.Client(transport=httpx2.MockTransport(handler)), auto_batch=cent.AutoBatch(1)
+    )
+    first = threading.Thread(target=c.info)
+    first.start()
+    time.sleep(0.05)
+    queued = threading.Thread(target=c.info)
+    queued.start()
+    time.sleep(0.05)
+    gate.set()
+    first.join()
+    queued.join()
+    assert senders() == 1  # sent the batch, still there
+    deadline = time.monotonic() + 5
+    while senders() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert senders() == 0  # ended idle, the client open
+
+
 def test_stress_sync() -> None:
     gate = Gate()
     gate.open.set()

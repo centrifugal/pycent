@@ -226,18 +226,29 @@ publications into different channels may not, unless the namespace sets
 
 ## Automatic batching
 
-With `auto_batch`, calls made concurrently - from threads, or asyncio tasks -
-go out together once enough requests are in flight, with no delay otherwise,
-since nothing waits for a timer:
+With `auto_batch`, calls made concurrently from one process go out together
+once `max_in_flight` requests are in flight, with no delay otherwise, since
+nothing waits for a timer. It is for processes which publish a lot at once - an
+asyncio server or worker with many tasks publishing, a thread pool fanning
+publications out - and does nothing for a sync web worker of a few threads:
+leave it off there.
 
 ```python
-client = cent.Client(endpoint, api_key=key, auto_batch=cent.AutoBatch(max_in_flight=8))
+client = cent.AsyncClient(endpoint, api_key=key, auto_batch=cent.AutoBatch(max_in_flight=8))
 ```
+
+Set `max_in_flight` to about half the tasks or threads which call the client
+at once. It batches only calls made while that many requests are in flight:
+above the concurrency, it never does; just below, it batches calls one at a
+time, and only limits them. Measured with the Ruby SDK - the same design - and
+16 threads publishing nonstop against Centrifugo PRO with Redis, half the
+concurrency sent 2,800 requests instead of 8,000, for twice the publications a
+second, with Centrifugo and Redis doing about half the work per publication.
 
 Every call still gets its own result or error, and keeps its own timeout. Calls
 sharing a batch share its request, though: if the request itself fails - the
 network, a body too large for a proxy in front of Centrifugo - every call in it
-fails. A smaller `max_in_flight` batches more; 8 suits most applications.
+fails.
 
 A batch belongs to no single caller: it runs in a context of its own, which
 carries no caller's `contextvars`. `batch_context` makes it one from the
