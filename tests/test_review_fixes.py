@@ -23,10 +23,8 @@ from tests.conftest import ENDPOINT, Fake
 
 
 @pytest.fixture
-def trickling_server(monkeypatch: pytest.MonkeyPatch) -> Iterator[int]:
-    """A server sending its reply's headers one line every 0.1 s."""
-    for var in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"):
-        monkeypatch.delenv(var, raising=False)
+def trickling_server() -> Iterator[int]:
+    """A server sending its reply's body a byte every 0.1 s."""
     srv = socket.socket()
     srv.bind(("127.0.0.1", 0))
     srv.listen()
@@ -41,11 +39,10 @@ def trickling_server(monkeypatch: pytest.MonkeyPatch) -> Iterator[int]:
             with c:
                 c.recv(65536)
                 try:
-                    c.sendall(b"HTTP/1.1 200 OK\r\n")
+                    c.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 40\r\n\r\n")
                     for _ in range(40):
-                        c.sendall(b"X-A: b\r\n")
+                        c.sendall(b" ")
                         time.sleep(0.1)
-                    c.sendall(b"Content-Length: 2\r\n\r\n{}")
                 except OSError:
                     pass
 
@@ -55,10 +52,9 @@ def trickling_server(monkeypatch: pytest.MonkeyPatch) -> Iterator[int]:
     srv.close()
 
 
-def test_deadline_bounds_a_trickling_reply(trickling_server: int) -> None:
-    """The default HTTP client bounds a request by one deadline, headers
-    included: httpx2's own timeouts bound each socket read only. This also
-    fails if httpx2 changes how the default client's pool is replaced."""
+def test_deadline_bounds_a_trickling_body(trickling_server: int) -> None:
+    """A body arriving in pieces, each read well within the timeout, stops at
+    the call's deadline: it is checked between chunks."""
     c = cent.Client(f"http://127.0.0.1:{trickling_server}/api", api_key="k")
     start = time.monotonic()
     with pytest.raises(cent.CentTimeoutError):

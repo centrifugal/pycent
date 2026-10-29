@@ -41,15 +41,13 @@ passes; if you find yourself about to break one, stop and say so instead.
    raised as the subclass of its code when the code is known, and as `ApiError`
    itself otherwise. Centrifugo's transport error mode gives the same error as a
    200 reply.
-4. **One deadline per call.** Its `timeout`, or `request_timeout`, bounds the
-   whole call - the endpoint and token functions, connecting, the reply read.
-   The async client wraps the call in `asyncio.timeout`. The blocking client's
-   default HTTP client sends through `cent/_deadline.py`: an httpcore2 network
-   backend bounding every connect, read and write by the time left, so a reply
-   trickling in - headers included - stops at the deadline. With a caller's
-   HTTP client, or an environment proxy, it falls back to httpx2's per-phase
-   timeouts and a check between body chunks. Any timeout raises
-   `CentTimeoutError`.
+4. **One deadline per call, with httpx2's public API only.** Its `timeout`,
+   or `request_timeout`, bounds the call - the endpoint and token functions,
+   connecting, the reply read. The async client wraps the call in
+   `asyncio.timeout`. The blocking client gives httpx2 the time left as each
+   request's timeout, which bounds each connect, read and write, and checks
+   the deadline between the body's chunks; only headers trickling in can
+   outlast it, which the README says. Any timeout raises `CentTimeoutError`.
 5. **A payload is carried exactly.** A payload from a reply sent back unchanged
    is the same JSON value; `RawJSON` is sent as its text; NaN, infinities,
    bytes and invalid JSON never leave the client.
@@ -118,10 +116,10 @@ which Centrifugo reaches as `host.docker.internal`.
 - **Payloads are spliced into the request's JSON** behind random placeholders:
   `RawJSON` keeps its number text, and no string of the request can pass for a
   placeholder.
-- **The default client's connection pool is replaced** (`_deadline.py`): httpx2
-  has no option for another network backend. `test_deadline_bounds_a_trickling_reply`
-  fails if httpx2 changes the attribute; CI installs the newest httpx2 on every
-  run, and runs weekly to catch a release between pushes.
+- **No deadline enforced inside httpx2.** A blocking request whose headers
+  trickle in can outlast its timeout: bounding it would mean replacing httpx2
+  internals - its connection pool - which it does not promise to keep. The
+  async client is strict through `asyncio.timeout`.
 - **No `wait(deadline, d)` helper** (spec 6): `time.sleep` and `asyncio.sleep` -
   which cancellation ends - are the language's waits, and Python code carries
   no deadline object to bound them by. `broadcast_with_retry` bounds its own

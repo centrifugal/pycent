@@ -15,7 +15,7 @@ from typing import Any, TypeVar
 
 import httpx2
 
-from cent import _broadcast, _core, _deadline
+from cent import _broadcast, _core
 from cent import _wire as _w
 from cent._api import BroadcastRequest, _AsyncClientAPI, _ClientAPI
 from cent._autobatch import AsyncBatcher, AutoBatch, BatchContext, SyncBatcher
@@ -216,8 +216,8 @@ class _AsyncCalls:
 
 def _read(chunks: Iterator[bytes], deadline: float, method: str, limit: int = -1) -> bytes:
     """A body, read until it ends - or limit bytes - and the deadline checked
-    between its chunks: each read is bounded by the time left when the request
-    started, and a reply arriving in pieces stops at the deadline."""
+    between its chunks: httpx2 bounds each read by the time left when the
+    request started, and a body arriving in pieces stops at the deadline."""
     out = bytearray()
     for chunk in chunks:
         out += chunk
@@ -320,7 +320,6 @@ class Client(_ClientAPI):
         token = _core.checked_token(cfg.token_func()) if cfg.token_func is not None else None
         body = make_body()
         left = _core.remaining(deadline, method)
-        bound = _deadline.deadline.set(deadline)
         try:
             with self._http.stream(
                 "POST",
@@ -340,8 +339,6 @@ class Client(_ClientAPI):
             raise DecodeError(f"{method}: the reply cannot be decoded: {e}") from e
         except httpx2.HTTPError as e:
             raise _core.transport_error(method, e) from e
-        finally:
-            _deadline.deadline.reset(bound)
 
     def _call(
         self,

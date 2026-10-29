@@ -79,10 +79,14 @@ seconds by default - bounds it:
 client.info(timeout=0.5)
 ```
 
-The timeout bounds the whole call, connecting and reading included - also a
-reply trickling in, headers and all. However a call times out, it raises
-`cent.CentTimeoutError`, which is also a builtin `TimeoutError`. In asyncio code an `asyncio.timeout()` around a call, or
-cancelling its task, ends it sooner.
+The timeout bounds the call: connecting, each read and write, and the reply's
+body, which is checked against it as it arrives. However a call times out, it
+raises `cent.CentTimeoutError`, which is also a builtin `TimeoutError`. A
+blocking call can outlast its timeout in one case only: a server - a proxy in
+trouble, say - sending the reply's headers a few bytes at a time, each read
+within the timeout. `AsyncClient` bounds the whole call, that case included.
+In asyncio code an `asyncio.timeout()` around a call, or cancelling its task,
+ends it sooner.
 
 `broadcast_with_retry` makes several requests in one call: its `timeout`
 bounds them all, waits between them included, and `attempt_timeout` each one.

@@ -312,10 +312,8 @@ def command_error(reply: dict[str, Any], i: int, method: str) -> ApiError | None
 
 def default_http_client() -> httpx2.Client:
     """The HTTP client of a Client created without one: no timeouts of its own,
-    each request bounded by one deadline - see _deadline."""
-    from cent import _deadline  # noqa: PLC0415 - _deadline imports httpcore2, which only this needs
-
-    return _deadline.http_client(POOL_LIMITS)
+    each request given the time left until its deadline."""
+    return httpx2.Client(limits=POOL_LIMITS, follow_redirects=False, timeout=None)
 
 
 def default_async_http_client() -> httpx2.AsyncClient:
