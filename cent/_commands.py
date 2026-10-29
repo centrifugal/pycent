@@ -585,7 +585,7 @@ class Commands:
     def device_list(
         self,
         *,
-        filter: DeviceFilter,
+        filter: DeviceFilter | None = None,
         include_total_count: bool = False,
         include_meta: bool = False,
         include_topics: bool = False,
@@ -596,7 +596,7 @@ class Commands:
         """The device_list command.
 
         Args:
-            filter: Selects the devices to list. Required.
+            filter: Selects the devices to list: all of them when unset.
             include_total_count: Includes the total count for the filter in the
                 result.
             include_meta: Includes meta of each device.
@@ -692,7 +692,8 @@ class Commands:
         """The user_topic_update command.
 
         Args:
-            user: The user ID. Required.
+            user: The user ID. Required. "" updates the global binding, which every
+                device - anonymous ones included - gets on its next device_register.
             op: The operation: add, remove or set. Required.
             topics: The topics for the operation.
         """

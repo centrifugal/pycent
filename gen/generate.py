@@ -171,6 +171,31 @@ def required(f: Field) -> bool:
     return re.search(r"\bRequired\.", " ".join(f.doc)) is not None
 
 
+# The fields made required arguments, as "Message.field": checked against
+# REQUIRED_FILE, so that a proto comment gaining "Required." - a breaking
+# change of the methods taking it - is a decision, not a side effect of a sync.
+REQUIRED: set[str] = set()
+REQUIRED_FILE = ROOT / "gen" / "required_fields.txt"
+
+
+def check_required(accept: bool) -> None:
+    """Fails when the required fields differ from REQUIRED_FILE; with accept,
+    records them there instead."""
+    want = sorted(REQUIRED)
+    if accept:
+        REQUIRED_FILE.write_text("".join(f"{r}\n" for r in want))
+        return
+    have = REQUIRED_FILE.read_text().split() if REQUIRED_FILE.exists() else []
+    added, removed = sorted(set(want) - set(have)), sorted(set(have) - set(want))
+    if added or removed:
+        raise SystemExit(
+            "the fields the protos mark Required. changed:"
+            + (f"\n  newly required (breaking: calls without them fail): {', '.join(added)}" if added else "")
+            + (f"\n  no longer required: {', '.join(removed)}" if removed else "")
+            + "\nReview them, then run gen/generate.py --accept-required to record them in gen/required_fields.txt"
+        )
+
+
 def kwargs(m: Message) -> tuple[list[str], list[str]]:
     """The keyword parameters of a request's method, and the arguments building
     the request from them. Lists and maps default to None, made empty."""
@@ -180,6 +205,7 @@ def kwargs(m: Message) -> tuple[list[str], list[str]]:
             raise SystemExit(f"api.proto: {m.name}.{f.name} is a Python keyword: no keyword argument can carry it")
         ann, default = field_type(f)
         if required(f):
+            REQUIRED.add(f"{m.name}.{f.name}")
             # No default: a call without it fails as Python fails it, and type
             # checkers and editors show it.
             params.append(f"{f.name}: {ann.removesuffix(' | None')}")
@@ -620,16 +646,23 @@ def format_code(code: str, path: Path) -> str:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="fail when the generated code is stale")
+    ap.add_argument(
+        "--accept-required", action="store_true", help="record the fields the protos mark Required. as reviewed"
+    )
     args = ap.parse_args()
     outputs = [
         ("api.proto", ROOT / "cent" / "_api.py", generate),
         ("api.proto", ROOT / "cent" / "_commands.py", generate_commands),
         ("proxy.proto", ROOT / "cent" / "proxy" / "_types.py", generate_proxy),
     ]
-    stale = []
+    codes = []
     for proto_name, out_path, gen in outputs:
         src_path = ROOT / "proto" / proto_name
-        code = format_code(gen(parse(src_path.read_text(), src_path.name)), out_path)
+        codes.append((out_path, format_code(gen(parse(src_path.read_text(), src_path.name)), out_path)))
+    # Before writing: nothing is generated from unreviewed required fields.
+    check_required(args.accept_required)
+    stale = []
+    for out_path, code in codes:
         if args.check:
             if not out_path.exists() or out_path.read_text() != code:
                 stale.append(str(out_path.relative_to(ROOT)))

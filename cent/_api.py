@@ -2246,7 +2246,9 @@ class DeviceUserUpdate:
     """DeviceUserUpdate sets the user of devices. Centrifugo PRO only."""
 
     user: str = ""
-    """user is the user ID to set. Required."""
+    """user is the user ID to set. Required. "" detaches the devices from their
+    user.
+    """
 
     def _to_wire(self) -> dict[str, Any]:
         w: dict[str, Any] = {}
@@ -2267,7 +2269,7 @@ class DeviceTimezoneUpdate:
     """DeviceTimezoneUpdate sets the timezone of devices. Centrifugo PRO only."""
 
     timezone: str = ""
-    """timezone is the IANA time zone to set. Required."""
+    """timezone is the IANA time zone to set. Required. "" clears it."""
 
     def _to_wire(self) -> dict[str, Any]:
         w: dict[str, Any] = {}
@@ -2288,7 +2290,7 @@ class DeviceLocaleUpdate:
     """DeviceLocaleUpdate sets the locale of devices. Centrifugo PRO only."""
 
     locale: str = ""
-    """locale is the locale to set. Required."""
+    """locale is the locale to set. Required. "" clears it."""
 
     def _to_wire(self) -> dict[str, Any]:
         w: dict[str, Any] = {}
@@ -2309,7 +2311,7 @@ class DeviceMetaUpdate:
     """DeviceMetaUpdate sets the meta of devices. Centrifugo PRO only."""
 
     meta: dict[str, str] = field(default_factory=dict)
-    """meta is the meta to set. Required."""
+    """meta is the meta to set. Required. An empty map clears it."""
 
     def _to_wire(self) -> dict[str, Any]:
         w: dict[str, Any] = {}
@@ -2407,7 +2409,7 @@ class DeviceListRequest:
     """The server API method the request is sent to."""
 
     filter: DeviceFilter | None = None
-    """filter selects the devices to list. Required."""
+    """filter selects the devices to list: all of them when unset."""
 
     include_total_count: bool = False
     """include_total_count includes the total count for the filter in the
@@ -2717,7 +2719,9 @@ class UserTopicUpdateRequest:
     """The server API method the request is sent to."""
 
     user: str = ""
-    """user is the user ID. Required."""
+    """user is the user ID. Required. "" updates the global binding, which every
+    device - anonymous ones included - gets on its next device_register.
+    """
 
     op: str = ""
     """op is the operation: add, remove or set. Required."""
@@ -5206,7 +5210,7 @@ class _ClientAPI:
     def device_list(
         self,
         *,
-        filter: DeviceFilter,
+        filter: DeviceFilter | None = None,
         include_total_count: bool = False,
         include_meta: bool = False,
         include_topics: bool = False,
@@ -5219,7 +5223,7 @@ class _ClientAPI:
         Centrifugo PRO only.
 
         Args:
-            filter: Selects the devices to list. Required.
+            filter: Selects the devices to list: all of them when unset.
             include_total_count: Includes the total count for the filter in the
                 result.
             include_meta: Includes meta of each device.
@@ -5338,7 +5342,8 @@ class _ClientAPI:
         applied to the user's registered devices. Centrifugo PRO only.
 
         Args:
-            user: The user ID. Required.
+            user: The user ID. Required. "" updates the global binding, which every
+                device - anonymous ones included - gets on its next device_register.
             op: The operation: add, remove or set. Required.
             topics: The topics for the operation.
             timeout: Seconds bounding the call: request_timeout when None.
@@ -6342,7 +6347,7 @@ class _AsyncClientAPI:
     async def device_list(
         self,
         *,
-        filter: DeviceFilter,
+        filter: DeviceFilter | None = None,
         include_total_count: bool = False,
         include_meta: bool = False,
         include_topics: bool = False,
@@ -6355,7 +6360,7 @@ class _AsyncClientAPI:
         Centrifugo PRO only.
 
         Args:
-            filter: Selects the devices to list. Required.
+            filter: Selects the devices to list: all of them when unset.
             include_total_count: Includes the total count for the filter in the
                 result.
             include_meta: Includes meta of each device.
@@ -6474,7 +6479,8 @@ class _AsyncClientAPI:
         applied to the user's registered devices. Centrifugo PRO only.
 
         Args:
-            user: The user ID. Required.
+            user: The user ID. Required. "" updates the global binding, which every
+                device - anonymous ones included - gets on its next device_register.
             op: The operation: add, remove or set. Required.
             topics: The topics for the operation.
             timeout: Seconds bounding the call: request_timeout when None.
@@ -7327,7 +7333,7 @@ class _BatchAPI:
     def device_list(
         self,
         *,
-        filter: DeviceFilter,
+        filter: DeviceFilter | None = None,
         include_total_count: bool = False,
         include_meta: bool = False,
         include_topics: bool = False,
@@ -7338,7 +7344,7 @@ class _BatchAPI:
         """Adds a device_list command; its outcome is what Client.device_list would return.
 
         Args:
-            filter: Selects the devices to list. Required.
+            filter: Selects the devices to list: all of them when unset.
             include_total_count: Includes the total count for the filter in the
                 result.
             include_meta: Includes meta of each device.
@@ -7442,7 +7448,8 @@ class _BatchAPI:
         """Adds a user_topic_update command; its outcome is what Client.user_topic_update would return.
 
         Args:
-            user: The user ID. Required.
+            user: The user ID. Required. "" updates the global binding, which every
+                device - anonymous ones included - gets on its next device_register.
             op: The operation: add, remove or set. Required.
             topics: The topics for the operation.
         """

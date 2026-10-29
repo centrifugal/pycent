@@ -11,6 +11,7 @@ concurrency and hard to misuse. Read this before changing code.
 | Path | What |
 |---|---|
 | `proto/api.proto`, `proto/proxy.proto` | Copies of Centrifugo's protos, from a released tag (`make sync-proto CENTRIFUGO_REF=v6.10.2`) |
+| `gen/required_fields.txt` | The fields the protos mark "Required.", made required keyword arguments. Generation fails when the protos' list differs: a newly required field breaks every call without it, so review the change - fix the proto upstream if Centrifugo accepts the field absent - then `python gen/generate.py --accept-required` |
 | `gen/` | The generator: `proto.py` parses the protos, `generate.py` writes the code |
 | `cent/_api.py`, `cent/proxy/_types.py` | Generated - never edited |
 | `API.md` | The API reference, generated from the docstrings by `gen/api_docs.py` (`make docs`) - never edited |

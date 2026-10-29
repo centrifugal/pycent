@@ -219,7 +219,7 @@ Arguments:
 
 #### `device_list(
     *,
-    filter: DeviceFilter,
+    filter: DeviceFilter | None = None,
     include_total_count: bool = False,
     include_meta: bool = False,
     include_topics: bool = False,
@@ -234,7 +234,7 @@ Centrifugo PRO only.
 
 Arguments:
 
-- `filter` - Selects the devices to list. Required.
+- `filter` - Selects the devices to list: all of them when unset.
 - `include_total_count` - Includes the total count for the filter in the result.
 - `include_meta` - Includes meta of each device.
 - `include_topics` - Includes topics of each device.
@@ -868,7 +868,7 @@ applied to the user's registered devices. Centrifugo PRO only.
 
 Arguments:
 
-- `user` - The user ID. Required.
+- `user` - The user ID. Required. "" updates the global binding, which every device - anonymous ones included - gets on its next device_register.
 - `op` - The operation: add, remove or set. Required.
 - `topics` - The topics for the operation.
 - `timeout` - Seconds bounding the call: request_timeout when None.
@@ -1047,7 +1047,7 @@ Arguments:
 
 #### `async device_list(
     *,
-    filter: DeviceFilter,
+    filter: DeviceFilter | None = None,
     include_total_count: bool = False,
     include_meta: bool = False,
     include_topics: bool = False,
@@ -1062,7 +1062,7 @@ Centrifugo PRO only.
 
 Arguments:
 
-- `filter` - Selects the devices to list. Required.
+- `filter` - Selects the devices to list: all of them when unset.
 - `include_total_count` - Includes the total count for the filter in the result.
 - `include_meta` - Includes meta of each device.
 - `include_topics` - Includes topics of each device.
@@ -1692,7 +1692,7 @@ applied to the user's registered devices. Centrifugo PRO only.
 
 Arguments:
 
-- `user` - The user ID. Required.
+- `user` - The user ID. Required. "" updates the global binding, which every device - anonymous ones included - gets on its next device_register.
 - `op` - The operation: add, remove or set. Required.
 - `topics` - The topics for the operation.
 - `timeout` - Seconds bounding the call: request_timeout when None.
@@ -1831,7 +1831,7 @@ Arguments:
 
 #### `device_list(
     *,
-    filter: DeviceFilter,
+    filter: DeviceFilter | None = None,
     include_total_count: bool = False,
     include_meta: bool = False,
     include_topics: bool = False,
@@ -1844,7 +1844,7 @@ Adds a device_list command; its outcome is what Client.device_list would return.
 
 Arguments:
 
-- `filter` - Selects the devices to list. Required.
+- `filter` - Selects the devices to list: all of them when unset.
 - `include_total_count` - Includes the total count for the filter in the result.
 - `include_meta` - Includes meta of each device.
 - `include_topics` - Includes topics of each device.
@@ -2387,7 +2387,7 @@ Adds a user_topic_update command; its outcome is what Client.user_topic_update w
 
 Arguments:
 
-- `user` - The user ID. Required.
+- `user` - The user ID. Required. "" updates the global binding, which every device - anonymous ones included - gets on its next device_register.
 - `op` - The operation: add, remove or set. Required.
 - `topics` - The topics for the operation.
 
@@ -2480,7 +2480,7 @@ Arguments:
 
 #### `device_list(
     *,
-    filter: DeviceFilter,
+    filter: DeviceFilter | None = None,
     include_total_count: bool = False,
     include_meta: bool = False,
     include_topics: bool = False,
@@ -2493,7 +2493,7 @@ Adds a device_list command; its outcome is what Client.device_list would return.
 
 Arguments:
 
-- `filter` - Selects the devices to list. Required.
+- `filter` - Selects the devices to list: all of them when unset.
 - `include_total_count` - Includes the total count for the filter in the result.
 - `include_meta` - Includes meta of each device.
 - `include_topics` - Includes topics of each device.
@@ -3025,7 +3025,7 @@ Adds a user_topic_update command; its outcome is what Client.user_topic_update w
 
 Arguments:
 
-- `user` - The user ID. Required.
+- `user` - The user ID. Required. "" updates the global binding, which every device - anonymous ones included - gets on its next device_register.
 - `op` - The operation: add, remove or set. Required.
 - `topics` - The topics for the operation.
 
@@ -3206,7 +3206,7 @@ Arguments:
 
 #### `device_list(
     *,
-    filter: DeviceFilter,
+    filter: DeviceFilter | None = None,
     include_total_count: bool = False,
     include_meta: bool = False,
     include_topics: bool = False,
@@ -3219,7 +3219,7 @@ The device_list command.
 
 Arguments:
 
-- `filter` - Selects the devices to list. Required.
+- `filter` - Selects the devices to list: all of them when unset.
 - `include_total_count` - Includes the total count for the filter in the result.
 - `include_meta` - Includes meta of each device.
 - `include_topics` - Includes topics of each device.
@@ -3736,7 +3736,7 @@ The user_topic_update command.
 
 Arguments:
 
-- `user` - The user ID. Required.
+- `user` - The user ID. Required. "" updates the global binding, which every device - anonymous ones included - gets on its next device_register.
 - `op` - The operation: add, remove or set. Required.
 - `topics` - The topics for the operation.
 
@@ -5418,13 +5418,13 @@ Centrifugo PRO only.
 
 DeviceLocaleUpdate sets the locale of devices. Centrifugo PRO only.
 
-- `locale: str = ''` - locale is the locale to set. Required.
+- `locale: str = ''` - locale is the locale to set. Required. "" clears it.
 
 #### `DeviceMetaUpdate`
 
 DeviceMetaUpdate sets the meta of devices. Centrifugo PRO only.
 
-- `meta: dict[str, str] = {}` - meta is the meta to set. Required.
+- `meta: dict[str, str] = {}` - meta is the meta to set. Required. An empty map clears it.
 
 #### `DeviceRegisterResult`
 
@@ -5442,7 +5442,7 @@ moment. Centrifugo PRO only.
 
 DeviceTimezoneUpdate sets the timezone of devices. Centrifugo PRO only.
 
-- `timezone: str = ''` - timezone is the IANA time zone to set. Required.
+- `timezone: str = ''` - timezone is the IANA time zone to set. Required. "" clears it.
 
 #### `DeviceTopic`
 
@@ -5493,7 +5493,7 @@ moment. Centrifugo PRO only.
 
 DeviceUserUpdate sets the user of devices. Centrifugo PRO only.
 
-- `user: str = ''` - user is the user ID to set. Required.
+- `user: str = ''` - user is the user ID to set. Required. "" detaches the devices from their user.
 
 #### `Disconnect`
 
