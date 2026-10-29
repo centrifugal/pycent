@@ -1,6 +1,13 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  # Weekly, for new releases of httpx2 and httpcore2: the default client's
+  # deadline replaces httpx2's connection pool (cent/_deadline.py), which
+  # httpx2 does not promise to keep, and every run installs their newest.
+  schedule:
+    - cron: "0 6 * * 1"
 
 permissions:
   contents: read

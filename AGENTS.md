@@ -120,7 +120,8 @@ which Centrifugo reaches as `host.docker.internal`.
   placeholder.
 - **The default client's connection pool is replaced** (`_deadline.py`): httpx2
   has no option for another network backend. `test_deadline_bounds_a_trickling_reply`
-  fails if httpx2 changes the attribute.
+  fails if httpx2 changes the attribute; CI installs the newest httpx2 on every
+  run, and runs weekly to catch a release between pushes.
 - **No `wait(deadline, d)` helper** (spec 6): `time.sleep` and `asyncio.sleep` -
   which cancellation ends - are the language's waits, and Python code carries
   no deadline object to bound them by. `broadcast_with_retry` bounds its own
