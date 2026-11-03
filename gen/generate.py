@@ -18,6 +18,7 @@ import re
 import subprocess
 import sys
 import textwrap
+from dataclasses import dataclass
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -157,6 +158,122 @@ def find_presence(s: Schema, name: str) -> None:
                 raise SystemExit(f"{name}: {m.name} is a presence wrapper gen/generate.py has no Python type for")
             continue
         PRESENCE.add(m.name)
+
+
+_VALUE = re.compile(r"^[a-z][a-z0-9_]*$")
+
+
+class ConstError(Exception):
+    pass
+
+
+def listed_values(doc: list[str]) -> list[str] | None:
+    """The values a field's comment lists in the sentence "One of: add, remove,
+    set.", or None without one (spec 3.3). A malformed sentence fails, rather
+    than being skipped."""
+    _, sep, after = " ".join(doc).partition("One of:")
+    if not sep:
+        return None
+    listed, period, _ = after.partition(".")
+    if not period:
+        raise ConstError('the values after "One of:" must end with a period')
+    values: list[str] = []
+    for raw in listed.split(","):
+        v = raw.strip()
+        if not _VALUE.match(v):
+            raise ConstError(f"{v!r} is not a value: lowercase letters, digits and underscores")
+        if v in values:
+            raise ConstError(f"value {v!r} listed twice")
+        values.append(v)
+    return values
+
+
+def snake(name: str) -> str:
+    """FilterNode -> filter_node."""
+    return re.sub(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", "_", name).lower()
+
+
+@dataclass
+class ConstGroup:
+    """The constants of a string field with listed values: the values, and the
+    messages whose field of that name lists exactly them."""
+
+    field: str
+    values: list[str]
+    messages: list[str]
+    prefix: str = ""  # the message, when the field name alone is ambiguous
+
+    def name(self, value: str) -> str:
+        """PROVIDER_FCM for the provider field's "fcm"."""
+        prefix = snake(self.prefix) + "_" if self.prefix else ""
+        return f"{prefix}{self.field}_{value}".upper()
+
+
+def const_groups(s: Schema, include: set[str]) -> list[ConstGroup]:
+    """The fields of the messages in include which list their values, grouped,
+    in the order of the proto. A constant is named by its field and value;
+    where fields of one name list different values in different messages, the
+    set listed in the most messages keeps the short name and the others are
+    named by their message too - OP_ADD for the topic updates, FILTER_NODE_OP_AND
+    for FilterNode - and a tie names all of them so (spec 3.3)."""
+    by_field: dict[str, list[ConstGroup]] = {}
+    for m in s.messages:
+        if m.name not in include:
+            continue
+        for f in m.fields:
+            try:
+                values = listed_values(f.doc)
+            except ConstError as e:
+                raise ConstError(f"{m.name}.{f.name}: {e}") from None
+            if values is None:
+                continue
+            groups = by_field.setdefault(f.name, [])
+            for g in groups:
+                if g.values == values:
+                    g.messages.append(m.name)
+                    break
+            else:
+                groups.append(ConstGroup(f.name, values, [m.name]))
+    out: list[ConstGroup] = []
+    for name, groups in by_field.items():
+        if len(groups) > 1:
+            most = max(len(g.messages) for g in groups)
+            tie = sum(len(g.messages) == most for g in groups) > 1
+            for g in groups:
+                if tie or len(g.messages) < most:
+                    if len(g.messages) > 1:
+                        raise ConstError(
+                            f"field {name} lists {g.values} in {g.messages} and other values elsewhere:"
+                            " cannot name its constants"
+                        )
+                    g.prefix = g.messages[0]
+        out.extend(groups)
+    names: dict[str, str] = {}
+    for g in out:
+        for v in g.values:
+            n = g.name(v)
+            if n in names:
+                raise ConstError(f"constant {n} names {v!r} of {g.messages} and {names[n]}")
+            names[n] = f"{g.messages}"
+    return out
+
+
+def emit_consts(out: list[str], groups: list[ConstGroup], methods: dict[str, str] | None = None) -> None:
+    """A constant per listed value, each with a docstring naming its field: a
+    request's by its method, whose argument it is."""
+    for g in groups:
+        where = [f"{methods[m]}" if methods and m in methods else m for m in g.messages]
+        fields = f"the {g.field} field of " + (
+            ", ".join(where[:-1]) + " and " + where[-1] if len(where) > 1 else where[0]
+        )
+        out.append("")
+        for v in g.values:
+            out.append(f"{g.name(v)}: Final = {v!r}")
+            out.extend(docstring(textwrap.wrap(f"A value of {fields}.", 76), ""))
+
+
+def const_names(groups: list[ConstGroup]) -> list[str]:
+    return [g.name(v) for g in groups for v in g.values]
 
 
 def encoder(f: Field) -> list[str]:
@@ -527,15 +644,22 @@ def generate_proxy(s: Schema) -> str:
     p("from __future__ import annotations")
     p("")
     p("from dataclasses import dataclass, field")
-    p("from typing import Any")
+    p("from typing import Any, Final")
     p("")
     p("from cent import _wire as _w")
     p("from cent._payload import JSON")
+    groups = const_groups(s, {m.name for m in msgs})
     p("")
     p("__all__ = [")
-    for name in sorted(m.name for m in msgs):
+    for name in sorted(const_names(groups)) + sorted(m.name for m in msgs):
         p(f"    {name!r},")
     p("]")
+    p("")
+    p("# The values of the string fields with a fixed set, from the proto's")
+    p('# "One of:" sentences: what a handler compares a request\'s fields with, or')
+    p("# sets in a result. The fields are strings: a value Centrifugo sends or")
+    p("# accepts which these do not name is still a valid one.")
+    emit_consts(out, groups)
     for m in msgs:
         emit_message(out, m, None, "proxy protocol")
     p("")
@@ -554,7 +678,7 @@ def generate(s: Schema) -> str:
     p("from __future__ import annotations")
     p("")
     p("from dataclasses import dataclass, field")
-    p("from typing import TYPE_CHECKING, Any, ClassVar, TypeVar")
+    p("from typing import TYPE_CHECKING, Any, ClassVar, Final, TypeVar")
 
     p("")
     p("from cent import _wire as _w")
@@ -570,11 +694,17 @@ def generate(s: Schema) -> str:
     # internal. Nested messages and results are public.
     request_names = {c.request.name for c in cmds}
     public = [m.name for m in s.messages if m.name not in skip and m.name not in request_names]
+    groups = const_groups(s, {m.name for m in s.messages if m.name not in skip})
     p("")
     p("__all__ = [")
-    for name in sorted(public):
+    for name in sorted(const_names(groups)) + sorted(public):
         p(f"    {name!r},")
     p("]")
+    p("")
+    p("# The values of the string fields with a fixed set, from the proto's")
+    p('# "One of:" sentences. The fields are strings: a value Centrifugo accepts')
+    p("# which these do not name can still be sent.")
+    emit_consts(out, groups, {c.request.name: c.method for c in cmds})
 
     requests = {c.request.name: c.method for c in cmds}
     for m in s.messages:
@@ -787,7 +917,11 @@ def main() -> None:
     codes = []
     for proto_name, out_path, gen in outputs:
         src_path = ROOT / "proto" / proto_name
-        codes.append((out_path, format_code(gen(parse(src_path.read_text(), src_path.name)), out_path)))
+        try:
+            code = gen(parse(src_path.read_text(), src_path.name))
+        except ConstError as e:
+            raise SystemExit(f"{proto_name}: {e}") from None
+        codes.append((out_path, format_code(code, out_path)))
     # Before writing: nothing is generated from unreviewed required fields.
     check_required(args.accept_required)
     stale = []

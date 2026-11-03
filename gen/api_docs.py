@@ -260,6 +260,27 @@ def _render_value(name: str, mod: str) -> str:
     return ""
 
 
+def is_constant(name: str, obj: Any) -> bool:
+    """A constant generated from a proto's "One of:" sentences."""
+    return isinstance(obj, str) and name.isupper()
+
+
+def render_constants(names: list[str], module: Any, mod: str) -> str:
+    """The generated constants of module, which mod assigns, as a table: name,
+    value and field."""
+    rows = ["| Constant | Value | Field |", "|---|---|---|"]
+    body = tree(mod).body
+    docs: dict[str, str] = {}
+    for i, stmt in enumerate(body):
+        if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
+            nxt = body[i + 1] if i + 1 < len(body) else None
+            if isinstance(nxt, ast.Expr) and isinstance(nxt.value, ast.Constant) and isinstance(nxt.value.value, str):
+                docs[stmt.target.id] = " ".join(nxt.value.value.split()).removeprefix("A value of the ").rstrip(".")
+    for n in names:
+        rows.append(f"| `{n}` | `{getattr(module, n)!r}` | {docs.get(n, '')} |")
+    return "\n".join(rows)
+
+
 def section(title: str, intro: str, items: list[str]) -> str:
     return "\n\n".join([f"## {title}", intro, *items]) if intro else "\n\n".join([f"## {title}", *items])
 
@@ -276,6 +297,12 @@ def is_class(obj: Any) -> bool:
 
 def is_generated(obj: Any) -> bool:
     return inspect.isclass(obj) and obj.__module__ in ("cent._api", "cent.proxy._types")
+
+
+CONSTANTS_INTRO = (
+    'The values of the string fields with a fixed set, generated from the proto\'s "One of:" sentences. '
+    "The fields stay strings: a value without a constant here is still sent and received."
+)
 
 
 def generate() -> str:
@@ -295,12 +322,16 @@ def generate() -> str:
     order = ["Client", "AsyncClient", "AutoBatch", "Batch", "AsyncBatch", "Pending", "BatchResult"]
     hand_classes.sort(key=lambda c: (order.index(c.__name__) if c.__name__ in order else len(order), c.__name__))
     funcs = [o for o in objs.values() if inspect.isfunction(o)]
-    values = [n for n in names if not is_class(objs[n]) and not inspect.isfunction(objs[n])]
+    consts = [n for n in names if is_constant(n, objs[n])]
+    values = [
+        n for n in names if not is_class(objs[n]) and not inspect.isfunction(objs[n]) and not is_constant(n, objs[n])
+    ]
     gen_types = sorted((o for o in objs.values() if inspect.isclass(o) and is_generated(o)), key=lambda c: c.__name__)
 
     out.append(section("cent", "The client, batches, results and helpers.", [render_class(c) for c in hand_classes]))
     out.append(section("cent: functions", "", [render_function(f) for f in funcs]))
     out.append(section("cent: types", "", [render_value(n) for n in values]))
+    out.append(section("cent: constants", CONSTANTS_INTRO, [render_constants(consts, cent, "cent._api")]))
     hierarchy = "\n".join(
         f"{'  ' * (len([b for b in e.__mro__ if b in errors]) - 1)}- `{e.__name__}`"
         for e in sorted(errors, key=lambda e: [b.__name__ for b in reversed(e.__mro__) if b in errors])
@@ -319,12 +350,16 @@ def generate() -> str:
                 items.append(render_value(n, mod))
         out.append(section(f"cent.{mod.__name__.split('.')[-1]}", doc(mod.__doc__), items))
 
-    pnames = [n for n in proxy.__all__ if not is_generated(getattr(proxy, n))]
+    pnames = [n for n in proxy.__all__ if not is_generated(getattr(proxy, n)) and not is_constant(n, getattr(proxy, n))]
     items = []
     for n in pnames:
         o = getattr(proxy, n)
         items.append(render_class(o) if inspect.isclass(o) else render_value(n, proxy))
     out.append(section("cent.proxy", doc(proxy.__doc__), items))
+    pconsts = [n for n in proxy.__all__ if is_constant(n, getattr(proxy, n))]
+    out.append(
+        section("cent.proxy: constants", CONSTANTS_INTRO, [render_constants(pconsts, proxy, "cent.proxy._types")])
+    )
 
     out.append(generated("cent: request and result types", gen_types))
     out.append(

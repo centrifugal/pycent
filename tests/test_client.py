@@ -212,6 +212,15 @@ def test_optional_nested_message_unset_is_not_checked(api: Api, fake: Fake) -> N
     assert "limit_strategy" not in fake.bodies()[1]
 
 
+def test_constants_and_unnamed_values(api: Api, fake: Fake) -> None:
+    # The fields stay strings: a value without a constant is still sent.
+    api.device_register(provider=cent.PROVIDER_FCM, token="t", platform=cent.PLATFORM_IOS)
+    api.device_register(provider="newprovider", token="t", platform="tv")
+    first, second = fake.bodies("device_register")
+    assert (first["provider"], first["platform"]) == ("fcm", "ios")
+    assert (second["provider"], second["platform"]) == ("newprovider", "tv")
+
+
 def test_empty_value_with_a_meaning_is_sent(api: Api, fake: Fake) -> None:
     # "" means anonymous users, the global binding: sent, not refused.
     api.invalidate_user_tokens(user="")

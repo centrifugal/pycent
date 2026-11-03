@@ -4,12 +4,42 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Final
 
 from cent import _wire as _w
 from cent._payload import JSON
 
 __all__ = [
+    "ALLOW_HST",
+    "ALLOW_PRS",
+    "ALLOW_PUB",
+    "ALLOW_SUB",
+    "CMP_CT",
+    "CMP_EQ",
+    "CMP_EW",
+    "CMP_EX",
+    "CMP_GT",
+    "CMP_GTE",
+    "CMP_IN",
+    "CMP_LT",
+    "CMP_LTE",
+    "CMP_NEQ",
+    "CMP_NEX",
+    "CMP_NIN",
+    "CMP_SW",
+    "ENCODING_BINARY",
+    "ENCODING_JSON",
+    "KEY_MODE_IF_EXISTS",
+    "KEY_MODE_IF_NEW",
+    "MATCH_REGEX",
+    "MATCH_WILDCARD",
+    "OP_AND",
+    "OP_NOT",
+    "OP_OR",
+    "PROTOCOL_JSON",
+    "PROTOCOL_PROTOBUF",
+    "TYPE_OCCUPIED",
+    "TYPE_VACATED",
     "ChannelEvent",
     "ChannelsCapability",
     "ConnectRequest",
@@ -40,6 +70,91 @@ __all__ = [
     "SubscribeRequest",
     "SubscribeResult",
 ]
+
+# The values of the string fields with a fixed set, from the proto's
+# "One of:" sentences: what a handler compares a request's fields with, or
+# sets in a result. The fields are strings: a value Centrifugo sends or
+# accepts which these do not name is still a valid one.
+
+OP_AND: Final = "and"
+"""A value of the op field of FilterNode."""
+OP_OR: Final = "or"
+"""A value of the op field of FilterNode."""
+OP_NOT: Final = "not"
+"""A value of the op field of FilterNode."""
+
+CMP_EQ: Final = "eq"
+"""A value of the cmp field of FilterNode."""
+CMP_NEQ: Final = "neq"
+"""A value of the cmp field of FilterNode."""
+CMP_IN: Final = "in"
+"""A value of the cmp field of FilterNode."""
+CMP_NIN: Final = "nin"
+"""A value of the cmp field of FilterNode."""
+CMP_EX: Final = "ex"
+"""A value of the cmp field of FilterNode."""
+CMP_NEX: Final = "nex"
+"""A value of the cmp field of FilterNode."""
+CMP_SW: Final = "sw"
+"""A value of the cmp field of FilterNode."""
+CMP_EW: Final = "ew"
+"""A value of the cmp field of FilterNode."""
+CMP_CT: Final = "ct"
+"""A value of the cmp field of FilterNode."""
+CMP_GT: Final = "gt"
+"""A value of the cmp field of FilterNode."""
+CMP_GTE: Final = "gte"
+"""A value of the cmp field of FilterNode."""
+CMP_LT: Final = "lt"
+"""A value of the cmp field of FilterNode."""
+CMP_LTE: Final = "lte"
+"""A value of the cmp field of FilterNode."""
+
+PROTOCOL_JSON: Final = "json"
+"""A value of the protocol field of ConnectRequest, RefreshRequest,
+SubscribeRequest, PublishRequest, MapPublishRequest, MapRemoveRequest,
+RPCRequest and SubRefreshRequest.
+"""
+PROTOCOL_PROTOBUF: Final = "protobuf"
+"""A value of the protocol field of ConnectRequest, RefreshRequest,
+SubscribeRequest, PublishRequest, MapPublishRequest, MapRemoveRequest,
+RPCRequest and SubRefreshRequest.
+"""
+
+ENCODING_JSON: Final = "json"
+"""A value of the encoding field of ConnectRequest, RefreshRequest,
+SubscribeRequest, PublishRequest, MapPublishRequest, MapRemoveRequest,
+RPCRequest and SubRefreshRequest.
+"""
+ENCODING_BINARY: Final = "binary"
+"""A value of the encoding field of ConnectRequest, RefreshRequest,
+SubscribeRequest, PublishRequest, MapPublishRequest, MapRemoveRequest,
+RPCRequest and SubRefreshRequest.
+"""
+
+ALLOW_SUB: Final = "sub"
+"""A value of the allow field of ChannelsCapability and SubscribeResult."""
+ALLOW_PUB: Final = "pub"
+"""A value of the allow field of ChannelsCapability and SubscribeResult."""
+ALLOW_HST: Final = "hst"
+"""A value of the allow field of ChannelsCapability and SubscribeResult."""
+ALLOW_PRS: Final = "prs"
+"""A value of the allow field of ChannelsCapability and SubscribeResult."""
+
+MATCH_WILDCARD: Final = "wildcard"
+"""A value of the match field of ChannelsCapability."""
+MATCH_REGEX: Final = "regex"
+"""A value of the match field of ChannelsCapability."""
+
+KEY_MODE_IF_NEW: Final = "if_new"
+"""A value of the key_mode field of MapPublishResult."""
+KEY_MODE_IF_EXISTS: Final = "if_exists"
+"""A value of the key_mode field of MapPublishResult."""
+
+TYPE_OCCUPIED: Final = "occupied"
+"""A value of the type field of ChannelEvent."""
+TYPE_VACATED: Final = "vacated"
+"""A value of the type field of ChannelEvent."""
 
 
 @dataclass(slots=True, kw_only=True)

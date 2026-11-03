@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Final, TypeVar
 
 from cent import _wire as _w
 from cent._payload import JSON
@@ -17,6 +17,36 @@ if TYPE_CHECKING:
 _R = TypeVar("_R")
 
 __all__ = [
+    "CMP_CT",
+    "CMP_EQ",
+    "CMP_EW",
+    "CMP_EX",
+    "CMP_GT",
+    "CMP_GTE",
+    "CMP_IN",
+    "CMP_LT",
+    "CMP_LTE",
+    "CMP_NEQ",
+    "CMP_NEX",
+    "CMP_NIN",
+    "CMP_SW",
+    "FILTER_NODE_OP_AND",
+    "FILTER_NODE_OP_NOT",
+    "FILTER_NODE_OP_OR",
+    "KEY_MODE_IF_EXISTS",
+    "KEY_MODE_IF_NEW",
+    "OP_ADD",
+    "OP_REMOVE",
+    "OP_SET",
+    "PLATFORM_ANDROID",
+    "PLATFORM_IOS",
+    "PLATFORM_WEB",
+    "PROVIDER_APNS",
+    "PROVIDER_FCM",
+    "PROVIDER_HMS",
+    "PROVIDER_WEBPUSH",
+    "STATUS_DELIVERED",
+    "STATUS_INTERACTED",
     "ApnsPushNotification",
     "BlockUserResult",
     "CancelPushResult",
@@ -94,6 +124,83 @@ __all__ = [
     "UserTopicUpdateResult",
     "WebPushPushNotification",
 ]
+
+# The values of the string fields with a fixed set, from the proto's
+# "One of:" sentences. The fields are strings: a value Centrifugo accepts
+# which these do not name can still be sent.
+
+FILTER_NODE_OP_AND: Final = "and"
+"""A value of the op field of FilterNode."""
+FILTER_NODE_OP_OR: Final = "or"
+"""A value of the op field of FilterNode."""
+FILTER_NODE_OP_NOT: Final = "not"
+"""A value of the op field of FilterNode."""
+
+OP_ADD: Final = "add"
+"""A value of the op field of DeviceTopicsUpdate, device_topic_update and
+user_topic_update.
+"""
+OP_REMOVE: Final = "remove"
+"""A value of the op field of DeviceTopicsUpdate, device_topic_update and
+user_topic_update.
+"""
+OP_SET: Final = "set"
+"""A value of the op field of DeviceTopicsUpdate, device_topic_update and
+user_topic_update.
+"""
+
+CMP_EQ: Final = "eq"
+"""A value of the cmp field of FilterNode."""
+CMP_NEQ: Final = "neq"
+"""A value of the cmp field of FilterNode."""
+CMP_IN: Final = "in"
+"""A value of the cmp field of FilterNode."""
+CMP_NIN: Final = "nin"
+"""A value of the cmp field of FilterNode."""
+CMP_EX: Final = "ex"
+"""A value of the cmp field of FilterNode."""
+CMP_NEX: Final = "nex"
+"""A value of the cmp field of FilterNode."""
+CMP_SW: Final = "sw"
+"""A value of the cmp field of FilterNode."""
+CMP_EW: Final = "ew"
+"""A value of the cmp field of FilterNode."""
+CMP_CT: Final = "ct"
+"""A value of the cmp field of FilterNode."""
+CMP_GT: Final = "gt"
+"""A value of the cmp field of FilterNode."""
+CMP_GTE: Final = "gte"
+"""A value of the cmp field of FilterNode."""
+CMP_LT: Final = "lt"
+"""A value of the cmp field of FilterNode."""
+CMP_LTE: Final = "lte"
+"""A value of the cmp field of FilterNode."""
+
+PROVIDER_FCM: Final = "fcm"
+"""A value of the provider field of device_register."""
+PROVIDER_HMS: Final = "hms"
+"""A value of the provider field of device_register."""
+PROVIDER_APNS: Final = "apns"
+"""A value of the provider field of device_register."""
+PROVIDER_WEBPUSH: Final = "webpush"
+"""A value of the provider field of device_register."""
+
+PLATFORM_IOS: Final = "ios"
+"""A value of the platform field of device_register."""
+PLATFORM_ANDROID: Final = "android"
+"""A value of the platform field of device_register."""
+PLATFORM_WEB: Final = "web"
+"""A value of the platform field of device_register."""
+
+STATUS_DELIVERED: Final = "delivered"
+"""A value of the status field of update_push_status."""
+STATUS_INTERACTED: Final = "interacted"
+"""A value of the status field of update_push_status."""
+
+KEY_MODE_IF_NEW: Final = "if_new"
+"""A value of the key_mode field of map_publish."""
+KEY_MODE_IF_EXISTS: Final = "if_exists"
+"""A value of the key_mode field of map_publish."""
 
 
 @dataclass(slots=True, kw_only=True)

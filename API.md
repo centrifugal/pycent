@@ -3918,6 +3918,43 @@ command = Commands()
 
 The commands for Centrifugo's async consumers: cent.command.publish(...) and the like.
 
+## cent: constants
+
+The values of the string fields with a fixed set, generated from the proto's "One of:" sentences. The fields stay strings: a value without a constant here is still sent and received.
+
+| Constant | Value | Field |
+|---|---|---|
+| `CMP_CT` | `'ct'` | cmp field of FilterNode |
+| `CMP_EQ` | `'eq'` | cmp field of FilterNode |
+| `CMP_EW` | `'ew'` | cmp field of FilterNode |
+| `CMP_EX` | `'ex'` | cmp field of FilterNode |
+| `CMP_GT` | `'gt'` | cmp field of FilterNode |
+| `CMP_GTE` | `'gte'` | cmp field of FilterNode |
+| `CMP_IN` | `'in'` | cmp field of FilterNode |
+| `CMP_LT` | `'lt'` | cmp field of FilterNode |
+| `CMP_LTE` | `'lte'` | cmp field of FilterNode |
+| `CMP_NEQ` | `'neq'` | cmp field of FilterNode |
+| `CMP_NEX` | `'nex'` | cmp field of FilterNode |
+| `CMP_NIN` | `'nin'` | cmp field of FilterNode |
+| `CMP_SW` | `'sw'` | cmp field of FilterNode |
+| `FILTER_NODE_OP_AND` | `'and'` | op field of FilterNode |
+| `FILTER_NODE_OP_NOT` | `'not'` | op field of FilterNode |
+| `FILTER_NODE_OP_OR` | `'or'` | op field of FilterNode |
+| `KEY_MODE_IF_EXISTS` | `'if_exists'` | key_mode field of map_publish |
+| `KEY_MODE_IF_NEW` | `'if_new'` | key_mode field of map_publish |
+| `OP_ADD` | `'add'` | op field of DeviceTopicsUpdate, device_topic_update and user_topic_update |
+| `OP_REMOVE` | `'remove'` | op field of DeviceTopicsUpdate, device_topic_update and user_topic_update |
+| `OP_SET` | `'set'` | op field of DeviceTopicsUpdate, device_topic_update and user_topic_update |
+| `PLATFORM_ANDROID` | `'android'` | platform field of device_register |
+| `PLATFORM_IOS` | `'ios'` | platform field of device_register |
+| `PLATFORM_WEB` | `'web'` | platform field of device_register |
+| `PROVIDER_APNS` | `'apns'` | provider field of device_register |
+| `PROVIDER_FCM` | `'fcm'` | provider field of device_register |
+| `PROVIDER_HMS` | `'hms'` | provider field of device_register |
+| `PROVIDER_WEBPUSH` | `'webpush'` | provider field of device_register |
+| `STATUS_DELIVERED` | `'delivered'` | status field of update_push_status |
+| `STATUS_INTERACTED` | `'interacted'` | status field of update_push_status |
+
 ## cent: errors
 
 - `CentError`
@@ -5291,6 +5328,43 @@ function as HTTPRequest.raw: the server's own request object.
 
 The handler as a WSGI app, for Flask, Django or any WSGI server: it
 needs a blocking function.
+
+## cent.proxy: constants
+
+The values of the string fields with a fixed set, generated from the proto's "One of:" sentences. The fields stay strings: a value without a constant here is still sent and received.
+
+| Constant | Value | Field |
+|---|---|---|
+| `ALLOW_HST` | `'hst'` | allow field of ChannelsCapability and SubscribeResult |
+| `ALLOW_PRS` | `'prs'` | allow field of ChannelsCapability and SubscribeResult |
+| `ALLOW_PUB` | `'pub'` | allow field of ChannelsCapability and SubscribeResult |
+| `ALLOW_SUB` | `'sub'` | allow field of ChannelsCapability and SubscribeResult |
+| `CMP_CT` | `'ct'` | cmp field of FilterNode |
+| `CMP_EQ` | `'eq'` | cmp field of FilterNode |
+| `CMP_EW` | `'ew'` | cmp field of FilterNode |
+| `CMP_EX` | `'ex'` | cmp field of FilterNode |
+| `CMP_GT` | `'gt'` | cmp field of FilterNode |
+| `CMP_GTE` | `'gte'` | cmp field of FilterNode |
+| `CMP_IN` | `'in'` | cmp field of FilterNode |
+| `CMP_LT` | `'lt'` | cmp field of FilterNode |
+| `CMP_LTE` | `'lte'` | cmp field of FilterNode |
+| `CMP_NEQ` | `'neq'` | cmp field of FilterNode |
+| `CMP_NEX` | `'nex'` | cmp field of FilterNode |
+| `CMP_NIN` | `'nin'` | cmp field of FilterNode |
+| `CMP_SW` | `'sw'` | cmp field of FilterNode |
+| `ENCODING_BINARY` | `'binary'` | encoding field of ConnectRequest, RefreshRequest, SubscribeRequest, PublishRequest, MapPublishRequest, MapRemoveRequest, RPCRequest and SubRefreshRequest |
+| `ENCODING_JSON` | `'json'` | encoding field of ConnectRequest, RefreshRequest, SubscribeRequest, PublishRequest, MapPublishRequest, MapRemoveRequest, RPCRequest and SubRefreshRequest |
+| `KEY_MODE_IF_EXISTS` | `'if_exists'` | key_mode field of MapPublishResult |
+| `KEY_MODE_IF_NEW` | `'if_new'` | key_mode field of MapPublishResult |
+| `MATCH_REGEX` | `'regex'` | match field of ChannelsCapability |
+| `MATCH_WILDCARD` | `'wildcard'` | match field of ChannelsCapability |
+| `OP_AND` | `'and'` | op field of FilterNode |
+| `OP_NOT` | `'not'` | op field of FilterNode |
+| `OP_OR` | `'or'` | op field of FilterNode |
+| `PROTOCOL_JSON` | `'json'` | protocol field of ConnectRequest, RefreshRequest, SubscribeRequest, PublishRequest, MapPublishRequest, MapRemoveRequest, RPCRequest and SubRefreshRequest |
+| `PROTOCOL_PROTOBUF` | `'protobuf'` | protocol field of ConnectRequest, RefreshRequest, SubscribeRequest, PublishRequest, MapPublishRequest, MapRemoveRequest, RPCRequest and SubRefreshRequest |
+| `TYPE_OCCUPIED` | `'occupied'` | type field of ChannelEvent |
+| `TYPE_VACATED` | `'vacated'` | type field of ChannelEvent |
 
 ## cent: request and result types
 
