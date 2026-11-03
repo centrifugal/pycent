@@ -4591,6 +4591,7 @@ https://centrifugal.dev/docs/server/authentication.
 - `meta: JSON = None` - Custom data attached to the connection. Not visible to other clients - Centrifugo never sends it - but the token carries it, visible to the user owning the token: put nothing in it that user must not see. The connect proxy's meta never reaches the client.
 - `caps: list[ChannelsCapability] = []` - Capabilities granting the connection operations in channels. Centrifugo PRO only.
 - `labels: dict[str, str] = {}` - The connection's client labels: for metrics, targeted server API calls and CEL expressions. Centrifugo PRO only.
+- `profile: str = ''` - The dictionary compression profile of the connection: it overrides the profile the client declared. Centrifugo PRO only.
 
 ### `Key`
 
@@ -4662,7 +4663,7 @@ The options of a server-side subscription in ConnectionClaims.subs.
 The claims of a subscription token. See
 https://centrifugal.dev/docs/server/channel_token_auth.
 
-- `user: str = ''` - The ID of the connection's user: the "sub" claim.
+- `user: str = ''` - The ID of the user of the connection subscribing: the "sub" claim, which Centrifugo checks against the connection's user. Empty for an anonymous connection.
 - `channel: str` - The channel the token allows to subscribe to. Required.
 - `expires_at: datetime | Never` - Until when the token is accepted: the "exp" claim, or NEVER. Required. The subscription expires then too, unless subscription_expires_at says otherwise.
 - `subscription_expires_at: datetime | Never | None = None` - When set, when the subscription expires instead of at expires_at: the "expire_at" claim. NEVER makes it never expire, while expires_at still bounds when the token is accepted: with a short expires_at, a token which subscribes once.

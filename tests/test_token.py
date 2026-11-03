@@ -104,6 +104,7 @@ def test_connection_claims_on_the_wire() -> None:
             meta={"plan": "pro"},
             caps=[token.ChannelsCapability(channels=["chat:*"], allow=["sub"], match="wildcard")],
             labels={"region": "eu"},
+            profile="chat",
         ),
     )
     header, claims, raw, _ = parts(tok)
@@ -112,7 +113,7 @@ def test_connection_claims_on_the_wire() -> None:
         b'{"sub":"42","exp":1700003600,"iat":1700000000,"jti":"t1","aud":"aud","iss":"iss","expire_at":0,'
         b'"info":{"name":"Alice"},"subs":{"news":{"data":{"n": 1.0},"override":{"presence":{"value":true}}}},'
         b'"meta":{"plan":"pro"},"caps":[{"channels":["chat:*"],"allow":["sub"],"match":"wildcard"}],'
-        b'"labels":{"region":"eu"}}'
+        b'"labels":{"region":"eu"},"profile":"chat"}'
     )
     assert claims["sub"] == "42"
 

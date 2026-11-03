@@ -355,6 +355,10 @@ class ConnectionClaims:
     """The connection's client labels: for metrics, targeted server API calls
     and CEL expressions. Centrifugo PRO only."""
 
+    profile: str = ""
+    """The dictionary compression profile of the connection: it overrides the
+    profile the client declared. Centrifugo PRO only."""
+
 
 @dataclass(slots=True, kw_only=True)
 class SubscriptionClaims:
@@ -362,7 +366,9 @@ class SubscriptionClaims:
     https://centrifugal.dev/docs/server/channel_token_auth."""
 
     user: str = ""
-    """The ID of the connection's user: the "sub" claim."""
+    """The ID of the user of the connection subscribing: the "sub" claim, which
+    Centrifugo checks against the connection's user. Empty for an anonymous
+    connection."""
 
     channel: str
     """The channel the token allows to subscribe to. Required."""
@@ -454,6 +460,8 @@ def connection(key: Key, claims: ConnectionClaims) -> str:
         w["caps"] = [cap._to_wire() for cap in c.caps]
     if c.labels:
         w["labels"] = dict(c.labels)
+    if c.profile:
+        w["profile"] = c.profile
     return _sign(key, w)
 
 
