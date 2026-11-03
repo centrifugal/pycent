@@ -117,8 +117,9 @@ start then. What a paged method lists changes under the iteration: a device
 registered while listing may or may not be seen. `timeout` bounds each page's
 call.
 
-`publish`, `history`, `map_read_state` and `map_read_stream` results give their
-`offset` and `epoch` as `position()`, a `cent.StreamPosition` - what came after
+Every result holding an `offset` and `epoch` - `publish`'s, `history`'s,
+`map_read_state`'s, `map_read_stream`'s, `map_publish`'s and `map_remove`'s -
+gives them as `position()`, a `cent.StreamPosition` - what came after
 a publication is `history`'s `since`:
 
 ```python

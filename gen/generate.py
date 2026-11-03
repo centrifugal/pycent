@@ -143,7 +143,30 @@ POSITIONS: dict[str, list[str]] = {
         "map_read_stream's since_offset and since_epoch, it reads the changes since.",
     ],
     "MapReadStreamResult": ["The map channel's stream position when its stream was read."],
+    "MapPublishResult": [
+        "Where the publication went in the map channel's stream: as",
+        "map_read_stream's since_offset and since_epoch, it reads what came after it.",
+    ],
+    "MapRemoveResult": [
+        "Where the removal went in the map channel's stream: as",
+        "map_read_stream's since_offset and since_epoch, it reads what came after it.",
+    ],
 }
+
+
+def positions(s: Schema) -> set[str]:
+    """The results holding offset and epoch, which give them as position()
+    (spec 3.8): found by the two fields, each needing its docs in POSITIONS."""
+    results = {f.type for f in s.by_name["Reply"].fields}
+    found = set()
+    for name in results:
+        m = s.by_name[name]
+        types = {f.name: f.type for f in m.fields}
+        if types.get("offset") == "uint64" and types.get("epoch") == "string":
+            found.add(name)
+    if found != set(POSITIONS):
+        raise SystemExit(f"api.proto: the results holding offset and epoch are {sorted(found)}: update POSITIONS")
+    return found
 
 
 class Command:
@@ -761,6 +784,7 @@ def generate_proxy(s: Schema) -> str:
 
 def generate(s: Schema) -> str:
     find_presence(s, "api.proto")
+    positions(s)
     cmds = commands(s)
     skip = skipped(s, cmds)
     out: list[str] = []

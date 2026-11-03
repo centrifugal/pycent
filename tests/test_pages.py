@@ -234,6 +234,15 @@ def test_positions(api: Api, fake: Fake) -> None:
     assert cent.HistoryResult(offset=7, epoch="e7").position() == pos
     assert cent.MapReadStateResult(offset=7, epoch="e7").position() == pos
     assert cent.MapReadStreamResult(offset=7, epoch="e7").position() == pos
+    assert cent.MapPublishResult(offset=7, epoch="e7").position() == pos
+    assert cent.MapRemoveResult(offset=7, epoch="e7").position() == pos
+    # Every result holding offset and epoch has it.
+    holding = {
+        n
+        for n in cent._api.__all__
+        if isinstance(t := getattr(cent, n), type) and {"offset", "epoch"} <= set(getattr(t, "__slots__", ()))
+    }
+    assert {n for n in holding if hasattr(getattr(cent, n), "position")} == holding - {"StreamPosition"}
     # What a publish returned is what the next history call asks from.
     res = api.publish(channel="ch", data=1)
     _history(fake, 3)

@@ -5962,6 +5962,11 @@ MapPublishResult is the result of a map publish call.
 - `suppressed: bool = False` - suppressed is true if the publish was not applied, see suppress_reason.
 - `suppress_reason: str = ''` - suppress_reason explains why the publish was suppressed, for example "idempotency", "version", "key_exists" or "key_not_found".
 
+#### `position() -> StreamPosition`
+
+Where the publication went in the map channel's stream: as
+map_read_stream's since_offset and since_epoch, it reads what came after it.
+
 #### `MapReadStateResult`
 
 MapReadStateResult is the result of a map read state call.
@@ -5996,6 +6001,11 @@ MapRemoveResult is the result of a map remove call.
 - `epoch: str = ''` - epoch is the epoch of the channel stream.
 - `suppressed: bool = False` - suppressed is true if the removal was not applied, see suppress_reason.
 - `suppress_reason: str = ''` - suppress_reason explains why the removal was suppressed, for example "idempotency" or "key_not_found".
+
+#### `position() -> StreamPosition`
+
+Where the removal went in the map channel's stream: as
+map_read_stream's since_offset and since_epoch, it reads what came after it.
 
 #### `MapStatsResult`
 

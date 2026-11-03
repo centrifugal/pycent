@@ -4229,6 +4229,12 @@ class MapPublishResult:
             w["suppress_reason"] = self.suppress_reason
         return w
 
+    def position(self) -> StreamPosition:
+        """Where the publication went in the map channel's stream: as
+        map_read_stream's since_offset and since_epoch, it reads what came after it.
+        """
+        return StreamPosition(offset=self.offset, epoch=self.epoch)
+
     @classmethod
     def _from_wire(cls, v: Any, where: str = "MapPublishResult") -> MapPublishResult:
         d = _w.obj(v, where)
@@ -4318,6 +4324,12 @@ class MapRemoveResult:
         if self.suppress_reason:
             w["suppress_reason"] = self.suppress_reason
         return w
+
+    def position(self) -> StreamPosition:
+        """Where the removal went in the map channel's stream: as
+        map_read_stream's since_offset and since_epoch, it reads what came after it.
+        """
+        return StreamPosition(offset=self.offset, epoch=self.epoch)
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "MapRemoveResult") -> MapRemoveResult:

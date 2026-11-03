@@ -160,6 +160,20 @@ def test_constants_and_unnamed_values(api: Api, fake: Fake) -> None:
     assert (second["provider"], second["platform"]) == ("newprovider", "tv")
 
 
+def test_json_null_payload_is_a_value(api: Api, fake: Fake) -> None:
+    # A required payload set to JSON null is a value, and is sent; None is
+    # unset (spec 3.3, 3.4).
+    push = every_field("send_push_notification")
+    api.send_push_notification(
+        **{**push, "notification": cent.PushNotification(fcm=cent.FcmPushNotification(message=cent.RawJSON("null")))}
+    )
+    assert fake.bodies("send_push_notification")[0]["notification"] == {"fcm": {"message": None}}
+    with pytest.raises(cent.InvalidRequestError, match=re.escape("notification is required")):
+        api.send_push_notification(
+            **{**push, "notification": cent.PushNotification(fcm=cent.FcmPushNotification(message=None))}
+        )
+
+
 def test_empty_value_with_a_meaning_is_sent(api: Api, fake: Fake) -> None:
     # "" means anonymous users, the global binding: sent, not refused.
     api.invalidate_user_tokens(user="")
