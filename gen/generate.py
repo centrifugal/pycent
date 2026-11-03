@@ -937,7 +937,7 @@ def generate(s: Schema) -> str:
                 ]
             extra = ["timeout: float | None = None"]
             call = f"self._invoke({build}, {res}, timeout)"
-            tdoc = ["    timeout: Seconds bounding the call: request_timeout when None."]
+            tdoc = ["    timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None."]
             if c.method == "broadcast":
                 call = f"self._broadcast({build}, timeout)"
             aw = "await " if kind == "async" else ""
@@ -963,7 +963,10 @@ def generate(s: Schema) -> str:
                     + ", ".join(["self", "*", *params, *extra])
                     + f") -> {it}[{item_field.type}]:"
                 )
-                tdoc_all = ["    timeout: Seconds bounding each page's call: request_timeout when None."]
+                tdoc_all = [
+                    "    timeout: Seconds bounding each page's call, replacing request_timeout:",
+                    "        request_timeout when None.",
+                ]
                 out.extend(docstring([*doc, *fdocs, *tdoc_all], "        "))
                 if cursor is None:
                     p(f"        return self._history_all({build}, timeout)")
@@ -1003,8 +1006,9 @@ def generate(s: Schema) -> str:
                             "- The result holds every channel's last outcome, and the key: retrying",
                             "  later with it publishes only into the channels which did not get it.",
                             "",
-                            "timeout, when set, bounds the whole call, waits included;",
-                            "attempt_timeout - request_timeout by default - bounds each attempt.",
+                            "timeout, when set, bounds the whole call, waits included.",
+                            "attempt_timeout is each attempt's own timeout, replacing request_timeout",
+                            "for it - longer or shorter - while timeout still ends an attempt sooner.",
                             "on_attempt_error decides the wait between attempts, and may stop them:",
                             "see BroadcastAttemptCallback. It raises as broadcast does.",
                         ],

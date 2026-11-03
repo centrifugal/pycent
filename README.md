@@ -134,8 +134,8 @@ is the only recovery. `map_read_stream` takes a position apart:
 
 ## Timeouts
 
-Each call takes a `timeout`, in seconds; without one, `request_timeout` - ten
-seconds by default - bounds it:
+`request_timeout` - ten seconds by default - bounds every call. A call's own
+`timeout`, in seconds, replaces it for that call, longer or shorter:
 
 ```python
 client.info(timeout=0.5)
@@ -148,10 +148,13 @@ blocking call can outlast its timeout in one case only: a server - a proxy in
 trouble, say - sending the reply's headers a few bytes at a time, each read
 within the timeout. `AsyncClient` bounds the whole call, that case included.
 In asyncio code an `asyncio.timeout()` around a call, or cancelling its task,
-ends it sooner.
+ends it sooner, but never later: a call under a longer deadline still gives
+up on a stuck Centrifugo after `request_timeout`.
 
 `broadcast_with_retry` makes several requests in one call: its `timeout`
-bounds them all, waits between them included, and `attempt_timeout` each one.
+bounds them all, waits between them included, and `attempt_timeout` is each
+one's own timeout, replacing `request_timeout` for it, longer or shorter,
+while `timeout` still ends an attempt sooner.
 
 ## Errors
 
@@ -305,7 +308,10 @@ above the concurrency, it never does; just below, it batches calls one at a
 time, and only limits them. Under heavy publishing it sends a fraction of the
 requests, and Centrifugo does about half the work per publication.
 
-Every call still gets its own result or error, and keeps its own timeout. Calls
+Every call still gets its own result or error, and keeps its own deadline, the
+one it would have alone. The batch request lasts until the latest of its
+calls' deadlines, and at least `request_timeout` from when it is sent, so it
+may outlast a call which gave up while it was in flight. Calls
 sharing a batch share its request, though: if the request itself fails - the
 network, a body too large for a proxy in front of Centrifugo - every call in it
 fails.

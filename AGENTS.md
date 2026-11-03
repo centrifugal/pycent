@@ -43,10 +43,13 @@ passes; if you find yourself about to break one, stop and say so instead.
    raised as the subclass of its code when the code is known, and as `ApiError`
    itself otherwise. Centrifugo's transport error mode gives the same error as a
    200 reply.
-4. **One deadline per call, with httpx2's public API only.** Its `timeout`,
-   or `request_timeout`, bounds the call - the endpoint and token functions,
-   connecting, the reply read. The async client wraps the call in
-   `asyncio.timeout`. The blocking client gives httpx2 the time left as each
+4. **One deadline per call, with httpx2's public API only.**
+   `request_timeout` bounds every call; a call's `timeout` replaces it for
+   that call, longer or shorter, and `attempt_timeout` does for each attempt
+   of `broadcast_with_retry`. An enclosing `asyncio.timeout` or a cancelled
+   task only shortens a call, never extends it. The deadline bounds the
+   endpoint and token functions, connecting, the reply read. The async
+   client wraps the call in `asyncio.timeout`. The blocking client gives httpx2 the time left as each
    request's timeout, which bounds each connect, read and write, and checks
    the deadline between the body's chunks; only headers trickling in can
    outlast it, which the README says. Any timeout raises `CentTimeoutError`.

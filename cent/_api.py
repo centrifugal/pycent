@@ -4987,7 +4987,7 @@ class _ClientAPI:
                 ignored. Only works in channels with history enabled.
             version_epoch: The epoch of version. When it changes, Centrifugo
                 accepts the publication even if its version is lower than before.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(
             PublishRequest(
@@ -5052,7 +5052,7 @@ class _ClientAPI:
                 ignored. Only works in channels with history enabled.
             version_epoch: The epoch of version. When it changes, Centrifugo
                 accepts the publication even if its version is lower than before.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._broadcast(
             BroadcastRequest(
@@ -5100,8 +5100,9 @@ class _ClientAPI:
         - The result holds every channel's last outcome, and the key: retrying
           later with it publishes only into the channels which did not get it.
 
-        timeout, when set, bounds the whole call, waits included;
-        attempt_timeout - request_timeout by default - bounds each attempt.
+        timeout, when set, bounds the whole call, waits included.
+        attempt_timeout is each attempt's own timeout, replacing request_timeout
+        for it - longer or shorter - while timeout still ends an attempt sooner.
         on_attempt_error decides the wait between attempts, and may stop them:
         see BroadcastAttemptCallback. It raises as broadcast does.
         """
@@ -5168,7 +5169,7 @@ class _ClientAPI:
             all_users: When user is empty, targets every connection on every node
                 instead of the anonymous-only bucket. No effect when user is non-empty.
                 Without label_filter it acts on every connection. Centrifugo PRO only.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(
             SubscribeRequest(
@@ -5214,7 +5215,7 @@ class _ClientAPI:
             label_filter: Restricts the call to clients whose labels match this
                 filter. Centrifugo PRO only.
             all_users: Works as SubscribeRequest.all_users. Centrifugo PRO only.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(
             UnsubscribeRequest(
@@ -5256,7 +5257,7 @@ class _ClientAPI:
             label_filter: Restricts the call to clients whose labels match this
                 filter. Centrifugo PRO only.
             all_users: Works as SubscribeRequest.all_users. Centrifugo PRO only.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(
             DisconnectRequest(
@@ -5278,7 +5279,7 @@ class _ClientAPI:
 
         Args:
             channel: The name of the channel. Required.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(PresenceRequest(channel=channel), PresenceResult, timeout)
 
@@ -5289,7 +5290,7 @@ class _ClientAPI:
 
         Args:
             channel: The name of the channel. Required.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(PresenceStatsRequest(channel=channel), PresenceStatsResult, timeout)
 
@@ -5312,7 +5313,7 @@ class _ClientAPI:
                 returned, without publications.
             since: Returns publications after this stream position.
             reverse: Iterates in reverse order, from latest to earliest.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(
             HistoryRequest(channel=channel, limit=limit, since=since, reverse=reverse), HistoryResult, timeout
@@ -5350,7 +5351,8 @@ class _ClientAPI:
                 returned, without publications.
             since: Returns publications after this stream position.
             reverse: Iterates in reverse order, from latest to earliest.
-            timeout: Seconds bounding each page's call: request_timeout when None.
+            timeout: Seconds bounding each page's call, replacing request_timeout:
+                request_timeout when None.
         """
         return self._history_all(HistoryRequest(channel=channel, limit=limit, since=since, reverse=reverse), timeout)
 
@@ -5361,7 +5363,7 @@ class _ClientAPI:
 
         Args:
             channel: The name of the channel. Required.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(HistoryRemoveRequest(channel=channel), HistoryRemoveResult, timeout)
 
@@ -5369,7 +5371,7 @@ class _ClientAPI:
         """Returns information about the running Centrifugo nodes.
 
         Args:
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(InfoRequest(), InfoResult, timeout)
 
@@ -5404,7 +5406,7 @@ class _ClientAPI:
             label_filter: Restricts the call to clients whose labels match this
                 filter. Centrifugo PRO only.
             all_users: Works as SubscribeRequest.all_users. Centrifugo PRO only.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(
             RefreshRequest(
@@ -5427,7 +5429,7 @@ class _ClientAPI:
 
         Args:
             pattern: Filters channels by name, using gobwas/glob syntax.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(ChannelsRequest(pattern=pattern), ChannelsResult, timeout)
 
@@ -5448,7 +5450,7 @@ class _ClientAPI:
             expression: A CEL expression to filter connections.
             label_filter: Restricts the listing to clients whose labels match this
                 filter. Centrifugo PRO only.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(
             ConnectionsRequest(user=user, expression=expression, label_filter=label_filter), ConnectionsResult, timeout
@@ -5464,7 +5466,7 @@ class _ClientAPI:
             users: The list of user IDs to update the status for. Required.
             state: An optional custom state to store in the user status. It can
                 be restricted by the user_status.state_regex option.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(UpdateUserStatusRequest(users=users, state=state), UpdateUserStatusResult, timeout)
 
@@ -5473,7 +5475,7 @@ class _ClientAPI:
 
         Args:
             users: The list of user IDs to get the status for. Required.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(GetUserStatusRequest(users=users), GetUserStatusResult, timeout)
 
@@ -5482,7 +5484,7 @@ class _ClientAPI:
 
         Args:
             users: The list of user IDs to delete the status for. Required.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(DeleteUserStatusRequest(users=users), DeleteUserStatusResult, timeout)
 
@@ -5495,7 +5497,7 @@ class _ClientAPI:
                 but a reasonably small value is recommended to keep the set of blocked
                 users small.
             user: The ID of the user to block. Required.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(BlockUserRequest(expire_at=expire_at, user=user), BlockUserResult, timeout)
 
@@ -5504,7 +5506,7 @@ class _ClientAPI:
 
         Args:
             user: The ID of the user to unblock. Required.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(UnblockUserRequest(user=user), UnblockUserResult, timeout)
 
@@ -5517,7 +5519,7 @@ class _ClientAPI:
             expire_at: The Unix time in seconds when the revocation expires.
                 Optional, but a value matching the token expiration is recommended.
             uid: The unique ID of the token to revoke (jti claim). Required.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(RevokeTokenRequest(expire_at=expire_at, uid=uid), RevokeTokenResult, timeout)
 
@@ -5536,7 +5538,7 @@ class _ClientAPI:
                 considered revoked. If not set, the current time is used.
             channel: Limits the invalidation to subscription tokens for this
                 channel.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(
             InvalidateUserTokensRequest(expire_at=expire_at, user=user, issued_before=issued_before, channel=channel),
@@ -5578,7 +5580,7 @@ class _ClientAPI:
                 Europe/Nicosia.
             locale: The locale of the device user as an IETF BCP 47 language
                 tag, for example en-US.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(
             DeviceRegisterRequest(
@@ -5621,7 +5623,7 @@ class _ClientAPI:
             topics_update: Updates the device topics.
             timezone_update: Updates the device timezone.
             locale_update: Updates the device locale.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(
             DeviceUpdateRequest(
@@ -5646,7 +5648,7 @@ class _ClientAPI:
         Args:
             ids: Selects devices to remove by ID.
             users: Selects devices to remove by user.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(
             DeviceRemoveRequest(ids=ids if ids is not None else [], users=users if users is not None else []),
@@ -5680,7 +5682,7 @@ class _ClientAPI:
             cursor: The pagination cursor: next_cursor of the previous page,
                 empty for the first page.
             limit: The maximum number of devices to return.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(
             DeviceListRequest(
@@ -5725,7 +5727,8 @@ class _ClientAPI:
             cursor: The pagination cursor: next_cursor of the previous page,
                 empty for the first page.
             limit: The maximum number of devices to return.
-            timeout: Seconds bounding each page's call: request_timeout when None.
+            timeout: Seconds bounding each page's call, replacing request_timeout:
+                request_timeout when None.
         """
         return self._cursor_all(
             DeviceListRequest(
@@ -5764,7 +5767,7 @@ class _ClientAPI:
             cursor: The pagination cursor: next_cursor of the previous page,
                 empty for the first page.
             limit: The maximum number of items to return.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(
             DeviceTopicListRequest(
@@ -5801,7 +5804,8 @@ class _ClientAPI:
             cursor: The pagination cursor: next_cursor of the previous page,
                 empty for the first page.
             limit: The maximum number of items to return.
-            timeout: Seconds bounding each page's call: request_timeout when None.
+            timeout: Seconds bounding each page's call, replacing request_timeout:
+                request_timeout when None.
         """
         return self._cursor_all(
             DeviceTopicListRequest(
@@ -5831,7 +5835,7 @@ class _ClientAPI:
             user: An optional ownership guard: the update is applied only if the
                 device currently belongs to this user. Otherwise the call fails with a
                 conflict error (or not found if there is no such device).
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(
             DeviceTopicUpdateRequest(
@@ -5860,7 +5864,7 @@ class _ClientAPI:
             cursor: The pagination cursor: next_cursor of the previous page,
                 empty for the first page.
             limit: The maximum number of items to return.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(
             UserTopicListRequest(filter=filter, include_total_count=include_total_count, cursor=cursor, limit=limit),
@@ -5889,7 +5893,8 @@ class _ClientAPI:
             cursor: The pagination cursor: next_cursor of the previous page,
                 empty for the first page.
             limit: The maximum number of items to return.
-            timeout: Seconds bounding each page's call: request_timeout when None.
+            timeout: Seconds bounding each page's call, replacing request_timeout:
+                request_timeout when None.
         """
         return self._cursor_all(
             UserTopicListRequest(filter=filter, include_total_count=include_total_count, cursor=cursor, limit=limit),
@@ -5910,7 +5915,7 @@ class _ClientAPI:
                 device - anonymous ones included - gets on its next device_register.
             op: The operation. Required. One of: add, remove, set.
             topics: The topics for the operation.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(
             UserTopicUpdateRequest(user=user, op=op, topics=topics if topics is not None else []),
@@ -5960,7 +5965,7 @@ class _ClientAPI:
                 with a filter recipient.
             use_meta: Additionally loads device meta while sending, making it
                 available in templating.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(
             SendPushNotificationRequest(
@@ -5992,7 +5997,7 @@ class _ClientAPI:
                 delivered, interacted.
             device_id: The Centrifugo device ID. Required.
             msg_id: The message ID issued by the provider.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(
             UpdatePushStatusRequest(analytics_uid=analytics_uid, status=status, device_id=device_id, msg_id=msg_id),
@@ -6006,7 +6011,7 @@ class _ClientAPI:
 
         Args:
             uid: The uid of the push notification to cancel. Required.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(CancelPushRequest(uid=uid), CancelPushResult, timeout)
 
@@ -6055,7 +6060,7 @@ class _ClientAPI:
             key_mode: Makes the publish conditional: if_new writes only if the key
                 does not exist, if_exists only if it exists. Empty always writes.
                 One of: if_new, if_exists.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(
             MapPublishRequest(
@@ -6089,7 +6094,7 @@ class _ClientAPI:
                 MapPublishRequest: a removal with a key already used in the channel is
                 not applied again, and its result is suppressed with suppress_reason
                 "idempotency". Keys are kept for 5 minutes by default.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(
             MapRemoveRequest(channel=channel, key=key, idempotency_key=idempotency_key), MapRemoveResult, timeout
@@ -6126,7 +6131,7 @@ class _ClientAPI:
             revision_epoch: The epoch of the position from a previous state
                 read. If the epoch changed, the call fails with an unrecoverable
                 position error.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(
             MapReadStateRequest(
@@ -6179,7 +6184,8 @@ class _ClientAPI:
             revision_epoch: The epoch of the position from a previous state
                 read. If the epoch changed, the call fails with an unrecoverable
                 position error.
-            timeout: Seconds bounding each page's call: request_timeout when None.
+            timeout: Seconds bounding each page's call, replacing request_timeout:
+                request_timeout when None.
         """
         return self._cursor_all(
             MapReadStateRequest(
@@ -6218,7 +6224,7 @@ class _ClientAPI:
             limit: The maximum number of entries: -1 means no limit, 0 returns
                 only the stream position.
             reverse: Returns entries newest first.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(
             MapReadStreamRequest(
@@ -6233,7 +6239,7 @@ class _ClientAPI:
 
         Args:
             channel: The name of the map channel. Required.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(MapStatsRequest(channel=channel), MapStatsResult, timeout)
 
@@ -6242,7 +6248,7 @@ class _ClientAPI:
 
         Args:
             channel: The name of the map channel. Required.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(MapClearRequest(channel=channel), MapClearResult, timeout)
 
@@ -6270,7 +6276,7 @@ class _ClientAPI:
                 higher than the current one within the same epoch is silently dropped.
             epoch: The channel-level publisher epoch. A change resets per-key
                 versions and unsubscribes current subscribers with insufficient state.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return self._invoke(
             SharedPollPublishRequest(
@@ -6338,7 +6344,7 @@ class _AsyncClientAPI:
                 ignored. Only works in channels with history enabled.
             version_epoch: The epoch of version. When it changes, Centrifugo
                 accepts the publication even if its version is lower than before.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(
             PublishRequest(
@@ -6403,7 +6409,7 @@ class _AsyncClientAPI:
                 ignored. Only works in channels with history enabled.
             version_epoch: The epoch of version. When it changes, Centrifugo
                 accepts the publication even if its version is lower than before.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._broadcast(
             BroadcastRequest(
@@ -6451,8 +6457,9 @@ class _AsyncClientAPI:
         - The result holds every channel's last outcome, and the key: retrying
           later with it publishes only into the channels which did not get it.
 
-        timeout, when set, bounds the whole call, waits included;
-        attempt_timeout - request_timeout by default - bounds each attempt.
+        timeout, when set, bounds the whole call, waits included.
+        attempt_timeout is each attempt's own timeout, replacing request_timeout
+        for it - longer or shorter - while timeout still ends an attempt sooner.
         on_attempt_error decides the wait between attempts, and may stop them:
         see BroadcastAttemptCallback. It raises as broadcast does.
         """
@@ -6519,7 +6526,7 @@ class _AsyncClientAPI:
             all_users: When user is empty, targets every connection on every node
                 instead of the anonymous-only bucket. No effect when user is non-empty.
                 Without label_filter it acts on every connection. Centrifugo PRO only.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(
             SubscribeRequest(
@@ -6565,7 +6572,7 @@ class _AsyncClientAPI:
             label_filter: Restricts the call to clients whose labels match this
                 filter. Centrifugo PRO only.
             all_users: Works as SubscribeRequest.all_users. Centrifugo PRO only.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(
             UnsubscribeRequest(
@@ -6607,7 +6614,7 @@ class _AsyncClientAPI:
             label_filter: Restricts the call to clients whose labels match this
                 filter. Centrifugo PRO only.
             all_users: Works as SubscribeRequest.all_users. Centrifugo PRO only.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(
             DisconnectRequest(
@@ -6629,7 +6636,7 @@ class _AsyncClientAPI:
 
         Args:
             channel: The name of the channel. Required.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(PresenceRequest(channel=channel), PresenceResult, timeout)
 
@@ -6640,7 +6647,7 @@ class _AsyncClientAPI:
 
         Args:
             channel: The name of the channel. Required.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(PresenceStatsRequest(channel=channel), PresenceStatsResult, timeout)
 
@@ -6663,7 +6670,7 @@ class _AsyncClientAPI:
                 returned, without publications.
             since: Returns publications after this stream position.
             reverse: Iterates in reverse order, from latest to earliest.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(
             HistoryRequest(channel=channel, limit=limit, since=since, reverse=reverse), HistoryResult, timeout
@@ -6701,7 +6708,8 @@ class _AsyncClientAPI:
                 returned, without publications.
             since: Returns publications after this stream position.
             reverse: Iterates in reverse order, from latest to earliest.
-            timeout: Seconds bounding each page's call: request_timeout when None.
+            timeout: Seconds bounding each page's call, replacing request_timeout:
+                request_timeout when None.
         """
         return self._history_all(HistoryRequest(channel=channel, limit=limit, since=since, reverse=reverse), timeout)
 
@@ -6712,7 +6720,7 @@ class _AsyncClientAPI:
 
         Args:
             channel: The name of the channel. Required.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(HistoryRemoveRequest(channel=channel), HistoryRemoveResult, timeout)
 
@@ -6720,7 +6728,7 @@ class _AsyncClientAPI:
         """Returns information about the running Centrifugo nodes.
 
         Args:
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(InfoRequest(), InfoResult, timeout)
 
@@ -6755,7 +6763,7 @@ class _AsyncClientAPI:
             label_filter: Restricts the call to clients whose labels match this
                 filter. Centrifugo PRO only.
             all_users: Works as SubscribeRequest.all_users. Centrifugo PRO only.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(
             RefreshRequest(
@@ -6778,7 +6786,7 @@ class _AsyncClientAPI:
 
         Args:
             pattern: Filters channels by name, using gobwas/glob syntax.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(ChannelsRequest(pattern=pattern), ChannelsResult, timeout)
 
@@ -6799,7 +6807,7 @@ class _AsyncClientAPI:
             expression: A CEL expression to filter connections.
             label_filter: Restricts the listing to clients whose labels match this
                 filter. Centrifugo PRO only.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(
             ConnectionsRequest(user=user, expression=expression, label_filter=label_filter), ConnectionsResult, timeout
@@ -6815,7 +6823,7 @@ class _AsyncClientAPI:
             users: The list of user IDs to update the status for. Required.
             state: An optional custom state to store in the user status. It can
                 be restricted by the user_status.state_regex option.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(UpdateUserStatusRequest(users=users, state=state), UpdateUserStatusResult, timeout)
 
@@ -6824,7 +6832,7 @@ class _AsyncClientAPI:
 
         Args:
             users: The list of user IDs to get the status for. Required.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(GetUserStatusRequest(users=users), GetUserStatusResult, timeout)
 
@@ -6833,7 +6841,7 @@ class _AsyncClientAPI:
 
         Args:
             users: The list of user IDs to delete the status for. Required.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(DeleteUserStatusRequest(users=users), DeleteUserStatusResult, timeout)
 
@@ -6846,7 +6854,7 @@ class _AsyncClientAPI:
                 but a reasonably small value is recommended to keep the set of blocked
                 users small.
             user: The ID of the user to block. Required.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(BlockUserRequest(expire_at=expire_at, user=user), BlockUserResult, timeout)
 
@@ -6855,7 +6863,7 @@ class _AsyncClientAPI:
 
         Args:
             user: The ID of the user to unblock. Required.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(UnblockUserRequest(user=user), UnblockUserResult, timeout)
 
@@ -6868,7 +6876,7 @@ class _AsyncClientAPI:
             expire_at: The Unix time in seconds when the revocation expires.
                 Optional, but a value matching the token expiration is recommended.
             uid: The unique ID of the token to revoke (jti claim). Required.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(RevokeTokenRequest(expire_at=expire_at, uid=uid), RevokeTokenResult, timeout)
 
@@ -6887,7 +6895,7 @@ class _AsyncClientAPI:
                 considered revoked. If not set, the current time is used.
             channel: Limits the invalidation to subscription tokens for this
                 channel.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(
             InvalidateUserTokensRequest(expire_at=expire_at, user=user, issued_before=issued_before, channel=channel),
@@ -6929,7 +6937,7 @@ class _AsyncClientAPI:
                 Europe/Nicosia.
             locale: The locale of the device user as an IETF BCP 47 language
                 tag, for example en-US.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(
             DeviceRegisterRequest(
@@ -6972,7 +6980,7 @@ class _AsyncClientAPI:
             topics_update: Updates the device topics.
             timezone_update: Updates the device timezone.
             locale_update: Updates the device locale.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(
             DeviceUpdateRequest(
@@ -6997,7 +7005,7 @@ class _AsyncClientAPI:
         Args:
             ids: Selects devices to remove by ID.
             users: Selects devices to remove by user.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(
             DeviceRemoveRequest(ids=ids if ids is not None else [], users=users if users is not None else []),
@@ -7031,7 +7039,7 @@ class _AsyncClientAPI:
             cursor: The pagination cursor: next_cursor of the previous page,
                 empty for the first page.
             limit: The maximum number of devices to return.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(
             DeviceListRequest(
@@ -7076,7 +7084,8 @@ class _AsyncClientAPI:
             cursor: The pagination cursor: next_cursor of the previous page,
                 empty for the first page.
             limit: The maximum number of devices to return.
-            timeout: Seconds bounding each page's call: request_timeout when None.
+            timeout: Seconds bounding each page's call, replacing request_timeout:
+                request_timeout when None.
         """
         return self._cursor_all(
             DeviceListRequest(
@@ -7115,7 +7124,7 @@ class _AsyncClientAPI:
             cursor: The pagination cursor: next_cursor of the previous page,
                 empty for the first page.
             limit: The maximum number of items to return.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(
             DeviceTopicListRequest(
@@ -7152,7 +7161,8 @@ class _AsyncClientAPI:
             cursor: The pagination cursor: next_cursor of the previous page,
                 empty for the first page.
             limit: The maximum number of items to return.
-            timeout: Seconds bounding each page's call: request_timeout when None.
+            timeout: Seconds bounding each page's call, replacing request_timeout:
+                request_timeout when None.
         """
         return self._cursor_all(
             DeviceTopicListRequest(
@@ -7182,7 +7192,7 @@ class _AsyncClientAPI:
             user: An optional ownership guard: the update is applied only if the
                 device currently belongs to this user. Otherwise the call fails with a
                 conflict error (or not found if there is no such device).
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(
             DeviceTopicUpdateRequest(
@@ -7211,7 +7221,7 @@ class _AsyncClientAPI:
             cursor: The pagination cursor: next_cursor of the previous page,
                 empty for the first page.
             limit: The maximum number of items to return.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(
             UserTopicListRequest(filter=filter, include_total_count=include_total_count, cursor=cursor, limit=limit),
@@ -7240,7 +7250,8 @@ class _AsyncClientAPI:
             cursor: The pagination cursor: next_cursor of the previous page,
                 empty for the first page.
             limit: The maximum number of items to return.
-            timeout: Seconds bounding each page's call: request_timeout when None.
+            timeout: Seconds bounding each page's call, replacing request_timeout:
+                request_timeout when None.
         """
         return self._cursor_all(
             UserTopicListRequest(filter=filter, include_total_count=include_total_count, cursor=cursor, limit=limit),
@@ -7261,7 +7272,7 @@ class _AsyncClientAPI:
                 device - anonymous ones included - gets on its next device_register.
             op: The operation. Required. One of: add, remove, set.
             topics: The topics for the operation.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(
             UserTopicUpdateRequest(user=user, op=op, topics=topics if topics is not None else []),
@@ -7311,7 +7322,7 @@ class _AsyncClientAPI:
                 with a filter recipient.
             use_meta: Additionally loads device meta while sending, making it
                 available in templating.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(
             SendPushNotificationRequest(
@@ -7343,7 +7354,7 @@ class _AsyncClientAPI:
                 delivered, interacted.
             device_id: The Centrifugo device ID. Required.
             msg_id: The message ID issued by the provider.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(
             UpdatePushStatusRequest(analytics_uid=analytics_uid, status=status, device_id=device_id, msg_id=msg_id),
@@ -7357,7 +7368,7 @@ class _AsyncClientAPI:
 
         Args:
             uid: The uid of the push notification to cancel. Required.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(CancelPushRequest(uid=uid), CancelPushResult, timeout)
 
@@ -7406,7 +7417,7 @@ class _AsyncClientAPI:
             key_mode: Makes the publish conditional: if_new writes only if the key
                 does not exist, if_exists only if it exists. Empty always writes.
                 One of: if_new, if_exists.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(
             MapPublishRequest(
@@ -7440,7 +7451,7 @@ class _AsyncClientAPI:
                 MapPublishRequest: a removal with a key already used in the channel is
                 not applied again, and its result is suppressed with suppress_reason
                 "idempotency". Keys are kept for 5 minutes by default.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(
             MapRemoveRequest(channel=channel, key=key, idempotency_key=idempotency_key), MapRemoveResult, timeout
@@ -7477,7 +7488,7 @@ class _AsyncClientAPI:
             revision_epoch: The epoch of the position from a previous state
                 read. If the epoch changed, the call fails with an unrecoverable
                 position error.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(
             MapReadStateRequest(
@@ -7530,7 +7541,8 @@ class _AsyncClientAPI:
             revision_epoch: The epoch of the position from a previous state
                 read. If the epoch changed, the call fails with an unrecoverable
                 position error.
-            timeout: Seconds bounding each page's call: request_timeout when None.
+            timeout: Seconds bounding each page's call, replacing request_timeout:
+                request_timeout when None.
         """
         return self._cursor_all(
             MapReadStateRequest(
@@ -7569,7 +7581,7 @@ class _AsyncClientAPI:
             limit: The maximum number of entries: -1 means no limit, 0 returns
                 only the stream position.
             reverse: Returns entries newest first.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(
             MapReadStreamRequest(
@@ -7584,7 +7596,7 @@ class _AsyncClientAPI:
 
         Args:
             channel: The name of the map channel. Required.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(MapStatsRequest(channel=channel), MapStatsResult, timeout)
 
@@ -7593,7 +7605,7 @@ class _AsyncClientAPI:
 
         Args:
             channel: The name of the map channel. Required.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(MapClearRequest(channel=channel), MapClearResult, timeout)
 
@@ -7621,7 +7633,7 @@ class _AsyncClientAPI:
                 higher than the current one within the same epoch is silently dropped.
             epoch: The channel-level publisher epoch. A change resets per-key
                 versions and unsubscribes current subscribers with insufficient state.
-            timeout: Seconds bounding the call: request_timeout when None.
+            timeout: Seconds bounding the call, replacing request_timeout: request_timeout when None.
         """
         return await self._invoke(
             SharedPollPublishRequest(

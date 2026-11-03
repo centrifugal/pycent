@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import http.server
 import json
 import os
 import re
 import sys
+import threading
 import time
 import types
 import typing
@@ -364,6 +366,93 @@ def test_timeout_bounds_the_call(new_api: Callable[..., Api], kind: str, fake: F
     with pytest.raises(cent.CentTimeoutError):
         a.publish(channel="x", data=1, timeout=0.2)
     assert time.monotonic() - start < 0.5
+
+
+@pytest.fixture
+def slow(kind: str) -> Iterator[Callable[[float, dict[str, Any]], dict[str, Any]]]:
+    """Makes a real HTTP server whose every reply takes seconds - its headers
+    included, so that the blocking client's per-read timeout ends it - and
+    returns the options of a client calling it, of the test's kind."""
+    servers: list[http.server.ThreadingHTTPServer] = []
+
+    def make(seconds: float, reply: dict[str, Any]) -> dict[str, Any]:
+        body = json.dumps(reply).encode()
+
+        class H(http.server.BaseHTTPRequestHandler):
+            def do_POST(self) -> None:
+                self.rfile.read(int(self.headers["Content-Length"]))
+                time.sleep(seconds)
+                try:
+                    self.send_response(200)
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                except OSError:
+                    pass
+
+            def log_message(self, format: str, *args: Any) -> None:
+                pass
+
+        srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
+        srv.daemon_threads = True
+        servers.append(srv)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        http_client: Any = httpx2.AsyncClient() if kind == "async" else httpx2.Client()
+        return {"api_endpoint": f"http://127.0.0.1:{srv.server_address[1]}/api", "http_client": http_client}
+
+    yield make
+    for srv in servers:
+        srv.shutdown()
+        srv.server_close()
+
+
+_PUBLISHED = {"result": {"offset": 1, "epoch": "e"}}
+_BROADCAST = {"result": {"responses": [{"result": {"offset": 1, "epoch": "e"}}]}}
+
+
+def test_per_call_timeout_replaces_request_timeout(new_api: Callable[..., Api], slow: Any) -> None:
+    # Longer: the call waits past request_timeout.
+    a = new_api(request_timeout=0.1, **slow(0.3, _PUBLISHED))
+    assert a.publish(channel="x", data=1, timeout=2).offset == 1
+    # Shorter: it gives up before request_timeout.
+    b = new_api(request_timeout=5, **slow(2, _PUBLISHED))
+    start = time.monotonic()
+    with pytest.raises(cent.CentTimeoutError):
+        b.publish(channel="x", data=1, timeout=0.1)
+    assert time.monotonic() - start < 1
+
+
+def test_request_timeout_bounds_every_call(new_api: Callable[..., Api], slow: Any) -> None:
+    a = new_api(request_timeout=0.1, **slow(2, _PUBLISHED))
+    start = time.monotonic()
+    with pytest.raises(cent.CentTimeoutError):
+        a.publish(channel="x", data=1)
+    assert time.monotonic() - start < 1
+
+
+@pytest.mark.parametrize("kind", ["async"])
+async def test_longer_asyncio_timeout_does_not_extend_a_call(slow: Any) -> None:
+    # An enclosing deadline only shortens a call: request_timeout still ends it.
+    c = cent.AsyncClient(request_timeout=0.1, **slow(2, _PUBLISHED))
+    start = time.monotonic()
+    with pytest.raises(cent.CentTimeoutError):
+        async with asyncio.timeout(5):
+            await c.publish(channel="x", data=1)
+    assert time.monotonic() - start < 1
+    await c.aclose()
+
+
+def test_attempt_timeout_replaces_request_timeout(new_api: Callable[..., Api], slow: Any) -> None:
+    # An attempt_timeout longer than request_timeout lets the attempt finish.
+    a = new_api(request_timeout=0.1, **slow(0.3, _BROADCAST))
+    res = a.broadcast_with_retry(channels=["a"], data=1, attempt_timeout=2)
+    assert res.attempts == 1
+    # The call's timeout still ends it sooner.
+    b = new_api(request_timeout=0.1, **slow(2, _BROADCAST))
+    start = time.monotonic()
+    with pytest.raises(cent.CentTimeoutError):
+        b.broadcast_with_retry(channels=["a"], data=1, attempt_timeout=5, timeout=0.2)
+    assert time.monotonic() - start < 1
 
 
 def test_validation(api: Api, fake: Fake) -> None:

@@ -35,8 +35,9 @@ client.publish(channel="news", data={"text": "hello"})
 ```
 
 Every API method takes its request and returns its result, raising unless
-Centrifugo did everything asked. Each takes ``timeout``, in seconds; without
-one, request_timeout bounds the call.
+Centrifugo did everything asked. request_timeout bounds every call; a
+call's ``timeout``, in seconds, replaces it for that call, longer or
+shorter.
 
 Options:
 
@@ -56,8 +57,8 @@ Options:
   keeps its connections alive between calls, never follows redirects, and
   starts its own after a fork - gunicorn --preload, Celery's prefork pool.
   A client you pass is the process's: create it after forking.
-- request_timeout: seconds bounding a call without a timeout of its own,
-  10 by default.
+- request_timeout: seconds bounding every call, 10 by default: the most a
+  call waits, unless it gives a timeout of its own, which replaces it.
 - headers: extra headers for every request, for a proxy in front of
   Centrifugo. Not X-API-Key, Authorization or Content-Type. A User-Agent
   replaces cent's.
@@ -80,7 +81,7 @@ Arguments:
 
 - `expire_at` - The Unix time in seconds when the block expires. Optional, but a reasonably small value is recommended to keep the set of blocked users small.
 - `user` - The ID of the user to block. Required.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `broadcast(
     *,
@@ -118,7 +119,7 @@ Arguments:
 - `delta` - Tells Centrifugo to construct a delta update, if possible, when broadcasting the publications to subscribers.
 - `version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
 - `version_epoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `broadcast_with_retry(
     *,
@@ -151,8 +152,9 @@ one retry).
 - The result holds every channel's last outcome, and the key: retrying
   later with it publishes only into the channels which did not get it.
 
-timeout, when set, bounds the whole call, waits included;
-attempt_timeout - request_timeout by default - bounds each attempt.
+timeout, when set, bounds the whole call, waits included.
+attempt_timeout is each attempt's own timeout, replacing request_timeout
+for it - longer or shorter - while timeout still ends an attempt sooner.
 on_attempt_error decides the wait between attempts, and may stop them:
 see BroadcastAttemptCallback. It raises as broadcast does.
 
@@ -164,7 +166,7 @@ send_at). Centrifugo PRO only.
 Arguments:
 
 - `uid` - The uid of the push notification to cancel. Required.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `channels(*, pattern: str = '', timeout: float | None = None) -> ChannelsResult`
 
@@ -174,7 +176,7 @@ It can be heavy on large deployments: there is no pagination.
 Arguments:
 
 - `pattern` - Filters channels by name, using gobwas/glob syntax.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `close(timeout: float | None = None) -> None`
 
@@ -206,7 +208,7 @@ Arguments:
 - `user` - Returns only the connections of this user ID.
 - `expression` - A CEL expression to filter connections.
 - `label_filter` - Restricts the listing to clients whose labels match this filter. Centrifugo PRO only.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `delete_user_status(*, users: list[str], timeout: float | None = None) -> DeleteUserStatusResult`
 
@@ -215,7 +217,7 @@ Deletes the status of users. Centrifugo PRO only.
 Arguments:
 
 - `users` - The list of user IDs to delete the status for. Required.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `device_list(
     *,
@@ -241,7 +243,7 @@ Arguments:
 - `include_webpush_keys` - Includes webpush_keys of each device (webpush only).
 - `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
 - `limit` - The maximum number of devices to return.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `device_list_all(
     *,
@@ -270,7 +272,7 @@ Arguments:
 - `include_webpush_keys` - Includes webpush_keys of each device (webpush only).
 - `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
 - `limit` - The maximum number of devices to return.
-- `timeout` - Seconds bounding each page's call: request_timeout when None.
+- `timeout` - Seconds bounding each page's call, replacing request_timeout: request_timeout when None.
 
 #### `device_register(
     *,
@@ -300,7 +302,7 @@ Arguments:
 - `topics` - The full list of the device's topic subscriptions, replacing the previous one. The user's topics are attached automatically.
 - `timezone` - The IANA time zone of the device user, for example Europe/Nicosia.
 - `locale` - The locale of the device user as an IETF BCP 47 language tag, for example en-US.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `device_remove(
     *,
@@ -316,7 +318,7 @@ Arguments:
 
 - `ids` - Selects devices to remove by ID.
 - `users` - Selects devices to remove by user.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `device_topic_list(
     *,
@@ -338,7 +340,7 @@ Arguments:
 - `include_device` - Includes the Device of each item.
 - `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
 - `limit` - The maximum number of items to return.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `device_topic_list_all(
     *,
@@ -362,7 +364,7 @@ Arguments:
 - `include_device` - Includes the Device of each item.
 - `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
 - `limit` - The maximum number of items to return.
-- `timeout` - Seconds bounding each page's call: request_timeout when None.
+- `timeout` - Seconds bounding each page's call, replacing request_timeout: request_timeout when None.
 
 #### `device_topic_update(
     *,
@@ -383,7 +385,7 @@ Arguments:
 - `op` - The operation. Required. One of: add, remove, set.
 - `topics` - The topics for the operation.
 - `user` - An optional ownership guard: the update is applied only if the device currently belongs to this user. Otherwise the call fails with a conflict error (or not found if there is no such device).
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `device_update(
     *,
@@ -409,7 +411,7 @@ Arguments:
 - `topics_update` - Updates the device topics.
 - `timezone_update` - Updates the device timezone.
 - `locale_update` - Updates the device locale.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `disconnect(
     *,
@@ -434,7 +436,7 @@ Arguments:
 - `session` - Limits the call to the connection with this session ID. user is still required.
 - `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `get_user_status(*, users: list[str], timeout: float | None = None) -> GetUserStatusResult`
 
@@ -443,7 +445,7 @@ Returns the status of users. Centrifugo PRO only.
 Arguments:
 
 - `users` - The list of user IDs to get the status for. Required.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `history(
     *,
@@ -463,7 +465,7 @@ Arguments:
 - `limit` - The maximum number of publications to return; -1 returns all the channel keeps. If not set, only the current stream position is returned, without publications.
 - `since` - Returns publications after this stream position.
 - `reverse` - Iterates in reverse order, from latest to earliest.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `history_all(
     *,
@@ -498,7 +500,7 @@ Arguments:
 - `limit` - The maximum number of publications to return; -1 returns all the channel keeps. If not set, only the current stream position is returned, without publications.
 - `since` - Returns publications after this stream position.
 - `reverse` - Iterates in reverse order, from latest to earliest.
-- `timeout` - Seconds bounding each page's call: request_timeout when None.
+- `timeout` - Seconds bounding each page's call, replacing request_timeout: request_timeout when None.
 
 #### `history_remove(*, channel: str, timeout: float | None = None) -> HistoryRemoveResult`
 
@@ -509,7 +511,7 @@ disconnected because of insufficient state.
 Arguments:
 
 - `channel` - The name of the channel. Required.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `info(*, timeout: float | None = None) -> InfoResult`
 
@@ -517,7 +519,7 @@ Returns information about the running Centrifugo nodes.
 
 Arguments:
 
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `invalidate_user_tokens(
     *,
@@ -537,7 +539,7 @@ Arguments:
 - `user` - The ID of the user whose tokens to invalidate. Required. "" invalidates the tokens of anonymous users.
 - `issued_before` - The Unix time in seconds: tokens issued before it are considered revoked. If not set, the current time is used.
 - `channel` - Limits the invalidation to subscription tokens for this channel.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `map_clear(*, channel: str, timeout: float | None = None) -> MapClearResult`
 
@@ -546,7 +548,7 @@ Removes all state and stream data of a map channel.
 Arguments:
 
 - `channel` - The name of the map channel. Required.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `map_publish(
     *,
@@ -583,7 +585,7 @@ Arguments:
 - `version_epoch` - Scopes version. A different epoch resets version comparison.
 - `score` - Currently not used by the server API.
 - `key_mode` - Makes the publish conditional: if_new writes only if the key does not exist, if_exists only if it exists. Empty always writes. One of: if_new, if_exists.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `map_read_state(
     *,
@@ -609,7 +611,7 @@ Arguments:
 - `asc` - Sorts ordered state by score ascending instead of descending. Ignored for unordered channels.
 - `revision_offset` - The offset of the position from a previous state read, used with revision_epoch.
 - `revision_epoch` - The epoch of the position from a previous state read. If the epoch changed, the call fails with an unrecoverable position error.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `map_read_state_all(
     *,
@@ -641,7 +643,7 @@ Arguments:
 - `asc` - Sorts ordered state by score ascending instead of descending. Ignored for unordered channels.
 - `revision_offset` - The offset of the position from a previous state read, used with revision_epoch.
 - `revision_epoch` - The epoch of the position from a previous state read. If the epoch changed, the call fails with an unrecoverable position error.
-- `timeout` - Seconds bounding each page's call: request_timeout when None.
+- `timeout` - Seconds bounding each page's call, replacing request_timeout: request_timeout when None.
 
 #### `map_read_stream(
     *,
@@ -662,7 +664,7 @@ Arguments:
 - `since_epoch` - The epoch of the since position. It must match the current stream epoch.
 - `limit` - The maximum number of entries: -1 means no limit, 0 returns only the stream position.
 - `reverse` - Returns entries newest first.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `map_remove(
     *,
@@ -679,7 +681,7 @@ Arguments:
 - `channel` - The name of the map channel. Required.
 - `key` - The key to remove. Required.
 - `idempotency_key` - Drops duplicate removals upon retries, as it does for MapPublishRequest: a removal with a key already used in the channel is not applied again, and its result is suppressed with suppress_reason "idempotency". Keys are kept for 5 minutes by default.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `map_stats(*, channel: str, timeout: float | None = None) -> MapStatsResult`
 
@@ -688,7 +690,7 @@ Returns statistics about a map channel.
 Arguments:
 
 - `channel` - The name of the map channel. Required.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `new_batch(*, parallel: bool = False) -> Batch`
 
@@ -707,7 +709,7 @@ currently subscribed to it. Presence must be enabled for the channel.
 Arguments:
 
 - `channel` - The name of the channel. Required.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `presence_stats(*, channel: str, timeout: float | None = None) -> PresenceStatsResult`
 
@@ -718,7 +720,7 @@ channel.
 Arguments:
 
 - `channel` - The name of the channel. Required.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `publish(
     *,
@@ -747,7 +749,7 @@ Arguments:
 - `delta` - Tells Centrifugo to construct a delta update, if possible, when broadcasting the publication to subscribers.
 - `version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
 - `version_epoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `refresh(
     *,
@@ -776,7 +778,7 @@ Arguments:
 - `session` - Limits the call to the connection with this session ID. user is still required.
 - `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `revoke_token(*, expire_at: int = 0, uid: str, timeout: float | None = None) -> RevokeTokenResult`
 
@@ -788,7 +790,7 @@ Arguments:
 
 - `expire_at` - The Unix time in seconds when the revocation expires. Optional, but a value matching the token expiration is recommended.
 - `uid` - The unique ID of the token to revoke (jti claim). Required.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `send_push_notification(
     *,
@@ -821,7 +823,7 @@ Arguments:
 - `localizations` - Optional per language/locale localizations. Setting them enables templating.
 - `use_templating` - Enables templating of the notification. Only works with a filter recipient.
 - `use_meta` - Additionally loads device meta while sending, making it available in templating.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `shared_poll_publish(
     *,
@@ -846,7 +848,7 @@ Arguments:
 - `b64data` - Data as base64, for binary payloads. Centrifugo decodes it.
 - `version` - The item version, must be >= 1. Required. A version not higher than the current one within the same epoch is silently dropped.
 - `epoch` - The channel-level publisher epoch. A change resets per-key versions and unsubscribes current subscribers with insufficient state.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `subscribe(
     *,
@@ -885,7 +887,7 @@ Arguments:
 - `session` - Limits the call to the connection with this session ID. user is still required.
 - `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `all_users` - When user is empty, targets every connection on every node instead of the anonymous-only bucket. No effect when user is non-empty. Without label_filter it acts on every connection. Centrifugo PRO only.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `unblock_user(*, user: str, timeout: float | None = None) -> UnblockUserResult`
 
@@ -894,7 +896,7 @@ Unblocks a user. Centrifugo PRO only.
 Arguments:
 
 - `user` - The ID of the user to unblock. Required.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `unsubscribe(
     *,
@@ -917,7 +919,7 @@ Arguments:
 - `session` - Limits the call to the connection with this session ID. user is still required.
 - `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `update_push_status(
     *,
@@ -937,7 +939,7 @@ Arguments:
 - `status` - The status of the push notification. Required. One of: delivered, interacted.
 - `device_id` - The Centrifugo device ID. Required.
 - `msg_id` - The message ID issued by the provider.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `update_user_status(
     *,
@@ -953,7 +955,7 @@ Arguments:
 
 - `users` - The list of user IDs to update the status for. Required.
 - `state` - An optional custom state to store in the user status. It can be restricted by the user_status.state_regex option.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `user_topic_list(
     *,
@@ -973,7 +975,7 @@ Arguments:
 - `include_total_count` - Includes the total count for the filter in the result.
 - `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
 - `limit` - The maximum number of items to return.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `user_topic_list_all(
     *,
@@ -995,7 +997,7 @@ Arguments:
 - `include_total_count` - Includes the total count for the filter in the result.
 - `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
 - `limit` - The maximum number of items to return.
-- `timeout` - Seconds bounding each page's call: request_timeout when None.
+- `timeout` - Seconds bounding each page's call, replacing request_timeout: request_timeout when None.
 
 #### `user_topic_update(
     *,
@@ -1013,7 +1015,7 @@ Arguments:
 - `user` - The user ID. Required. "" updates the global binding, which every device - anonymous ones included - gets on its next device_register.
 - `op` - The operation. Required. One of: add, remove, set.
 - `topics` - The topics for the operation.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 ### `AsyncClient`
 
@@ -1042,8 +1044,9 @@ async with cent.AsyncClient("http://localhost:8000/api", api_key=key) as client:
 ```
 
 api_endpoint_func and bearer_token_func may be coroutine functions.
-http_client is an httpx2.AsyncClient. A call's timeout bounds it; an
-asyncio.timeout around it, or cancelling its task, ends it sooner.
+http_client is an httpx2.AsyncClient. request_timeout, or a call's own
+timeout, bounds it; an asyncio.timeout around it, or cancelling its task,
+only ends it sooner - a longer one does not extend it.
 
 #### `async aclose(timeout: float | None = None) -> None`
 
@@ -1059,7 +1062,7 @@ Arguments:
 
 - `expire_at` - The Unix time in seconds when the block expires. Optional, but a reasonably small value is recommended to keep the set of blocked users small.
 - `user` - The ID of the user to block. Required.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async broadcast(
     *,
@@ -1097,7 +1100,7 @@ Arguments:
 - `delta` - Tells Centrifugo to construct a delta update, if possible, when broadcasting the publications to subscribers.
 - `version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
 - `version_epoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async broadcast_with_retry(
     *,
@@ -1130,8 +1133,9 @@ one retry).
 - The result holds every channel's last outcome, and the key: retrying
   later with it publishes only into the channels which did not get it.
 
-timeout, when set, bounds the whole call, waits included;
-attempt_timeout - request_timeout by default - bounds each attempt.
+timeout, when set, bounds the whole call, waits included.
+attempt_timeout is each attempt's own timeout, replacing request_timeout
+for it - longer or shorter - while timeout still ends an attempt sooner.
 on_attempt_error decides the wait between attempts, and may stop them:
 see BroadcastAttemptCallback. It raises as broadcast does.
 
@@ -1143,7 +1147,7 @@ send_at). Centrifugo PRO only.
 Arguments:
 
 - `uid` - The uid of the push notification to cancel. Required.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async channels(*, pattern: str = '', timeout: float | None = None) -> ChannelsResult`
 
@@ -1153,7 +1157,7 @@ It can be heavy on large deployments: there is no pagination.
 Arguments:
 
 - `pattern` - Filters channels by name, using gobwas/glob syntax.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async connections(
     *,
@@ -1172,7 +1176,7 @@ Arguments:
 - `user` - Returns only the connections of this user ID.
 - `expression` - A CEL expression to filter connections.
 - `label_filter` - Restricts the listing to clients whose labels match this filter. Centrifugo PRO only.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async delete_user_status(
     *,
@@ -1185,7 +1189,7 @@ Deletes the status of users. Centrifugo PRO only.
 Arguments:
 
 - `users` - The list of user IDs to delete the status for. Required.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async device_list(
     *,
@@ -1211,7 +1215,7 @@ Arguments:
 - `include_webpush_keys` - Includes webpush_keys of each device (webpush only).
 - `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
 - `limit` - The maximum number of devices to return.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async device_register(
     *,
@@ -1241,7 +1245,7 @@ Arguments:
 - `topics` - The full list of the device's topic subscriptions, replacing the previous one. The user's topics are attached automatically.
 - `timezone` - The IANA time zone of the device user, for example Europe/Nicosia.
 - `locale` - The locale of the device user as an IETF BCP 47 language tag, for example en-US.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async device_remove(
     *,
@@ -1257,7 +1261,7 @@ Arguments:
 
 - `ids` - Selects devices to remove by ID.
 - `users` - Selects devices to remove by user.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async device_topic_list(
     *,
@@ -1279,7 +1283,7 @@ Arguments:
 - `include_device` - Includes the Device of each item.
 - `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
 - `limit` - The maximum number of items to return.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async device_topic_update(
     *,
@@ -1300,7 +1304,7 @@ Arguments:
 - `op` - The operation. Required. One of: add, remove, set.
 - `topics` - The topics for the operation.
 - `user` - An optional ownership guard: the update is applied only if the device currently belongs to this user. Otherwise the call fails with a conflict error (or not found if there is no such device).
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async device_update(
     *,
@@ -1326,7 +1330,7 @@ Arguments:
 - `topics_update` - Updates the device topics.
 - `timezone_update` - Updates the device timezone.
 - `locale_update` - Updates the device locale.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async disconnect(
     *,
@@ -1351,7 +1355,7 @@ Arguments:
 - `session` - Limits the call to the connection with this session ID. user is still required.
 - `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async get_user_status(*, users: list[str], timeout: float | None = None) -> GetUserStatusResult`
 
@@ -1360,7 +1364,7 @@ Returns the status of users. Centrifugo PRO only.
 Arguments:
 
 - `users` - The list of user IDs to get the status for. Required.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async history(
     *,
@@ -1380,7 +1384,7 @@ Arguments:
 - `limit` - The maximum number of publications to return; -1 returns all the channel keeps. If not set, only the current stream position is returned, without publications.
 - `since` - Returns publications after this stream position.
 - `reverse` - Iterates in reverse order, from latest to earliest.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async history_remove(*, channel: str, timeout: float | None = None) -> HistoryRemoveResult`
 
@@ -1391,7 +1395,7 @@ disconnected because of insufficient state.
 Arguments:
 
 - `channel` - The name of the channel. Required.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async info(*, timeout: float | None = None) -> InfoResult`
 
@@ -1399,7 +1403,7 @@ Returns information about the running Centrifugo nodes.
 
 Arguments:
 
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async invalidate_user_tokens(
     *,
@@ -1419,7 +1423,7 @@ Arguments:
 - `user` - The ID of the user whose tokens to invalidate. Required. "" invalidates the tokens of anonymous users.
 - `issued_before` - The Unix time in seconds: tokens issued before it are considered revoked. If not set, the current time is used.
 - `channel` - Limits the invalidation to subscription tokens for this channel.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async map_clear(*, channel: str, timeout: float | None = None) -> MapClearResult`
 
@@ -1428,7 +1432,7 @@ Removes all state and stream data of a map channel.
 Arguments:
 
 - `channel` - The name of the map channel. Required.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async map_publish(
     *,
@@ -1465,7 +1469,7 @@ Arguments:
 - `version_epoch` - Scopes version. A different epoch resets version comparison.
 - `score` - Currently not used by the server API.
 - `key_mode` - Makes the publish conditional: if_new writes only if the key does not exist, if_exists only if it exists. Empty always writes. One of: if_new, if_exists.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async map_read_state(
     *,
@@ -1491,7 +1495,7 @@ Arguments:
 - `asc` - Sorts ordered state by score ascending instead of descending. Ignored for unordered channels.
 - `revision_offset` - The offset of the position from a previous state read, used with revision_epoch.
 - `revision_epoch` - The epoch of the position from a previous state read. If the epoch changed, the call fails with an unrecoverable position error.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async map_read_stream(
     *,
@@ -1512,7 +1516,7 @@ Arguments:
 - `since_epoch` - The epoch of the since position. It must match the current stream epoch.
 - `limit` - The maximum number of entries: -1 means no limit, 0 returns only the stream position.
 - `reverse` - Returns entries newest first.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async map_remove(
     *,
@@ -1529,7 +1533,7 @@ Arguments:
 - `channel` - The name of the map channel. Required.
 - `key` - The key to remove. Required.
 - `idempotency_key` - Drops duplicate removals upon retries, as it does for MapPublishRequest: a removal with a key already used in the channel is not applied again, and its result is suppressed with suppress_reason "idempotency". Keys are kept for 5 minutes by default.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async map_stats(*, channel: str, timeout: float | None = None) -> MapStatsResult`
 
@@ -1538,7 +1542,7 @@ Returns statistics about a map channel.
 Arguments:
 
 - `channel` - The name of the map channel. Required.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async presence(*, channel: str, timeout: float | None = None) -> PresenceResult`
 
@@ -1548,7 +1552,7 @@ currently subscribed to it. Presence must be enabled for the channel.
 Arguments:
 
 - `channel` - The name of the channel. Required.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async presence_stats(*, channel: str, timeout: float | None = None) -> PresenceStatsResult`
 
@@ -1559,7 +1563,7 @@ channel.
 Arguments:
 
 - `channel` - The name of the channel. Required.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async publish(
     *,
@@ -1588,7 +1592,7 @@ Arguments:
 - `delta` - Tells Centrifugo to construct a delta update, if possible, when broadcasting the publication to subscribers.
 - `version` - When > 0, the version of the document being sent: publications with a version less than or equal to one already seen are ignored. Only works in channels with history enabled.
 - `version_epoch` - The epoch of version. When it changes, Centrifugo accepts the publication even if its version is lower than before.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async refresh(
     *,
@@ -1617,7 +1621,7 @@ Arguments:
 - `session` - Limits the call to the connection with this session ID. user is still required.
 - `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async revoke_token(
     *,
@@ -1634,7 +1638,7 @@ Arguments:
 
 - `expire_at` - The Unix time in seconds when the revocation expires. Optional, but a value matching the token expiration is recommended.
 - `uid` - The unique ID of the token to revoke (jti claim). Required.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async send_push_notification(
     *,
@@ -1667,7 +1671,7 @@ Arguments:
 - `localizations` - Optional per language/locale localizations. Setting them enables templating.
 - `use_templating` - Enables templating of the notification. Only works with a filter recipient.
 - `use_meta` - Additionally loads device meta while sending, making it available in templating.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async shared_poll_publish(
     *,
@@ -1692,7 +1696,7 @@ Arguments:
 - `b64data` - Data as base64, for binary payloads. Centrifugo decodes it.
 - `version` - The item version, must be >= 1. Required. A version not higher than the current one within the same epoch is silently dropped.
 - `epoch` - The channel-level publisher epoch. A change resets per-key versions and unsubscribes current subscribers with insufficient state.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async subscribe(
     *,
@@ -1731,7 +1735,7 @@ Arguments:
 - `session` - Limits the call to the connection with this session ID. user is still required.
 - `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `all_users` - When user is empty, targets every connection on every node instead of the anonymous-only bucket. No effect when user is non-empty. Without label_filter it acts on every connection. Centrifugo PRO only.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async unblock_user(*, user: str, timeout: float | None = None) -> UnblockUserResult`
 
@@ -1740,7 +1744,7 @@ Unblocks a user. Centrifugo PRO only.
 Arguments:
 
 - `user` - The ID of the user to unblock. Required.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async unsubscribe(
     *,
@@ -1763,7 +1767,7 @@ Arguments:
 - `session` - Limits the call to the connection with this session ID. user is still required.
 - `label_filter` - Restricts the call to clients whose labels match this filter. Centrifugo PRO only.
 - `all_users` - Works as SubscribeRequest.all_users. Centrifugo PRO only.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async update_push_status(
     *,
@@ -1783,7 +1787,7 @@ Arguments:
 - `status` - The status of the push notification. Required. One of: delivered, interacted.
 - `device_id` - The Centrifugo device ID. Required.
 - `msg_id` - The message ID issued by the provider.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async update_user_status(
     *,
@@ -1799,7 +1803,7 @@ Arguments:
 
 - `users` - The list of user IDs to update the status for. Required.
 - `state` - An optional custom state to store in the user status. It can be restricted by the user_status.state_regex option.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async user_topic_list(
     *,
@@ -1819,7 +1823,7 @@ Arguments:
 - `include_total_count` - Includes the total count for the filter in the result.
 - `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
 - `limit` - The maximum number of items to return.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `async user_topic_update(
     *,
@@ -1837,7 +1841,7 @@ Arguments:
 - `user` - The user ID. Required. "" updates the global binding, which every device - anonymous ones included - gets on its next device_register.
 - `op` - The operation. Required. One of: add, remove, set.
 - `topics` - The topics for the operation.
-- `timeout` - Seconds bounding the call: request_timeout when None.
+- `timeout` - Seconds bounding the call, replacing request_timeout: request_timeout when None.
 
 #### `device_list_all(
     *,
@@ -1866,7 +1870,7 @@ Arguments:
 - `include_webpush_keys` - Includes webpush_keys of each device (webpush only).
 - `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
 - `limit` - The maximum number of devices to return.
-- `timeout` - Seconds bounding each page's call: request_timeout when None.
+- `timeout` - Seconds bounding each page's call, replacing request_timeout: request_timeout when None.
 
 #### `device_topic_list_all(
     *,
@@ -1890,7 +1894,7 @@ Arguments:
 - `include_device` - Includes the Device of each item.
 - `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
 - `limit` - The maximum number of items to return.
-- `timeout` - Seconds bounding each page's call: request_timeout when None.
+- `timeout` - Seconds bounding each page's call, replacing request_timeout: request_timeout when None.
 
 #### `history_all(
     *,
@@ -1925,7 +1929,7 @@ Arguments:
 - `limit` - The maximum number of publications to return; -1 returns all the channel keeps. If not set, only the current stream position is returned, without publications.
 - `since` - Returns publications after this stream position.
 - `reverse` - Iterates in reverse order, from latest to earliest.
-- `timeout` - Seconds bounding each page's call: request_timeout when None.
+- `timeout` - Seconds bounding each page's call, replacing request_timeout: request_timeout when None.
 
 #### `map_read_state_all(
     *,
@@ -1957,7 +1961,7 @@ Arguments:
 - `asc` - Sorts ordered state by score ascending instead of descending. Ignored for unordered channels.
 - `revision_offset` - The offset of the position from a previous state read, used with revision_epoch.
 - `revision_epoch` - The epoch of the position from a previous state read. If the epoch changed, the call fails with an unrecoverable position error.
-- `timeout` - Seconds bounding each page's call: request_timeout when None.
+- `timeout` - Seconds bounding each page's call, replacing request_timeout: request_timeout when None.
 
 #### `new_batch(*, parallel: bool = False) -> AsyncBatch`
 
@@ -1983,7 +1987,7 @@ Arguments:
 - `include_total_count` - Includes the total count for the filter in the result.
 - `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
 - `limit` - The maximum number of items to return.
-- `timeout` - Seconds bounding each page's call: request_timeout when None.
+- `timeout` - Seconds bounding each page's call, replacing request_timeout: request_timeout when None.
 
 ### `AutoBatch`
 

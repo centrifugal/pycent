@@ -260,8 +260,9 @@ class Client(_ClientAPI):
     >>> client.publish(channel="news", data={"text": "hello"})
 
     Every API method takes its request and returns its result, raising unless
-    Centrifugo did everything asked. Each takes ``timeout``, in seconds; without
-    one, request_timeout bounds the call.
+    Centrifugo did everything asked. request_timeout bounds every call; a
+    call's ``timeout``, in seconds, replaces it for that call, longer or
+    shorter.
 
     Options:
 
@@ -281,8 +282,8 @@ class Client(_ClientAPI):
       keeps its connections alive between calls, never follows redirects, and
       starts its own after a fork - gunicorn --preload, Celery's prefork pool.
       A client you pass is the process's: create it after forking.
-    - request_timeout: seconds bounding a call without a timeout of its own,
-      10 by default.
+    - request_timeout: seconds bounding every call, 10 by default: the most a
+      call waits, unless it gives a timeout of its own, which replaces it.
     - headers: extra headers for every request, for a proxy in front of
       Centrifugo. Not X-API-Key, Authorization or Content-Type. A User-Agent
       replaces cent's.
@@ -574,8 +575,9 @@ class AsyncClient(_AsyncClientAPI):
     ...     await client.publish(channel="news", data={"text": "hello"})
 
     api_endpoint_func and bearer_token_func may be coroutine functions.
-    http_client is an httpx2.AsyncClient. A call's timeout bounds it; an
-    asyncio.timeout around it, or cancelling its task, ends it sooner.
+    http_client is an httpx2.AsyncClient. request_timeout, or a call's own
+    timeout, bounds it; an asyncio.timeout around it, or cancelling its task,
+    only ends it sooner - a longer one does not extend it.
     """
 
     def __init__(
