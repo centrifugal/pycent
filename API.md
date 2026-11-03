@@ -4754,16 +4754,16 @@ the JSON Web Key Set Centrifugo fetches.
 def issue(request: cent.HTTPRequest) -> str:
     user = session_user(request.headers.get("cookie"))
     if user is None:
-        raise endpoints.Unauthorized
+        raise endpoints.Forbidden
     return token.connection(key, token.ConnectionClaims(
         user=user, expires_at=datetime.now(UTC) + timedelta(minutes=15)))
 conn = endpoints.ConnectionToken(issue)
 app.mount("/centrifugo/connection_token", conn.asgi)   # FastAPI, Starlette
 ```
 
-An endpoint answers a JSON object, never cached; Unauthorized - also as the
-cause of another exception - with 403, on which client SDKs stop asking, and
-disconnect or unsubscribe; any other exception with 500, which they retry.
+An endpoint answers a JSON object, never cached; Forbidden - also as the
+cause of another exception - with 403, which client SDKs report as their
+UnauthorizedError, stop asking, and disconnect or unsubscribe; any other exception with 500, which they retry.
 A malformed request gets 400, a wrong method 405. on_error, when set, is told
 of every 500 and 400, with the exception; it must not raise.
 
@@ -4831,7 +4831,7 @@ ConnectionToken(
 
 The endpoint a client's getToken callback calls: issue(request) returns
 the connection token of the request's user - from token.connection, say -
-or raises Unauthorized. It takes GET and POST, the body ignored. issue may
+or raises Forbidden. It takes GET and POST, the body ignored. issue may
 be a coroutine function, served by ahandle and asgi.
 
 #### `async ahandle(
@@ -4875,6 +4875,14 @@ function as HTTPRequest.raw: the server's own request object.
 The handler as a WSGI app, for Flask, Django or any WSGI server: it
 needs a blocking function.
 
+### `Forbidden`
+
+Raised by the function of an endpoint when the user may not have a token
+or signature: answered with 403, which client SDKs report as their
+UnauthorizedError, and stop asking. It is not the API client's
+cent.UnauthorizedError, which means Centrifugo refused this server's
+credentials: catching that one in an endpoint never matches this.
+
 ### `SharedPollSignature`
 
 ```python
@@ -4893,7 +4901,7 @@ sign(request, channel, keys) decides which of keys the user may track in
 channel, signs them - with sharedpoll.sign, say - and returns them, in the
 order signed, with the signature: ``(allowed, signature)``. The keys it
 leaves out are revoked: the client stops tracking them. To end the
-subscription instead, it raises Unauthorized. It may return only keys it
+subscription instead, it raises Forbidden. It may return only keys it
 was asked for: a signature covering another would be refused, and such a
 key fails the request with 500.
 
@@ -4950,7 +4958,7 @@ SubscriptionToken(
 
 The endpoint a subscription's getToken callback calls: issue(request,
 channel) returns the token of the request's user for channel - from
-token.subscription, say - or raises Unauthorized when the user may not
+token.subscription, say - or raises Forbidden when the user may not
 subscribe. The channel comes from a POST's JSON body, {"channel": ...},
 or from a GET's channel query parameter; it is required.
 
@@ -4994,14 +5002,6 @@ function as HTTPRequest.raw: the server's own request object.
 
 The handler as a WSGI app, for Flask, Django or any WSGI server: it
 needs a blocking function.
-
-### `Unauthorized`
-
-Raised by the function of an endpoint when the user may not have a token
-or signature: answered with 403, on which client SDKs stop asking. It is
-the endpoints' own, named after client SDKs' UnauthorizedError - not the
-API client's cent.UnauthorizedError, which means Centrifugo refused the
-SDK's credentials.
 
 ## cent.sharedpoll
 

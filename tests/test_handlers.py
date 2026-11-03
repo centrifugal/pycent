@@ -58,23 +58,23 @@ def test_connection_token() -> None:
     assert errors == []
 
 
-def test_unauthorized_is_403_and_not_an_error() -> None:
+def test_forbidden_is_403_and_not_an_error() -> None:
     errors = Errors()
 
     def deny(req: cent.HTTPRequest) -> str:
-        raise endpoints.Unauthorized
+        raise endpoints.Forbidden
 
     def deny_wrapped(req: cent.HTTPRequest) -> str:
         try:
-            raise endpoints.Unauthorized("no session")
-        except endpoints.Unauthorized as e:
+            raise endpoints.Forbidden("no session")
+        except endpoints.Forbidden as e:
             raise RuntimeError("wrapped") from e
 
     for f in (deny, deny_wrapped):
         assert call(endpoints.ConnectionToken(f, on_error=errors)).status == 403
     assert errors == []
-    # The endpoints' Unauthorized is not the API client's.
-    assert not issubclass(endpoints.Unauthorized, cent.UnauthorizedError)
+    # The endpoints' Forbidden is not the API client's Unauthorized.
+    assert not issubclass(endpoints.Forbidden, cent.UnauthorizedError)
 
 
 def test_other_errors_are_500_and_reported() -> None:

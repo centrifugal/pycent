@@ -515,12 +515,16 @@ key = token.Key.hmac(secret)  # client.token.hmac_secret_key
 def issue(request: cent.HTTPRequest) -> str:
     user = session_user(request)
     if user is None:
-        raise endpoints.Unauthorized  # 403: the client stops asking
+        raise endpoints.Forbidden  # 403: the client SDK's UnauthorizedError; it stops asking
     return token.connection(key, token.ConnectionClaims(user=user, expires_at=datetime.now(UTC) + timedelta(hours=1)))
 
 
 connection_token = endpoints.ConnectionToken(issue, on_error=log_error)
 ```
+
+`endpoints.Forbidden` answers 403, which client SDKs report as their
+`UnauthorizedError`, stopping their requests. It is not `cent.UnauthorizedError`,
+Centrifugo refusing this server's API credentials.
 
 An expiry is required: an aware `datetime`, or `token.NEVER` for a token
 accepted forever. `endpoints.SubscriptionToken` serves subscription tokens the
