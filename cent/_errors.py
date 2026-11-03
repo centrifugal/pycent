@@ -163,9 +163,14 @@ class HTTPError(CentError):
     def __str__(self) -> str:
         s = f"unexpected HTTP status {self.status_code}"
         if 300 <= self.status_code < 400:
-            # Centrifugo's API never redirects: something in front of it does,
-            # which cent does not follow.
-            s += " (a redirect, which cent does not follow: check api_endpoint, http or https say)"
+            # Centrifugo's API never redirects a call: its router redirects
+            # only a path not in canonical form - a doubled slash, say - and
+            # anything else is something in front of it. cent follows neither.
+            s += (
+                " (a redirect, which cent does not follow: check the scheme and the path of api_endpoint -"
+                " Centrifugo's API never redirects a call, but its router redirects a path not in canonical form,"
+                " one with a doubled slash say)"
+            )
         elif self.status_code == 404 and self._pro_method:
             s += (
                 f" ({self._pro_method} is a Centrifugo PRO method: if other methods work, the server is Centrifugo OSS)"

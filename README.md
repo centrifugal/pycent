@@ -415,7 +415,11 @@ subscribe_handler = proxy.SubscribeHandler(subscribe, on_error=log_proxy_error)
 Return a result to accept the request, raise `proxy.ProxyError` to reject it
 with an error the client receives, or `proxy.Disconnect` to close the client's
 connection; any other exception fails the request, and goes to `on_error` to
-be logged - `on_error` itself must not raise. Error codes are in [400, 1999],
+be logged - `on_error` itself must not raise. So does a function returning
+anything but its result - `None`, say: Centrifugo would take a response with
+none of result, error and disconnect as accepting a subscribe, publish, RPC,
+map publish or map remove as sent, as refusing a connect unless anonymous
+connections are allowed, and as a refresh or sub refresh which expired. Error codes are in [400, 1999],
 disconnect codes in [4000, 4999], and a disconnect reason is at most 32 bytes. Keep proxy endpoints reachable by Centrifugo only: whoever can call
 them can claim to be any user.
 
@@ -546,6 +550,14 @@ message.
 cmd = cent.command.publish(channel="news", data={"text": "hi"})
 cur.execute("INSERT INTO centrifugo_outbox (method, payload, partition) VALUES (%s, %s, 0)", (cmd.method, cmd.payload))
 ```
+
+`payload` is the request's JSON text: write it as it is, to the outbox's
+`jsonb` column as above. Where the method goes apart from the payload - the
+outbox's `method` column, a message header or attribute - Centrifugo reads the
+payload as the request itself, so a JSON string holding it -
+`json.dumps(cmd.payload)` - is a bad request there, dropped with only
+Centrifugo's log saying so. Only a message which is a whole command,
+`to_json()`'s, may hold its payload as a string, for CDC pipelines.
 
 A consumer keeps commands in order only within a partition: to keep a
 channel's commands in order, derive their partition from the channel the same

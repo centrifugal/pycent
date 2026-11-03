@@ -19,6 +19,11 @@ class Command:
     Consumers take it as its method and payload apart - the outbox table's
     method and payload columns, a message attribute - or as the JSON message
     ``{"method": ..., "payload": ...}`` of to_json (Kafka, NATS JetStream).
+    Where the method goes apart, Centrifugo reads the payload as the request
+    itself: write payload's JSON as it is - a JSON string holding it is a bad
+    request there, dropped with only Centrifugo's log saying so. Only a
+    message which is a whole command may hold its payload as a string, for
+    CDC pipelines.
 
     Within a partition a consumer keeps commands in order: a channel's
     commands keep their order only when every writer derives their partition

@@ -36,8 +36,12 @@ Answering: a function returns a result to accept the request, or raises:
 A ProxyError or Disconnect raised from another exception (``raise ... from``)
 counts too. The refresh and sub refresh proxies end a connection or
 subscription through their result's expired, not an exception. A handler
-answers with exactly one of result, error and disconnect: Centrifugo would take
-a response with none as accepting the request as the client sent it.
+answers with exactly one of result, error and disconnect: a function returning
+anything but its proxy's result - None, say - fails the request with 500 too.
+Centrifugo would take a response with none of them as accepting a subscribe,
+publish, RPC, map publish or map remove as the client sent it; as refusing a
+connect, unless anonymous connections are allowed; and as a refresh or sub
+refresh which expired.
 
 Payloads - data, info, meta - arrive as the values they decode to, and a
 result takes them back as they are, or as cent.RawJSON. A proxy with

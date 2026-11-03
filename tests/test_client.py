@@ -193,6 +193,7 @@ def test_redirect_is_not_followed(api: Api, fake: Fake) -> None:
         api.publish(channel="x", data=1)
     assert e.value.status_code == 307
     assert "does not follow" in str(e.value)
+    assert "scheme and the path" in str(e.value)
     assert len(fake.requests) == 1
 
 
