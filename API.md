@@ -44,13 +44,18 @@ Options:
 - api_endpoint: the base URL of the API, "http://localhost:8000/api". Each
   method is sent to it plus its name, "/publish".
 - api_endpoint_func: instead of api_endpoint, a function returning it for
-  each request, for addresses discovered rather than fixed.
+  each request, for addresses discovered rather than fixed. An endpoint
+  failing api_endpoint's rules fails the call with InvalidConfigError,
+  and an exception of the function with FunctionError, before sending.
 - api_key: sent as X-API-Key. Leave it and bearer_token_func unset when
   requests are authenticated another way - mutual TLS, a proxy - or not
   at all.
 - bearer_token_func: returns the token sent as "Authorization: Bearer"
   with each request, for Centrifugo PRO's JWKS authentication of the API
-  - cent.token.APITokens.token, say. Not together with api_key.
+  - cent.token.APITokens.token, say. Not together with api_key. An empty
+  token, or one with control characters, fails the call with
+  InvalidConfigError, and an exception of the function with
+  FunctionError, before sending.
 - http_client: the httpx2.Client sending requests - httpx2 is the maintained
   fork of httpx, with the same API. It is never changed:
   credentials and headers go on each request. Without one, the client
@@ -4157,6 +4162,8 @@ Centrifugo versions which did not mark errors yet; a network failure; a
 timeout, also a caller's own; an HTTPError 429 or 5xx; a broadcast or batch
 partial error with at least one retryable part.
 
+A FunctionError is judged by the exception of the function it wraps.
+
 Not retryable are the request's own errors - an unknown channel, a bad
 request, InvalidRequestError - and InvalidConfigError, ClosedError, a
 cancelled call, a DecodeError, rejected credentials and an invalid TLS
@@ -4291,6 +4298,7 @@ The values of the string fields with a fixed set, generated from the proto's "On
   - `CentTimeoutError`
   - `ClosedError`
   - `DecodeError`
+  - `FunctionError`
   - `HTTPError`
     - `UnauthorizedError`
   - `InvalidConfigError`
@@ -4419,6 +4427,16 @@ The reply is not a Centrifugo API reply. The usual cause is an
 api_endpoint which does not point at Centrifugo's API, so that something
 else - a proxy, a web page - answers instead.
 
+### `FunctionError`
+
+```python
+FunctionError(function: str, cause: BaseException) -> None
+```
+
+api_endpoint_func or bearer_token_func raised: the call failed before
+sending. The function's own exception is the cause, and retryable judges
+this error by it; the message names the function.
+
 ### `HTTPError`
 
 ```python
@@ -4442,8 +4460,11 @@ The error for code: the subclass of a known code, ApiError otherwise.
 
 ### `InvalidConfigError`
 
-A client configuration with a mistake: the message names the option and
-the fix.
+A client the SDK refuses to use as configured: the message names the
+option and the fix. Raised when the client is created, and on a call: an
+AsyncClient used from a second event loop, an endpoint from
+api_endpoint_func failing api_endpoint's rules, an empty token or one with
+control characters from bearer_token_func. Not retryable.
 
 ### `InvalidRequestError`
 

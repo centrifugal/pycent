@@ -176,7 +176,8 @@ while `timeout` still ends an attempt sooner.
 | `cent.HTTPError` | the request did not reach the API method: `status_code`, `body`, `headers`; `UnauthorizedError` for rejected credentials |
 | `cent.DecodeError` | the reply was not Centrifugo's - usually `api_endpoint` points elsewhere |
 | `cent.InvalidRequestError` | the client could tell the request is wrong and did not send it |
-| `cent.InvalidConfigError` | the client was not created: the message names the option and the fix |
+| `cent.InvalidConfigError` | the client refuses to work as configured - not created, used from a second event loop, or given an endpoint or token by `api_endpoint_func` or `bearer_token_func` which it cannot send: the message names the option and the fix |
+| `cent.FunctionError` | `api_endpoint_func` or `bearer_token_func` raised: the message names the function, its exception is the `__cause__`, and `retryable` judges it by that |
 | `cent.NetworkError`, `cent.CentTimeoutError`, `cent.ClosedError` | as their names say |
 
 All are `cent.CentError`. Centrifugo adds error codes over time: an unknown code

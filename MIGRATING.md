@@ -324,7 +324,7 @@ A batch has the same methods, and so do commands for async consumers:
 | `CentNetworkError` | `NetworkError` |
 | `CentTimeoutError` | `CentTimeoutError`, now also a builtin `TimeoutError` |
 | `CentDecodeError` | `DecodeError` |
-| - | `InvalidRequestError`, `InvalidConfigError`, `ClosedError`, `BroadcastFailedChannelsError`, `BatchFailedCommandsError` |
+| - | `InvalidRequestError`, `InvalidConfigError`, `FunctionError`, `ClosedError`, `BroadcastFailedChannelsError`, `BatchFailedCommandsError` |
 
 `cent.retryable(err)` says whether retrying may succeed. Retry a publication
 only with an `idempotency_key`.

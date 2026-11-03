@@ -962,24 +962,54 @@ def test_endpoint_and_token_funcs(new_api: Callable[..., Api], kind: str, fake: 
 @pytest.mark.parametrize("token", ["", "a\nb"])
 def test_bad_token_fails_before_sending(new_api: Callable[..., Api], kind: str, fake: Fake, token: str) -> None:
     a = new_api(bearer_token_func=lambda: token)
-    with pytest.raises(cent.InvalidConfigError):
+    with pytest.raises(cent.InvalidConfigError, match="bearer_token_func") as e:
         a.publish(channel="x", data=1)
+    assert not cent.retryable(e.value)
     assert fake.requests == []
 
 
-def test_bad_endpoint_from_func(new_api: Callable[..., Api], kind: str, fake: Fake) -> None:
-    a = new_api(api_endpoint=None, api_endpoint_func=lambda: "http://x/api/publish")
-    with pytest.raises(cent.InvalidConfigError, match="api_endpoint_func"):
+@pytest.mark.parametrize("endpoint", ["http://x/api/publish", "ftp://x/api", "http://x/api?q=1", "not a url"])
+def test_bad_endpoint_from_func(new_api: Callable[..., Api], kind: str, fake: Fake, endpoint: str) -> None:
+    a = new_api(api_endpoint=None, api_endpoint_func=lambda: endpoint)
+    with pytest.raises(cent.InvalidConfigError, match="api_endpoint_func") as e:
         a.publish(channel="x", data=1)
+    assert not cent.retryable(e.value)
+    assert fake.requests == []
 
 
-def test_endpoint_func_error_propagates(new_api: Callable[..., Api], kind: str, fake: Fake) -> None:
-    def down() -> str:
-        raise ConnectionRefusedError("discovery is down")
+def _failing(kind: str, err: Exception) -> Callable[[], Any]:
+    if kind == "async":
 
-    a = new_api(api_endpoint=None, api_endpoint_func=down)
-    with pytest.raises(ConnectionRefusedError):
+        async def af() -> str:
+            raise err
+
+        return af
+
+    def f() -> str:
+        raise err
+
+    return f
+
+
+@pytest.mark.parametrize("option", ["api_endpoint_func", "bearer_token_func"])
+def test_function_errors_are_chained(new_api: Callable[..., Api], kind: str, fake: Fake, option: str) -> None:
+    # The function's own exception fails the call before sending, chained,
+    # the message naming the function; retryable judges it by that exception.
+    opts: dict[str, Any] = {"api_endpoint": None, "api_endpoint_func": lambda: ENDPOINT}
+    down = ConnectionRefusedError("discovery is down")
+    opts[option] = _failing(kind, down)
+    a = new_api(**opts)
+    with pytest.raises(cent.FunctionError, match=f"^{option}: discovery is down$") as e:
         a.publish(channel="x", data=1)
+    assert e.value.function == option
+    assert e.value.__cause__ is down
+    assert not cent.retryable(e.value)
+    assert fake.requests == []
+    # A retryable cause keeps the call retryable.
+    opts[option] = _failing(kind, cent.NetworkError("vault unreachable"))
+    with pytest.raises(cent.FunctionError) as e:
+        new_api(**opts).publish(channel="x", data=1)
+    assert cent.retryable(e.value)
 
 
 # Observability.

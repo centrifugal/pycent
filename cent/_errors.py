@@ -210,8 +210,23 @@ class InvalidRequestError(CentError, ValueError):
 
 
 class InvalidConfigError(CentError, ValueError):
-    """A client configuration with a mistake: the message names the option and
-    the fix."""
+    """A client the SDK refuses to use as configured: the message names the
+    option and the fix. Raised when the client is created, and on a call: an
+    AsyncClient used from a second event loop, an endpoint from
+    api_endpoint_func failing api_endpoint's rules, an empty token or one with
+    control characters from bearer_token_func. Not retryable."""
+
+
+class FunctionError(CentError):
+    """api_endpoint_func or bearer_token_func raised: the call failed before
+    sending. The function's own exception is the cause, and retryable judges
+    this error by it; the message names the function."""
+
+    def __init__(self, function: str, cause: BaseException) -> None:
+        super().__init__(f"{function}: {cause}")
+        # The option naming the function: "api_endpoint_func" or
+        # "bearer_token_func".
+        self.function = function
 
 
 class ClosedError(CentError):
@@ -364,6 +379,8 @@ def retryable(err: BaseException | None) -> bool:
     timeout, also a caller's own; an HTTPError 429 or 5xx; a broadcast or batch
     partial error with at least one retryable part.
 
+    A FunctionError is judged by the exception of the function it wraps.
+
     Not retryable are the request's own errors - an unknown channel, a bad
     request, InvalidRequestError - and InvalidConfigError, ClosedError, a
     cancelled call, a DecodeError, rejected credentials and an invalid TLS
@@ -386,6 +403,8 @@ def retryable(err: BaseException | None) -> bool:
         return err.status_code == 429 or err.status_code >= 500
     if isinstance(err, TimeoutError):
         return True
+    if isinstance(err, FunctionError):
+        return retryable(err.__cause__)
     if isinstance(err, NetworkError):
         cause = err.__cause__
         while cause is not None:

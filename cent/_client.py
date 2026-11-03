@@ -30,6 +30,7 @@ from cent._errors import (
     CentTimeoutError,
     ClosedError,
     DecodeError,
+    FunctionError,
     InvalidConfigError,
     InvalidRequestError,
     retryable,
@@ -269,13 +270,18 @@ class Client(_ClientAPI):
     - api_endpoint: the base URL of the API, "http://localhost:8000/api". Each
       method is sent to it plus its name, "/publish".
     - api_endpoint_func: instead of api_endpoint, a function returning it for
-      each request, for addresses discovered rather than fixed.
+      each request, for addresses discovered rather than fixed. An endpoint
+      failing api_endpoint's rules fails the call with InvalidConfigError,
+      and an exception of the function with FunctionError, before sending.
     - api_key: sent as X-API-Key. Leave it and bearer_token_func unset when
       requests are authenticated another way - mutual TLS, a proxy - or not
       at all.
     - bearer_token_func: returns the token sent as "Authorization: Bearer"
       with each request, for Centrifugo PRO's JWKS authentication of the API
-      - cent.token.APITokens.token, say. Not together with api_key.
+      - cent.token.APITokens.token, say. Not together with api_key. An empty
+      token, or one with control characters, fails the call with
+      InvalidConfigError, and an exception of the function with
+      FunctionError, before sending.
     - http_client: the httpx2.Client sending requests - httpx2 is the maintained
       fork of httpx, with the same API. It is never changed:
       credentials and headers go on each request. Without one, the client
@@ -352,8 +358,18 @@ class Client(_ClientAPI):
         cfg = self._cfg
         base = cfg.endpoint
         if cfg.endpoint_func is not None:
-            base = _core.checked_endpoint(cfg.endpoint_func())
-        token = _core.checked_token(cfg.token_func()) if cfg.token_func is not None else None
+            try:
+                addr = cfg.endpoint_func()
+            except Exception as e:
+                raise FunctionError("api_endpoint_func", e) from e
+            base = _core.checked_endpoint(addr)
+        token = None
+        if cfg.token_func is not None:
+            try:
+                raw = cfg.token_func()
+            except Exception as e:
+                raise FunctionError("bearer_token_func", e) from e
+            token = _core.checked_token(raw)
         body = make_body()
         left = _core.remaining(deadline, method)
         try:
@@ -620,10 +636,18 @@ class AsyncClient(_AsyncClientAPI):
             async with timer:
                 base = cfg.endpoint
                 if cfg.endpoint_func is not None:
-                    base = _core.checked_endpoint(await _maybe_await(cfg.endpoint_func()))
+                    try:
+                        addr = await _maybe_await(cfg.endpoint_func())
+                    except Exception as e:
+                        raise FunctionError("api_endpoint_func", e) from e
+                    base = _core.checked_endpoint(addr)
                 token = None
                 if cfg.token_func is not None:
-                    token = _core.checked_token(await _maybe_await(cfg.token_func()))
+                    try:
+                        raw = await _maybe_await(cfg.token_func())
+                    except Exception as e:
+                        raise FunctionError("bearer_token_func", e) from e
+                    token = _core.checked_token(raw)
                 body = make_body()
                 async with self._http.stream(
                     "POST",
