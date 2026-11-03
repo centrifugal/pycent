@@ -257,7 +257,31 @@ def test_deeply_nested_request_is_a_400() -> None:
 
 
 def test_bad_call_timeout_is_an_invalid_request() -> None:
-    c = cent.Client(ENDPOINT, http_client=httpx2.Client(transport=httpx2.MockTransport(Fake())))
-    for bad in (-1, "5", True):
+    # Zero is refused as a negative is: None, not 0, means request_timeout.
+    fake = Fake()
+    c = cent.Client(ENDPOINT, http_client=httpx2.Client(transport=httpx2.MockTransport(fake)))
+    for bad in (-1, 0, 0.0, "5", True):
         with pytest.raises(cent.InvalidRequestError, match="timeout"):
             c.publish(channel="x", data=1, timeout=bad)  # type: ignore[arg-type]
+        with pytest.raises(cent.InvalidRequestError, match="timeout"):
+            c.broadcast_with_retry(channels=["a"], data=1, timeout=bad)  # type: ignore[arg-type]
+        with pytest.raises(cent.InvalidRequestError, match="timeout"):
+            list(c.history_all(channel="x", limit=1, timeout=bad))  # type: ignore[arg-type]
+    for bad in (-1, 0, 0.0):
+        with pytest.raises(cent.InvalidRequestError, match="attempt_timeout"):
+            c.broadcast_with_retry(channels=["a"], data=1, attempt_timeout=bad)
+    assert fake.requests == []
+
+
+async def test_bad_call_timeout_is_an_invalid_request_async() -> None:
+    fake = Fake()
+    c = cent.AsyncClient(ENDPOINT, http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(fake)))
+    for bad in (-1, 0):
+        with pytest.raises(cent.InvalidRequestError, match="timeout"):
+            await c.publish(channel="x", data=1, timeout=bad)
+        with pytest.raises(cent.InvalidRequestError, match="timeout"):
+            await c.broadcast_with_retry(channels=["a"], data=1, timeout=bad)
+        with pytest.raises(cent.InvalidRequestError, match="attempt_timeout"):
+            await c.broadcast_with_retry(channels=["a"], data=1, attempt_timeout=bad)
+    assert fake.requests == []
+    await c.aclose()

@@ -192,8 +192,9 @@ class Config:
         """The monotonic deadline of a call with timeout, or request_timeout."""
         if timeout is None:
             timeout = self.request_timeout
-        elif isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout < 0:
-            raise InvalidRequestError("timeout must be a non-negative number of seconds")
+        elif isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
+            # Zero is refused as a negative is: None, not 0, means request_timeout.
+            raise InvalidRequestError("timeout must be a positive number of seconds: None for request_timeout")
         return time.monotonic() + timeout
 
     def request_headers(self, token: str | None) -> dict[str, str]:
