@@ -315,16 +315,16 @@ class FilterNode:
     """
 
     op: str = ""
-    """op is the logical operation of a non-leaf node: "and", "or" or "not".
-    Empty for a leaf node.
+    """op is the logical operation of a non-leaf node. Empty for a leaf node.
+    One of: and, or, not.
     """
 
     key: str = ""
     """key is the label key a leaf node compares."""
 
     cmp: str = ""
-    """cmp is the comparison of a leaf node: "eq", "neq", "in", "nin", "ex",
-    "nex", "sw", "ew", "ct", "gt", "gte", "lt" or "lte".
+    """cmp is the comparison of a leaf node. One of: eq, neq, in, nin, ex, nex,
+    sw, ew, ct, gt, gte, lt, lte.
     """
 
     val: str = ""
@@ -2069,8 +2069,8 @@ class DeviceRegisterRequest:
     """
 
     provider: str = ""
-    """provider is the provider of the device token: fcm, hms, apns or
-    webpush. Required.
+    """provider is the provider of the device token. Required. One of: fcm,
+    hms, apns, webpush.
     """
 
     token: str = ""
@@ -2079,7 +2079,7 @@ class DeviceRegisterRequest:
     """
 
     platform: str = ""
-    """platform is the device platform: ios, android or web. Required."""
+    """platform is the device platform. Required. One of: ios, android, web."""
 
     user: str = ""
     """user is the user associated with the device."""
@@ -2334,7 +2334,7 @@ class DeviceTopicsUpdate:
     """DeviceTopicsUpdate changes the topics of devices. Centrifugo PRO only."""
 
     op: str = ""
-    """op is the operation: add, remove or set. Required."""
+    """op is the operation. Required. One of: add, remove, set."""
 
     topics: list[str] = field(default_factory=list)
     """topics are the topics for the operation."""
@@ -2677,7 +2677,7 @@ class DeviceTopicUpdateRequest:
     """device_id is the ID of the device. Required."""
 
     op: str = ""
-    """op is the operation: add, remove or set. Required."""
+    """op is the operation. Required. One of: add, remove, set."""
 
     topics: list[str] = field(default_factory=list)
     """topics are the topics for the operation."""
@@ -2726,7 +2726,7 @@ class UserTopicUpdateRequest:
     """
 
     op: str = ""
-    """op is the operation: add, remove or set. Required."""
+    """op is the operation. Required. One of: add, remove, set."""
 
     topics: list[str] = field(default_factory=list)
     """topics are the topics for the operation."""
@@ -3210,6 +3210,7 @@ class PushNotification:
     expire_at: int = 0
     """expire_at is the Unix time in seconds when Centrifugo stops trying to
     send the notification. Not related to the providers' TTL fields.
+    Required when the request sets limit_strategy.
     """
 
     def _to_wire(self) -> dict[str, Any]:
@@ -3376,7 +3377,8 @@ class SendPushNotificationRequest:
     limit_strategy: PushLimitStrategy | None = None
     """limit_strategy sets time constraints and rate limits. Only applies
     with a filter recipient; devices are then processed one by one
-    instead of in batches.
+    instead of in batches. Needs notification.expire_at: a push the limits
+    hold back is not tried forever.
     """
 
     analytics_uid: str = ""
@@ -3649,8 +3651,8 @@ class UpdatePushStatusRequest:
     """
 
     status: str = ""
-    """status is the status of the push notification: delivered or
-    interacted. Required.
+    """status is the status of the push notification. Required. One of:
+    delivered, interacted.
     """
 
     device_id: str = ""
@@ -3796,9 +3798,9 @@ class MapPublishRequest:
     """score is currently not used by the server API."""
 
     key_mode: str = ""
-    """key_mode makes the publish conditional: "if_new" writes only if the
-    key does not exist, "if_exists" only if it exists. Empty always
-    writes.
+    """key_mode makes the publish conditional: if_new writes only if the key
+    does not exist, if_exists only if it exists. Empty always writes.
+    One of: if_new, if_exists.
     """
 
     def _to_wire(self) -> dict[str, Any]:
@@ -5121,11 +5123,11 @@ class _ClientAPI:
             id: The device ID. Omit it on first registration: Centrifugo
                 generates one and returns it. Pass the stored value to update the
                 device.
-            provider: The provider of the device token: fcm, hms, apns or
-                webpush. Required.
+            provider: The provider of the device token. Required. One of: fcm,
+                hms, apns, webpush.
             token: The push token of the device. For webpush, it is the browser
                 PushSubscription serialized as a JSON string. Required.
-            platform: The device platform: ios, android or web. Required.
+            platform: The device platform. Required. One of: ios, android, web.
             user: The user associated with the device.
             meta: Additional custom metadata of the device.
             topics: The full list of the device's topic subscriptions, replacing
@@ -5296,7 +5298,7 @@ class _ClientAPI:
 
         Args:
             device_id: The ID of the device. Required.
-            op: The operation: add, remove or set. Required.
+            op: The operation. Required. One of: add, remove, set.
             topics: The topics for the operation.
             user: An optional ownership guard: the update is applied only if the
                 device currently belongs to this user. Otherwise the call fails with a
@@ -5347,7 +5349,7 @@ class _ClientAPI:
         Args:
             user: The user ID. Required. "" updates the global binding, which every
                 device - anonymous ones included - gets on its next device_register.
-            op: The operation: add, remove or set. Required.
+            op: The operation. Required. One of: add, remove, set.
             topics: The topics for the operation.
             timeout: Seconds bounding the call: request_timeout when None.
         """
@@ -5389,7 +5391,8 @@ class _ClientAPI:
                 unavailable.
             limit_strategy: Sets time constraints and rate limits. Only applies
                 with a filter recipient; devices are then processed one by one
-                instead of in batches.
+                instead of in batches. Needs notification.expire_at: a push the limits
+                hold back is not tried forever.
             analytics_uid: The identifier for push notification analytics. If
                 not set, uid is used.
             localizations: Optional per language/locale localizations. Setting
@@ -5426,8 +5429,8 @@ class _ClientAPI:
         Args:
             analytics_uid: The analytics_uid of the push notification (as in
                 SendPushNotificationRequest). Required.
-            status: The status of the push notification: delivered or
-                interacted. Required.
+            status: The status of the push notification. Required. One of:
+                delivered, interacted.
             device_id: The Centrifugo device ID. Required.
             msg_id: The message ID issued by the provider.
             timeout: Seconds bounding the call: request_timeout when None.
@@ -5490,9 +5493,9 @@ class _ClientAPI:
             version_epoch: Scopes version. A different epoch resets version
                 comparison.
             score: Currently not used by the server API.
-            key_mode: Makes the publish conditional: "if_new" writes only if the
-                key does not exist, "if_exists" only if it exists. Empty always
-                writes.
+            key_mode: Makes the publish conditional: if_new writes only if the key
+                does not exist, if_exists only if it exists. Empty always writes.
+                One of: if_new, if_exists.
             timeout: Seconds bounding the call: request_timeout when None.
         """
         return self._invoke(
@@ -6259,11 +6262,11 @@ class _AsyncClientAPI:
             id: The device ID. Omit it on first registration: Centrifugo
                 generates one and returns it. Pass the stored value to update the
                 device.
-            provider: The provider of the device token: fcm, hms, apns or
-                webpush. Required.
+            provider: The provider of the device token. Required. One of: fcm,
+                hms, apns, webpush.
             token: The push token of the device. For webpush, it is the browser
                 PushSubscription serialized as a JSON string. Required.
-            platform: The device platform: ios, android or web. Required.
+            platform: The device platform. Required. One of: ios, android, web.
             user: The user associated with the device.
             meta: Additional custom metadata of the device.
             topics: The full list of the device's topic subscriptions, replacing
@@ -6434,7 +6437,7 @@ class _AsyncClientAPI:
 
         Args:
             device_id: The ID of the device. Required.
-            op: The operation: add, remove or set. Required.
+            op: The operation. Required. One of: add, remove, set.
             topics: The topics for the operation.
             user: An optional ownership guard: the update is applied only if the
                 device currently belongs to this user. Otherwise the call fails with a
@@ -6485,7 +6488,7 @@ class _AsyncClientAPI:
         Args:
             user: The user ID. Required. "" updates the global binding, which every
                 device - anonymous ones included - gets on its next device_register.
-            op: The operation: add, remove or set. Required.
+            op: The operation. Required. One of: add, remove, set.
             topics: The topics for the operation.
             timeout: Seconds bounding the call: request_timeout when None.
         """
@@ -6527,7 +6530,8 @@ class _AsyncClientAPI:
                 unavailable.
             limit_strategy: Sets time constraints and rate limits. Only applies
                 with a filter recipient; devices are then processed one by one
-                instead of in batches.
+                instead of in batches. Needs notification.expire_at: a push the limits
+                hold back is not tried forever.
             analytics_uid: The identifier for push notification analytics. If
                 not set, uid is used.
             localizations: Optional per language/locale localizations. Setting
@@ -6564,8 +6568,8 @@ class _AsyncClientAPI:
         Args:
             analytics_uid: The analytics_uid of the push notification (as in
                 SendPushNotificationRequest). Required.
-            status: The status of the push notification: delivered or
-                interacted. Required.
+            status: The status of the push notification. Required. One of:
+                delivered, interacted.
             device_id: The Centrifugo device ID. Required.
             msg_id: The message ID issued by the provider.
             timeout: Seconds bounding the call: request_timeout when None.
@@ -6628,9 +6632,9 @@ class _AsyncClientAPI:
             version_epoch: Scopes version. A different epoch resets version
                 comparison.
             score: Currently not used by the server API.
-            key_mode: Makes the publish conditional: "if_new" writes only if the
-                key does not exist, "if_exists" only if it exists. Empty always
-                writes.
+            key_mode: Makes the publish conditional: if_new writes only if the key
+                does not exist, if_exists only if it exists. Empty always writes.
+                One of: if_new, if_exists.
             timeout: Seconds bounding the call: request_timeout when None.
         """
         return await self._invoke(
@@ -7255,11 +7259,11 @@ class _BatchAPI:
             id: The device ID. Omit it on first registration: Centrifugo
                 generates one and returns it. Pass the stored value to update the
                 device.
-            provider: The provider of the device token: fcm, hms, apns or
-                webpush. Required.
+            provider: The provider of the device token. Required. One of: fcm,
+                hms, apns, webpush.
             token: The push token of the device. For webpush, it is the browser
                 PushSubscription serialized as a JSON string. Required.
-            platform: The device platform: ios, android or web. Required.
+            platform: The device platform. Required. One of: ios, android, web.
             user: The user associated with the device.
             meta: Additional custom metadata of the device.
             topics: The full list of the device's topic subscriptions, replacing
@@ -7411,7 +7415,7 @@ class _BatchAPI:
 
         Args:
             device_id: The ID of the device. Required.
-            op: The operation: add, remove or set. Required.
+            op: The operation. Required. One of: add, remove, set.
             topics: The topics for the operation.
             user: An optional ownership guard: the update is applied only if the
                 device currently belongs to this user. Otherwise the call fails with a
@@ -7455,7 +7459,7 @@ class _BatchAPI:
         Args:
             user: The user ID. Required. "" updates the global binding, which every
                 device - anonymous ones included - gets on its next device_register.
-            op: The operation: add, remove or set. Required.
+            op: The operation. Required. One of: add, remove, set.
             topics: The topics for the operation.
         """
         return self._add(
@@ -7491,7 +7495,8 @@ class _BatchAPI:
                 unavailable.
             limit_strategy: Sets time constraints and rate limits. Only applies
                 with a filter recipient; devices are then processed one by one
-                instead of in batches.
+                instead of in batches. Needs notification.expire_at: a push the limits
+                hold back is not tried forever.
             analytics_uid: The identifier for push notification analytics. If
                 not set, uid is used.
             localizations: Optional per language/locale localizations. Setting
@@ -7525,8 +7530,8 @@ class _BatchAPI:
         Args:
             analytics_uid: The analytics_uid of the push notification (as in
                 SendPushNotificationRequest). Required.
-            status: The status of the push notification: delivered or
-                interacted. Required.
+            status: The status of the push notification. Required. One of:
+                delivered, interacted.
             device_id: The Centrifugo device ID. Required.
             msg_id: The message ID issued by the provider.
         """
@@ -7584,9 +7589,9 @@ class _BatchAPI:
             version_epoch: Scopes version. A different epoch resets version
                 comparison.
             score: Currently not used by the server API.
-            key_mode: Makes the publish conditional: "if_new" writes only if the
-                key does not exist, "if_exists" only if it exists. Empty always
-                writes.
+            key_mode: Makes the publish conditional: if_new writes only if the key
+                does not exist, if_exists only if it exists. Empty always writes.
+                One of: if_new, if_exists.
         """
         return self._add(
             MapPublishRequest(

@@ -50,15 +50,15 @@ class FilterNode:
     """
 
     op: str = ""
-    """op is the logical operation: "and", "or" or "not". Empty for a leaf node."""
+    """op is the logical operation. Empty for a leaf node. One of: and, or, not."""
 
     key: str = ""
     """key is the tag a leaf node compares."""
 
     cmp: str = ""
-    """cmp is the comparison of a leaf node: "eq", "neq", "in", "nin", "ex"
-    (exists), "nex" (does not exist), "sw" (starts with), "ew" (ends with), "ct"
-    (contains), "gt", "gte", "lt" or "lte".
+    """cmp is the comparison of a leaf node: ex is exists, nex does not exist,
+    sw starts with, ew ends with, ct contains. One of: eq, neq, in, nin, ex,
+    nex, sw, ew, ct, gt, gte, lt, lte.
     """
 
     val: str = ""
@@ -112,11 +112,12 @@ class ConnectRequest:
     """
 
     protocol: str = ""
-    """protocol is the client protocol: "json" or "protobuf"."""
+    """protocol is the client protocol. One of: json, protobuf."""
 
     encoding: str = ""
-    """encoding is "binary" when the proxy has binary_encoding enabled, so that
-    payloads come in the b64 fields, and "json" otherwise.
+    """encoding is binary when the proxy has binary_encoding enabled, so that
+    payloads come in the b64 fields, and json otherwise.
+    One of: json, binary.
     """
 
     data: JSON = None
@@ -312,6 +313,12 @@ class ConnectResult:
     Parsed by OSS but not used (OSS does not populate centrifuge.ConnectReply.Labels).
     """
 
+    profile: str = ""
+    """profile assigns the connection to a dictionary compression profile, as the
+    profile claim of a connection token does: it overrides the profile the
+    client declared. Centrifugo PRO only.
+    """
+
     def _to_wire(self) -> dict[str, Any]:
         w: dict[str, Any] = {}
         if self.user:
@@ -336,6 +343,8 @@ class ConnectResult:
             w["caps"] = [v._to_wire() for v in self.caps]
         if self.labels:
             w["labels"] = dict(self.labels)
+        if self.profile:
+            w["profile"] = self.profile
         return w
 
     @classmethod
@@ -353,6 +362,7 @@ class ConnectResult:
             meta=d.get("meta"),
             caps=_w.list_of(d, "caps", "ConnectResult.caps", ChannelsCapability._from_wire),
             labels=_w.dict_of(d, "labels", "ConnectResult.labels", _w.c_str),
+            profile=_w.scalar(d, "profile", "ConnectResult.profile", _w.c_str, ""),
         )
 
 
@@ -367,13 +377,13 @@ class ChannelsCapability:
     """channels are the channels, or channel patterns, it applies to."""
 
     allow: list[str] = field(default_factory=list)
-    """allow are the operations it grants: "sub" (subscribe), "pub" (publish),
-    "hst" (history) and "prs" (presence).
+    """allow are the operations it grants: sub is subscribe, pub publish, hst
+    history, prs presence. One of: sub, pub, hst, prs.
     """
 
     match: str = ""
-    """match is how channels are matched: empty for exact names, "wildcard" or
-    "regex".
+    """match is how channels are matched: empty for exact names. One of:
+    wildcard, regex.
     """
 
     def _to_wire(self) -> dict[str, Any]:
@@ -407,11 +417,12 @@ class RefreshRequest:
     """transport is the connection's transport."""
 
     protocol: str = ""
-    """protocol is the client protocol: "json" or "protobuf"."""
+    """protocol is the client protocol. One of: json, protobuf."""
 
     encoding: str = ""
-    """encoding is "binary" when the proxy has binary_encoding enabled, so that
-    payloads come in the b64 fields, and "json" otherwise.
+    """encoding is binary when the proxy has binary_encoding enabled, so that
+    payloads come in the b64 fields, and json otherwise.
+    One of: json, binary.
     """
 
     user: str = ""
@@ -519,11 +530,12 @@ class SubscribeRequest:
     """transport is the connection's transport."""
 
     protocol: str = ""
-    """protocol is the client protocol: "json" or "protobuf"."""
+    """protocol is the client protocol. One of: json, protobuf."""
 
     encoding: str = ""
-    """encoding is "binary" when the proxy has binary_encoding enabled, so that
-    payloads come in the b64 fields, and "json" otherwise.
+    """encoding is binary when the proxy has binary_encoding enabled, so that
+    payloads come in the b64 fields, and json otherwise.
+    One of: json, binary.
     """
 
     user: str = ""
@@ -677,8 +689,8 @@ class SubscribeResult:
     """
 
     allow: list[str] = field(default_factory=list)
-    """allow are capabilities granted in the channel for this subscription:
-    "sub", "pub", "hst" and "prs". Centrifugo PRO only.
+    """allow are capabilities granted in the channel for this subscription.
+    Centrifugo PRO only. One of: sub, pub, hst, prs.
     """
 
     server_tags_filter: FilterNode | None = None
@@ -734,11 +746,12 @@ class PublishRequest:
     """transport is the connection's transport."""
 
     protocol: str = ""
-    """protocol is the client protocol: "json" or "protobuf"."""
+    """protocol is the client protocol. One of: json, protobuf."""
 
     encoding: str = ""
-    """encoding is "binary" when the proxy has binary_encoding enabled, so that
-    payloads come in the b64 fields, and "json" otherwise.
+    """encoding is binary when the proxy has binary_encoding enabled, so that
+    payloads come in the b64 fields, and json otherwise.
+    One of: json, binary.
     """
 
     user: str = ""
@@ -889,11 +902,12 @@ class MapPublishRequest:
     """transport is the connection's transport."""
 
     protocol: str = ""
-    """protocol is the client protocol: "json" or "protobuf"."""
+    """protocol is the client protocol. One of: json, protobuf."""
 
     encoding: str = ""
-    """encoding is "binary" when the proxy has binary_encoding enabled, so that
-    payloads come in the b64 fields, and "json" otherwise.
+    """encoding is binary when the proxy has binary_encoding enabled, so that
+    payloads come in the b64 fields, and json otherwise.
+    One of: json, binary.
     """
 
     user: str = ""
@@ -989,8 +1003,9 @@ class MapPublishResult:
     """score is not used by Centrifugo yet."""
 
     key_mode: str = ""
-    """key_mode makes the publication conditional: "if_new" publishes only a key
-    which does not exist yet, "if_exists" only one which does.
+    """key_mode makes the publication conditional: if_new publishes only a key
+    which does not exist yet, if_exists only one which does.
+    One of: if_new, if_exists.
     """
 
     stream_data: JSON = None
@@ -1073,11 +1088,12 @@ class MapRemoveRequest:
     """transport is the connection's transport."""
 
     protocol: str = ""
-    """protocol is the client protocol: "json" or "protobuf"."""
+    """protocol is the client protocol. One of: json, protobuf."""
 
     encoding: str = ""
-    """encoding is "binary" when the proxy has binary_encoding enabled, so that
-    payloads come in the b64 fields, and "json" otherwise.
+    """encoding is binary when the proxy has binary_encoding enabled, so that
+    payloads come in the b64 fields, and json otherwise.
+    One of: json, binary.
     """
 
     user: str = ""
@@ -1185,11 +1201,12 @@ class RPCRequest:
     """transport is the connection's transport."""
 
     protocol: str = ""
-    """protocol is the client protocol: "json" or "protobuf"."""
+    """protocol is the client protocol. One of: json, protobuf."""
 
     encoding: str = ""
-    """encoding is "binary" when the proxy has binary_encoding enabled, so that
-    payloads come in the b64 fields, and "json" otherwise.
+    """encoding is binary when the proxy has binary_encoding enabled, so that
+    payloads come in the b64 fields, and json otherwise.
+    One of: json, binary.
     """
 
     user: str = ""
@@ -1291,11 +1308,12 @@ class SubRefreshRequest:
     """transport is the connection's transport."""
 
     protocol: str = ""
-    """protocol is the client protocol: "json" or "protobuf"."""
+    """protocol is the client protocol. One of: json, protobuf."""
 
     encoding: str = ""
-    """encoding is "binary" when the proxy has binary_encoding enabled, so that
-    payloads come in the b64 fields, and "json" otherwise.
+    """encoding is binary when the proxy has binary_encoding enabled, so that
+    payloads come in the b64 fields, and json otherwise.
+    One of: json, binary.
     """
 
     user: str = ""
@@ -1479,9 +1497,9 @@ class ChannelEvent:
     """channel is the channel it happened in."""
 
     type: str = ""
-    """type is "occupied" when the channel got its first subscriber, "vacated"
+    """type is occupied when the channel got its first subscriber, vacated
     when it lost its last one. More types may come; the field is a string,
-    not an enum, for JSON interoperability.
+    not an enum, for JSON interoperability. One of: occupied, vacated.
     """
 
     def _to_wire(self) -> dict[str, Any]:

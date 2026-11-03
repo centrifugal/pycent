@@ -263,9 +263,9 @@ updates a registered one. Centrifugo PRO only.
 Arguments:
 
 - `id` - The device ID. Omit it on first registration: Centrifugo generates one and returns it. Pass the stored value to update the device.
-- `provider` - The provider of the device token: fcm, hms, apns or webpush. Required.
+- `provider` - The provider of the device token. Required. One of: fcm, hms, apns, webpush.
 - `token` - The push token of the device. For webpush, it is the browser PushSubscription serialized as a JSON string. Required.
-- `platform` - The device platform: ios, android or web. Required.
+- `platform` - The device platform. Required. One of: ios, android, web.
 - `user` - The user associated with the device.
 - `meta` - Additional custom metadata of the device.
 - `topics` - The full list of the device's topic subscriptions, replacing the previous one. The user's topics are attached automatically.
@@ -327,7 +327,7 @@ Centrifugo PRO only.
 Arguments:
 
 - `device_id` - The ID of the device. Required.
-- `op` - The operation: add, remove or set. Required.
+- `op` - The operation. Required. One of: add, remove, set.
 - `topics` - The topics for the operation.
 - `user` - An optional ownership guard: the update is applied only if the device currently belongs to this user. Otherwise the call fails with a conflict error (or not found if there is no such device).
 - `timeout` - Seconds bounding the call: request_timeout when None.
@@ -494,7 +494,7 @@ Arguments:
 - `version` - A per-key version: publications with a version not higher than the key's current one are suppressed.
 - `version_epoch` - Scopes version. A different epoch resets version comparison.
 - `score` - Currently not used by the server API.
-- `key_mode` - Makes the publish conditional: "if_new" writes only if the key does not exist, "if_exists" only if it exists. Empty always writes.
+- `key_mode` - Makes the publish conditional: if_new writes only if the key does not exist, if_exists only if it exists. Empty always writes. One of: if_new, if_exists.
 - `timeout` - Seconds bounding the call: request_timeout when None.
 
 #### `map_read_state(
@@ -696,7 +696,7 @@ Arguments:
 - `uid` - A unique identifier of the request, can be used to cancel the push. UUID v4 is recommended; different requests must use different uids.
 - `send_at` - The Unix time in seconds when to send the notification. If not set, the notification is sent immediately.
 - `optimize_for_reliability` - Makes processing heavier, but tolerates edge cases, like not losing inflight pushes when the queue is briefly unavailable.
-- `limit_strategy` - Sets time constraints and rate limits. Only applies with a filter recipient; devices are then processed one by one instead of in batches.
+- `limit_strategy` - Sets time constraints and rate limits. Only applies with a filter recipient; devices are then processed one by one instead of in batches. Needs notification.expire_at: a push the limits hold back is not tried forever.
 - `analytics_uid` - The identifier for push notification analytics. If not set, uid is used.
 - `localizations` - Optional per language/locale localizations. Setting them enables templating.
 - `use_templating` - Enables templating of the notification. Only works with a filter recipient.
@@ -814,7 +814,7 @@ push notification to analytics. Experimental. Centrifugo PRO only.
 Arguments:
 
 - `analytics_uid` - The analytics_uid of the push notification (as in SendPushNotificationRequest). Required.
-- `status` - The status of the push notification: delivered or interacted. Required.
+- `status` - The status of the push notification. Required. One of: delivered, interacted.
 - `device_id` - The Centrifugo device ID. Required.
 - `msg_id` - The message ID issued by the provider.
 - `timeout` - Seconds bounding the call: request_timeout when None.
@@ -869,7 +869,7 @@ applied to the user's registered devices. Centrifugo PRO only.
 Arguments:
 
 - `user` - The user ID. Required. "" updates the global binding, which every device - anonymous ones included - gets on its next device_register.
-- `op` - The operation: add, remove or set. Required.
+- `op` - The operation. Required. One of: add, remove, set.
 - `topics` - The topics for the operation.
 - `timeout` - Seconds bounding the call: request_timeout when None.
 
@@ -1091,9 +1091,9 @@ updates a registered one. Centrifugo PRO only.
 Arguments:
 
 - `id` - The device ID. Omit it on first registration: Centrifugo generates one and returns it. Pass the stored value to update the device.
-- `provider` - The provider of the device token: fcm, hms, apns or webpush. Required.
+- `provider` - The provider of the device token. Required. One of: fcm, hms, apns, webpush.
 - `token` - The push token of the device. For webpush, it is the browser PushSubscription serialized as a JSON string. Required.
-- `platform` - The device platform: ios, android or web. Required.
+- `platform` - The device platform. Required. One of: ios, android, web.
 - `user` - The user associated with the device.
 - `meta` - Additional custom metadata of the device.
 - `topics` - The full list of the device's topic subscriptions, replacing the previous one. The user's topics are attached automatically.
@@ -1155,7 +1155,7 @@ Centrifugo PRO only.
 Arguments:
 
 - `device_id` - The ID of the device. Required.
-- `op` - The operation: add, remove or set. Required.
+- `op` - The operation. Required. One of: add, remove, set.
 - `topics` - The topics for the operation.
 - `user` - An optional ownership guard: the update is applied only if the device currently belongs to this user. Otherwise the call fails with a conflict error (or not found if there is no such device).
 - `timeout` - Seconds bounding the call: request_timeout when None.
@@ -1322,7 +1322,7 @@ Arguments:
 - `version` - A per-key version: publications with a version not higher than the key's current one are suppressed.
 - `version_epoch` - Scopes version. A different epoch resets version comparison.
 - `score` - Currently not used by the server API.
-- `key_mode` - Makes the publish conditional: "if_new" writes only if the key does not exist, "if_exists" only if it exists. Empty always writes.
+- `key_mode` - Makes the publish conditional: if_new writes only if the key does not exist, if_exists only if it exists. Empty always writes. One of: if_new, if_exists.
 - `timeout` - Seconds bounding the call: request_timeout when None.
 
 #### `async map_read_state(
@@ -1520,7 +1520,7 @@ Arguments:
 - `uid` - A unique identifier of the request, can be used to cancel the push. UUID v4 is recommended; different requests must use different uids.
 - `send_at` - The Unix time in seconds when to send the notification. If not set, the notification is sent immediately.
 - `optimize_for_reliability` - Makes processing heavier, but tolerates edge cases, like not losing inflight pushes when the queue is briefly unavailable.
-- `limit_strategy` - Sets time constraints and rate limits. Only applies with a filter recipient; devices are then processed one by one instead of in batches.
+- `limit_strategy` - Sets time constraints and rate limits. Only applies with a filter recipient; devices are then processed one by one instead of in batches. Needs notification.expire_at: a push the limits hold back is not tried forever.
 - `analytics_uid` - The identifier for push notification analytics. If not set, uid is used.
 - `localizations` - Optional per language/locale localizations. Setting them enables templating.
 - `use_templating` - Enables templating of the notification. Only works with a filter recipient.
@@ -1638,7 +1638,7 @@ push notification to analytics. Experimental. Centrifugo PRO only.
 Arguments:
 
 - `analytics_uid` - The analytics_uid of the push notification (as in SendPushNotificationRequest). Required.
-- `status` - The status of the push notification: delivered or interacted. Required.
+- `status` - The status of the push notification. Required. One of: delivered, interacted.
 - `device_id` - The Centrifugo device ID. Required.
 - `msg_id` - The message ID issued by the provider.
 - `timeout` - Seconds bounding the call: request_timeout when None.
@@ -1693,7 +1693,7 @@ applied to the user's registered devices. Centrifugo PRO only.
 Arguments:
 
 - `user` - The user ID. Required. "" updates the global binding, which every device - anonymous ones included - gets on its next device_register.
-- `op` - The operation: add, remove or set. Required.
+- `op` - The operation. Required. One of: add, remove, set.
 - `topics` - The topics for the operation.
 - `timeout` - Seconds bounding the call: request_timeout when None.
 
@@ -1870,9 +1870,9 @@ Adds a device_register command; its outcome is what Client.device_register would
 Arguments:
 
 - `id` - The device ID. Omit it on first registration: Centrifugo generates one and returns it. Pass the stored value to update the device.
-- `provider` - The provider of the device token: fcm, hms, apns or webpush. Required.
+- `provider` - The provider of the device token. Required. One of: fcm, hms, apns, webpush.
 - `token` - The push token of the device. For webpush, it is the browser PushSubscription serialized as a JSON string. Required.
-- `platform` - The device platform: ios, android or web. Required.
+- `platform` - The device platform. Required. One of: ios, android, web.
 - `user` - The user associated with the device.
 - `meta` - Additional custom metadata of the device.
 - `topics` - The full list of the device's topic subscriptions, replacing the previous one. The user's topics are attached automatically.
@@ -1924,7 +1924,7 @@ Adds a device_topic_update command; its outcome is what Client.device_topic_upda
 Arguments:
 
 - `device_id` - The ID of the device. Required.
-- `op` - The operation: add, remove or set. Required.
+- `op` - The operation. Required. One of: add, remove, set.
 - `topics` - The topics for the operation.
 - `user` - An optional ownership guard: the update is applied only if the device currently belongs to this user. Otherwise the call fails with a conflict error (or not found if there is no such device).
 
@@ -2069,7 +2069,7 @@ Arguments:
 - `version` - A per-key version: publications with a version not higher than the key's current one are suppressed.
 - `version_epoch` - Scopes version. A different epoch resets version comparison.
 - `score` - Currently not used by the server API.
-- `key_mode` - Makes the publish conditional: "if_new" writes only if the key does not exist, "if_exists" only if it exists. Empty always writes.
+- `key_mode` - Makes the publish conditional: if_new writes only if the key does not exist, if_exists only if it exists. Empty always writes. One of: if_new, if_exists.
 
 #### `map_read_state(
     *,
@@ -2242,7 +2242,7 @@ Arguments:
 - `uid` - A unique identifier of the request, can be used to cancel the push. UUID v4 is recommended; different requests must use different uids.
 - `send_at` - The Unix time in seconds when to send the notification. If not set, the notification is sent immediately.
 - `optimize_for_reliability` - Makes processing heavier, but tolerates edge cases, like not losing inflight pushes when the queue is briefly unavailable.
-- `limit_strategy` - Sets time constraints and rate limits. Only applies with a filter recipient; devices are then processed one by one instead of in batches.
+- `limit_strategy` - Sets time constraints and rate limits. Only applies with a filter recipient; devices are then processed one by one instead of in batches. Needs notification.expire_at: a push the limits hold back is not tried forever.
 - `analytics_uid` - The identifier for push notification analytics. If not set, uid is used.
 - `localizations` - Optional per language/locale localizations. Setting them enables templating.
 - `use_templating` - Enables templating of the notification. Only works with a filter recipient.
@@ -2346,7 +2346,7 @@ Adds a update_push_status command; its outcome is what Client.update_push_status
 Arguments:
 
 - `analytics_uid` - The analytics_uid of the push notification (as in SendPushNotificationRequest). Required.
-- `status` - The status of the push notification: delivered or interacted. Required.
+- `status` - The status of the push notification. Required. One of: delivered, interacted.
 - `device_id` - The Centrifugo device ID. Required.
 - `msg_id` - The message ID issued by the provider.
 
@@ -2388,7 +2388,7 @@ Adds a user_topic_update command; its outcome is what Client.user_topic_update w
 Arguments:
 
 - `user` - The user ID. Required. "" updates the global binding, which every device - anonymous ones included - gets on its next device_register.
-- `op` - The operation: add, remove or set. Required.
+- `op` - The operation. Required. One of: add, remove, set.
 - `topics` - The topics for the operation.
 
 ### `AsyncBatch`
@@ -2519,9 +2519,9 @@ Adds a device_register command; its outcome is what Client.device_register would
 Arguments:
 
 - `id` - The device ID. Omit it on first registration: Centrifugo generates one and returns it. Pass the stored value to update the device.
-- `provider` - The provider of the device token: fcm, hms, apns or webpush. Required.
+- `provider` - The provider of the device token. Required. One of: fcm, hms, apns, webpush.
 - `token` - The push token of the device. For webpush, it is the browser PushSubscription serialized as a JSON string. Required.
-- `platform` - The device platform: ios, android or web. Required.
+- `platform` - The device platform. Required. One of: ios, android, web.
 - `user` - The user associated with the device.
 - `meta` - Additional custom metadata of the device.
 - `topics` - The full list of the device's topic subscriptions, replacing the previous one. The user's topics are attached automatically.
@@ -2573,7 +2573,7 @@ Adds a device_topic_update command; its outcome is what Client.device_topic_upda
 Arguments:
 
 - `device_id` - The ID of the device. Required.
-- `op` - The operation: add, remove or set. Required.
+- `op` - The operation. Required. One of: add, remove, set.
 - `topics` - The topics for the operation.
 - `user` - An optional ownership guard: the update is applied only if the device currently belongs to this user. Otherwise the call fails with a conflict error (or not found if there is no such device).
 
@@ -2718,7 +2718,7 @@ Arguments:
 - `version` - A per-key version: publications with a version not higher than the key's current one are suppressed.
 - `version_epoch` - Scopes version. A different epoch resets version comparison.
 - `score` - Currently not used by the server API.
-- `key_mode` - Makes the publish conditional: "if_new" writes only if the key does not exist, "if_exists" only if it exists. Empty always writes.
+- `key_mode` - Makes the publish conditional: if_new writes only if the key does not exist, if_exists only if it exists. Empty always writes. One of: if_new, if_exists.
 
 #### `map_read_state(
     *,
@@ -2880,7 +2880,7 @@ Arguments:
 - `uid` - A unique identifier of the request, can be used to cancel the push. UUID v4 is recommended; different requests must use different uids.
 - `send_at` - The Unix time in seconds when to send the notification. If not set, the notification is sent immediately.
 - `optimize_for_reliability` - Makes processing heavier, but tolerates edge cases, like not losing inflight pushes when the queue is briefly unavailable.
-- `limit_strategy` - Sets time constraints and rate limits. Only applies with a filter recipient; devices are then processed one by one instead of in batches.
+- `limit_strategy` - Sets time constraints and rate limits. Only applies with a filter recipient; devices are then processed one by one instead of in batches. Needs notification.expire_at: a push the limits hold back is not tried forever.
 - `analytics_uid` - The identifier for push notification analytics. If not set, uid is used.
 - `localizations` - Optional per language/locale localizations. Setting them enables templating.
 - `use_templating` - Enables templating of the notification. Only works with a filter recipient.
@@ -2984,7 +2984,7 @@ Adds a update_push_status command; its outcome is what Client.update_push_status
 Arguments:
 
 - `analytics_uid` - The analytics_uid of the push notification (as in SendPushNotificationRequest). Required.
-- `status` - The status of the push notification: delivered or interacted. Required.
+- `status` - The status of the push notification. Required. One of: delivered, interacted.
 - `device_id` - The Centrifugo device ID. Required.
 - `msg_id` - The message ID issued by the provider.
 
@@ -3026,7 +3026,7 @@ Adds a user_topic_update command; its outcome is what Client.user_topic_update w
 Arguments:
 
 - `user` - The user ID. Required. "" updates the global binding, which every device - anonymous ones included - gets on its next device_register.
-- `op` - The operation: add, remove or set. Required.
+- `op` - The operation. Required. One of: add, remove, set.
 - `topics` - The topics for the operation.
 
 ### `Pending`
@@ -3245,9 +3245,9 @@ The device_register command.
 Arguments:
 
 - `id` - The device ID. Omit it on first registration: Centrifugo generates one and returns it. Pass the stored value to update the device.
-- `provider` - The provider of the device token: fcm, hms, apns or webpush. Required.
+- `provider` - The provider of the device token. Required. One of: fcm, hms, apns, webpush.
 - `token` - The push token of the device. For webpush, it is the browser PushSubscription serialized as a JSON string. Required.
-- `platform` - The device platform: ios, android or web. Required.
+- `platform` - The device platform. Required. One of: ios, android, web.
 - `user` - The user associated with the device.
 - `meta` - Additional custom metadata of the device.
 - `topics` - The full list of the device's topic subscriptions, replacing the previous one. The user's topics are attached automatically.
@@ -3295,7 +3295,7 @@ The device_topic_update command.
 Arguments:
 
 - `device_id` - The ID of the device. Required.
-- `op` - The operation: add, remove or set. Required.
+- `op` - The operation. Required. One of: add, remove, set.
 - `topics` - The topics for the operation.
 - `user` - An optional ownership guard: the update is applied only if the device currently belongs to this user. Otherwise the call fails with a conflict error (or not found if there is no such device).
 
@@ -3440,7 +3440,7 @@ Arguments:
 - `version` - A per-key version: publications with a version not higher than the key's current one are suppressed.
 - `version_epoch` - Scopes version. A different epoch resets version comparison.
 - `score` - Currently not used by the server API.
-- `key_mode` - Makes the publish conditional: "if_new" writes only if the key does not exist, "if_exists" only if it exists. Empty always writes.
+- `key_mode` - Makes the publish conditional: if_new writes only if the key does not exist, if_exists only if it exists. Empty always writes. One of: if_new, if_exists.
 
 #### `map_read_state(
     *,
@@ -3602,7 +3602,7 @@ Arguments:
 - `uid` - A unique identifier of the request, can be used to cancel the push. UUID v4 is recommended; different requests must use different uids.
 - `send_at` - The Unix time in seconds when to send the notification. If not set, the notification is sent immediately.
 - `optimize_for_reliability` - Makes processing heavier, but tolerates edge cases, like not losing inflight pushes when the queue is briefly unavailable.
-- `limit_strategy` - Sets time constraints and rate limits. Only applies with a filter recipient; devices are then processed one by one instead of in batches.
+- `limit_strategy` - Sets time constraints and rate limits. Only applies with a filter recipient; devices are then processed one by one instead of in batches. Needs notification.expire_at: a push the limits hold back is not tried forever.
 - `analytics_uid` - The identifier for push notification analytics. If not set, uid is used.
 - `localizations` - Optional per language/locale localizations. Setting them enables templating.
 - `use_templating` - Enables templating of the notification. Only works with a filter recipient.
@@ -3700,7 +3700,7 @@ The update_push_status command.
 Arguments:
 
 - `analytics_uid` - The analytics_uid of the push notification (as in SendPushNotificationRequest). Required.
-- `status` - The status of the push notification: delivered or interacted. Required.
+- `status` - The status of the push notification. Required. One of: delivered, interacted.
 - `device_id` - The Centrifugo device ID. Required.
 - `msg_id` - The message ID issued by the provider.
 
@@ -3737,7 +3737,7 @@ The user_topic_update command.
 Arguments:
 
 - `user` - The user ID. Required. "" updates the global binding, which every device - anonymous ones included - gets on its next device_register.
-- `op` - The operation: add, remove or set. Required.
+- `op` - The operation. Required. One of: add, remove, set.
 - `topics` - The topics for the operation.
 
 ### `FailedCommand`
@@ -5481,7 +5481,7 @@ Empty at the moment. Centrifugo PRO only.
 
 DeviceTopicsUpdate changes the topics of devices. Centrifugo PRO only.
 
-- `op: str = ''` - op is the operation: add, remove or set. Required.
+- `op: str = ''` - op is the operation. Required. One of: add, remove, set.
 - `topics: list[str] = []` - topics are the topics for the operation.
 
 #### `DeviceUpdateResult`
@@ -5521,9 +5521,9 @@ vals) or a logical operation (op) over child nodes.
 Centrifugo PRO only: defined here for protocol-surface consistency,
 Centrifugo OSS parses it but ignores it.
 
-- `op: str = ''` - op is the logical operation of a non-leaf node: "and", "or" or "not". Empty for a leaf node.
+- `op: str = ''` - op is the logical operation of a non-leaf node. Empty for a leaf node. One of: and, or, not.
 - `key: str = ''` - key is the label key a leaf node compares.
-- `cmp: str = ''` - cmp is the comparison of a leaf node: "eq", "neq", "in", "nin", "ex", "nex", "sw", "ew", "ct", "gt", "gte", "lt" or "lte".
+- `cmp: str = ''` - cmp is the comparison of a leaf node. One of: eq, neq, in, nin, ex, nex, sw, ew, ct, gt, gte, lt, lte.
 - `val: str = ''` - val is the value to compare with, for single-value comparisons.
 - `vals: list[str] = []` - vals are the values to compare with, for "in" and "nin".
 - `nodes: list[FilterNode] = []` - nodes are the child nodes of a logical operation.
@@ -5704,7 +5704,7 @@ Centrifugo PRO only.
 - `hms: HmsPushNotification | None = None` - hms is the notification for HMS.
 - `apns: ApnsPushNotification | None = None` - apns is the notification for APNs.
 - `webpush: WebPushPushNotification | None = None` - webpush is the notification for Web Push.
-- `expire_at: int = 0` - expire_at is the Unix time in seconds when Centrifugo stops trying to send the notification. Not related to the providers' TTL fields.
+- `expire_at: int = 0` - expire_at is the Unix time in seconds when Centrifugo stops trying to send the notification. Not related to the providers' TTL fields. Required when the request sets limit_strategy.
 
 #### `PushRateLimitStrategy`
 
@@ -5876,7 +5876,7 @@ ChannelEvent is a change of a channel's state.
 
 - `time_ms: int = 0` - time_ms is when it happened, in Unix milliseconds.
 - `channel: str = ''` - channel is the channel it happened in.
-- `type: str = ''` - type is "occupied" when the channel got its first subscriber, "vacated" when it lost its last one. More types may come; the field is a string, not an enum, for JSON interoperability.
+- `type: str = ''` - type is occupied when the channel got its first subscriber, vacated when it lost its last one. More types may come; the field is a string, not an enum, for JSON interoperability. One of: occupied, vacated.
 
 #### `ChannelsCapability`
 
@@ -5885,8 +5885,8 @@ operation in a channel when any of its capabilities both allows the
 operation and matches the channel. Centrifugo PRO only.
 
 - `channels: list[str] = []` - channels are the channels, or channel patterns, it applies to.
-- `allow: list[str] = []` - allow are the operations it grants: "sub" (subscribe), "pub" (publish), "hst" (history) and "prs" (presence).
-- `match: str = ''` - match is how channels are matched: empty for exact names, "wildcard" or "regex".
+- `allow: list[str] = []` - allow are the operations it grants: sub is subscribe, pub publish, hst history, prs presence. One of: sub, pub, hst, prs.
+- `match: str = ''` - match is how channels are matched: empty for exact names. One of: wildcard, regex.
 
 #### `ConnectRequest`
 
@@ -5894,8 +5894,8 @@ ConnectRequest is sent when a client connects.
 
 - `client: str = ''` - client is the unique ID Centrifugo gave the connection.
 - `transport: str = ''` - transport is the connection's transport: "websocket", "sse", "uni_sse" and the like.
-- `protocol: str = ''` - protocol is the client protocol: "json" or "protobuf".
-- `encoding: str = ''` - encoding is "binary" when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and "json" otherwise.
+- `protocol: str = ''` - protocol is the client protocol. One of: json, protobuf.
+- `encoding: str = ''` - encoding is binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary.
 - `data: JSON = None` - data is the custom data the client sent with its connect command, if any.
 - `b64data: str = ''` - b64data is data in base64, sent instead of data in binary encoding mode.
 - `name: str = ''` - name is the client's name, if it sent one.
@@ -5917,6 +5917,7 @@ ConnectResult accepts the connection.
 - `meta: JSON = None` - meta is custom data attached to the connection, as JSON. It is never sent to the client; proxies with include_connection_meta receive it.
 - `caps: list[ChannelsCapability] = []` - caps are capabilities granting the connection operations in channels. Centrifugo PRO only.
 - `labels: dict[str, str] = {}` - PRO only — client labels attached to the centrifuge.Client by Centrifugo PRO. Parsed by OSS but not used (OSS does not populate centrifuge.ConnectReply.Labels).
+- `profile: str = ''` - profile assigns the connection to a dictionary compression profile, as the profile claim of a connection token does: it overrides the profile the client declared. Centrifugo PRO only.
 
 #### `FilterNode`
 
@@ -5924,9 +5925,9 @@ FilterNode is a node of a publication tags filter expression. A leaf node
 compares one tag: it sets key, cmp and val or vals, and leaves op empty. A
 logical node combines its nodes: it sets op and nodes only.
 
-- `op: str = ''` - op is the logical operation: "and", "or" or "not". Empty for a leaf node.
+- `op: str = ''` - op is the logical operation. Empty for a leaf node. One of: and, or, not.
 - `key: str = ''` - key is the tag a leaf node compares.
-- `cmp: str = ''` - cmp is the comparison of a leaf node: "eq", "neq", "in", "nin", "ex" (exists), "nex" (does not exist), "sw" (starts with), "ew" (ends with), "ct" (contains), "gt", "gte", "lt" or "lte".
+- `cmp: str = ''` - cmp is the comparison of a leaf node: ex is exists, nex does not exist, sw starts with, ew ends with, ct contains. One of: eq, neq, in, nin, ex, nex, sw, ew, ct, gt, gte, lt, lte.
 - `val: str = ''` - val is the value most comparisons compare the tag with.
 - `vals: list[str] = []` - vals are the values "in" and "nin" compare the tag with.
 - `nodes: list[FilterNode] = []` - nodes are the operands of a logical node.
@@ -5937,8 +5938,8 @@ MapPublishRequest is sent when a client publishes a key into a map channel.
 
 - `client: str = ''` - client is the unique ID Centrifugo gave the connection.
 - `transport: str = ''` - transport is the connection's transport.
-- `protocol: str = ''` - protocol is the client protocol: "json" or "protobuf".
-- `encoding: str = ''` - encoding is "binary" when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and "json" otherwise.
+- `protocol: str = ''` - protocol is the client protocol. One of: json, protobuf.
+- `encoding: str = ''` - encoding is binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary.
 - `user: str = ''` - user is the connection's user ID.
 - `channel: str = ''` - channel is the map channel the client publishes into.
 - `key: str = ''` - key is the key the client publishes, empty if it sent none.
@@ -5957,7 +5958,7 @@ unset keep what the client sent, or the defaults.
 - `b64data: str = ''` - b64data is data in base64, for binary data.
 - `tags: dict[str, str] = {}` - tags are attached to the publication: clients cannot send tags, so this is where server-side tag filters get their tags from.
 - `score: int = 0` - score is not used by Centrifugo yet.
-- `key_mode: str = ''` - key_mode makes the publication conditional: "if_new" publishes only a key which does not exist yet, "if_exists" only one which does.
+- `key_mode: str = ''` - key_mode makes the publication conditional: if_new publishes only a key which does not exist yet, if_exists only one which does. One of: if_new, if_exists.
 - `stream_data: JSON = None` - stream_data is not used by Centrifugo yet.
 - `b64stream_data: str = ''` - b64stream_data is not used by Centrifugo yet.
 - `idempotency_key: str = ''` - idempotency_key makes the publication idempotent: another one with the same key within the broker's idempotency window is not published.
@@ -5971,8 +5972,8 @@ MapRemoveRequest is sent when a client removes a key from a map channel.
 
 - `client: str = ''` - client is the unique ID Centrifugo gave the connection.
 - `transport: str = ''` - transport is the connection's transport.
-- `protocol: str = ''` - protocol is the client protocol: "json" or "protobuf".
-- `encoding: str = ''` - encoding is "binary" when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and "json" otherwise.
+- `protocol: str = ''` - protocol is the client protocol. One of: json, protobuf.
+- `encoding: str = ''` - encoding is binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary.
 - `user: str = ''` - user is the connection's user ID.
 - `channel: str = ''` - channel is the map channel the client removes the key from.
 - `key: str = ''` - key is the key the client removes.
@@ -6019,8 +6020,8 @@ PublishRequest is sent when a client publishes into a channel.
 
 - `client: str = ''` - client is the unique ID Centrifugo gave the connection.
 - `transport: str = ''` - transport is the connection's transport.
-- `protocol: str = ''` - protocol is the client protocol: "json" or "protobuf".
-- `encoding: str = ''` - encoding is "binary" when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and "json" otherwise.
+- `protocol: str = ''` - protocol is the client protocol. One of: json, protobuf.
+- `encoding: str = ''` - encoding is binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary.
 - `user: str = ''` - user is the connection's user ID.
 - `channel: str = ''` - channel is the channel the client publishes into.
 - `data: JSON = None` - data is the data the client publishes.
@@ -6048,8 +6049,8 @@ RPCRequest is sent when a client makes an RPC call.
 
 - `client: str = ''` - client is the unique ID Centrifugo gave the connection.
 - `transport: str = ''` - transport is the connection's transport.
-- `protocol: str = ''` - protocol is the client protocol: "json" or "protobuf".
-- `encoding: str = ''` - encoding is "binary" when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and "json" otherwise.
+- `protocol: str = ''` - protocol is the client protocol. One of: json, protobuf.
+- `encoding: str = ''` - encoding is binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary.
 - `user: str = ''` - user is the connection's user ID.
 - `method: str = ''` - method is the method the client calls, empty if it named none.
 - `data: JSON = None` - data is the data the client sent with the call.
@@ -6070,8 +6071,8 @@ RefreshRequest is sent when a connection is about to expire.
 
 - `client: str = ''` - client is the unique ID Centrifugo gave the connection.
 - `transport: str = ''` - transport is the connection's transport.
-- `protocol: str = ''` - protocol is the client protocol: "json" or "protobuf".
-- `encoding: str = ''` - encoding is "binary" when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and "json" otherwise.
+- `protocol: str = ''` - protocol is the client protocol. One of: json, protobuf.
+- `encoding: str = ''` - encoding is binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary.
 - `user: str = ''` - user is the connection's user ID.
 - `meta: JSON = None` - meta is the connection's meta, when the proxy has include_connection_meta.
 - `labels: dict[str, str] = {}` - PRO only — connection labels attached to the originating centrifuge.Client. Centrifugo PRO always populates this from Client.Labels() (no opt-in toggle).
@@ -6126,8 +6127,8 @@ SubRefreshRequest is sent when a subscription is about to expire.
 
 - `client: str = ''` - client is the unique ID Centrifugo gave the connection.
 - `transport: str = ''` - transport is the connection's transport.
-- `protocol: str = ''` - protocol is the client protocol: "json" or "protobuf".
-- `encoding: str = ''` - encoding is "binary" when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and "json" otherwise.
+- `protocol: str = ''` - protocol is the client protocol. One of: json, protobuf.
+- `encoding: str = ''` - encoding is binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary.
 - `user: str = ''` - user is the connection's user ID.
 - `channel: str = ''` - channel is the channel whose subscription is about to expire.
 - `meta: JSON = None` - meta is the connection's meta, when the proxy has include_connection_meta.
@@ -6174,8 +6175,8 @@ SubscribeRequest is sent when a client subscribes to a channel.
 
 - `client: str = ''` - client is the unique ID Centrifugo gave the connection.
 - `transport: str = ''` - transport is the connection's transport.
-- `protocol: str = ''` - protocol is the client protocol: "json" or "protobuf".
-- `encoding: str = ''` - encoding is "binary" when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and "json" otherwise.
+- `protocol: str = ''` - protocol is the client protocol. One of: json, protobuf.
+- `encoding: str = ''` - encoding is binary when the proxy has binary_encoding enabled, so that payloads come in the b64 fields, and json otherwise. One of: json, binary.
 - `user: str = ''` - user is the connection's user ID.
 - `channel: str = ''` - channel is the channel the client subscribes to.
 - `token: str = ''` - token is the subscription token the client sent for the channel, if any.
@@ -6194,7 +6195,7 @@ SubscribeResult accepts the subscription.
 - `data: JSON = None` - data is custom data sent to the client in the subscribe reply.
 - `b64data: str = ''` - b64data is data in base64, for binary data.
 - `override: SubscribeOptionOverride | None = None` - override overrides channel options of the namespace for this subscription.
-- `allow: list[str] = []` - allow are capabilities granted in the channel for this subscription: "sub", "pub", "hst" and "prs". Centrifugo PRO only.
+- `allow: list[str] = []` - allow are capabilities granted in the channel for this subscription. Centrifugo PRO only. One of: sub, pub, hst, prs.
 - `server_tags_filter: FilterNode | None = None` - server_tags_filter makes the subscription receive only publications whose tags match it. Centrifugo PRO only.
 
 </details>

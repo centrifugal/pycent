@@ -508,11 +508,11 @@ class Commands:
             id: The device ID. Omit it on first registration: Centrifugo
                 generates one and returns it. Pass the stored value to update the
                 device.
-            provider: The provider of the device token: fcm, hms, apns or
-                webpush. Required.
+            provider: The provider of the device token. Required. One of: fcm,
+                hms, apns, webpush.
             token: The push token of the device. For webpush, it is the browser
                 PushSubscription serialized as a JSON string. Required.
-            platform: The device platform: ios, android or web. Required.
+            platform: The device platform. Required. One of: ios, android, web.
             user: The user associated with the device.
             meta: Additional custom metadata of the device.
             topics: The full list of the device's topic subscriptions, replacing
@@ -657,7 +657,7 @@ class Commands:
 
         Args:
             device_id: The ID of the device. Required.
-            op: The operation: add, remove or set. Required.
+            op: The operation. Required. One of: add, remove, set.
             topics: The topics for the operation.
             user: An optional ownership guard: the update is applied only if the
                 device currently belongs to this user. Otherwise the call fails with a
@@ -695,7 +695,7 @@ class Commands:
         Args:
             user: The user ID. Required. "" updates the global binding, which every
                 device - anonymous ones included - gets on its next device_register.
-            op: The operation: add, remove or set. Required.
+            op: The operation. Required. One of: add, remove, set.
             topics: The topics for the operation.
         """
         return new_command(UserTopicUpdateRequest(user=user, op=op, topics=topics if topics is not None else []))
@@ -729,7 +729,8 @@ class Commands:
                 unavailable.
             limit_strategy: Sets time constraints and rate limits. Only applies
                 with a filter recipient; devices are then processed one by one
-                instead of in batches.
+                instead of in batches. Needs notification.expire_at: a push the limits
+                hold back is not tried forever.
             analytics_uid: The identifier for push notification analytics. If
                 not set, uid is used.
             localizations: Optional per language/locale localizations. Setting
@@ -760,8 +761,8 @@ class Commands:
         Args:
             analytics_uid: The analytics_uid of the push notification (as in
                 SendPushNotificationRequest). Required.
-            status: The status of the push notification: delivered or
-                interacted. Required.
+            status: The status of the push notification. Required. One of:
+                delivered, interacted.
             device_id: The Centrifugo device ID. Required.
             msg_id: The message ID issued by the provider.
         """
@@ -818,9 +819,9 @@ class Commands:
             version_epoch: Scopes version. A different epoch resets version
                 comparison.
             score: Currently not used by the server API.
-            key_mode: Makes the publish conditional: "if_new" writes only if the
-                key does not exist, "if_exists" only if it exists. Empty always
-                writes.
+            key_mode: Makes the publish conditional: if_new writes only if the key
+                does not exist, if_exists only if it exists. Empty always writes.
+                One of: if_new, if_exists.
         """
         return new_command(
             MapPublishRequest(
