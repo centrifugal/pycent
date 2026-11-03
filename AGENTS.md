@@ -2,7 +2,7 @@
 
 cent is the Python SDK for Centrifugo's HTTP server API, written to the
 [Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/master/spec.md),
-whose reference implementation is gocent. Applications use it on their hot
+version 0.3, whose reference implementation is gocent. Applications use it on their hot
 paths and from both threads and asyncio, so it has to be correct under
 concurrency and hard to misuse. Read this before changing code.
 
@@ -10,7 +10,7 @@ concurrency and hard to misuse. Read this before changing code.
 
 | Path | What |
 |---|---|
-| `proto/api.proto`, `proto/proxy.proto` | Copies of Centrifugo's protos, from a released tag (`make sync-proto CENTRIFUGO_REF=v6.10.2`) |
+| `proto/api.proto`, `proto/proxy.proto` | Copies of Centrifugo's protos, from a released tag (`make sync-proto CENTRIFUGO_REF=v6.10.2`). Today from Centrifugo master, for the "One of:" sentences of centrifugo#1308-#1310, which no tag has yet: sync them from the tag before releasing |
 | `gen/required_fields.txt` | The fields the protos mark "Required.", made required keyword arguments - of the methods and of the nested dataclasses - and checked for a value before sending by each request's generated `_required`, but those whose empty value has a meaning (spec 3.3). Generation fails when the protos' list differs: a newly required field breaks every call without it, so review the change - fix the proto upstream if Centrifugo accepts the field absent - then `python gen/generate.py --accept-required` |
 | `gen/` | The generator: `proto.py` parses the protos, `generate.py` writes the code |
 | `cent/_api.py`, `cent/proxy/_types.py` | Generated - never edited |
@@ -20,6 +20,7 @@ concurrency and hard to misuse. Read this before changing code.
 | `cent/_wire.py`, `cent/_payload.py` | Encoding requests, decoding replies, payloads and `RawJSON` |
 | `cent/_errors.py` | The exceptions and `retryable` |
 | `cent/_broadcast.py`, `cent/_batch.py`, `cent/_autobatch.py`, `cent/_retry.py` | Broadcast results, batches, automatic batching, retries |
+| `cent/_pages.py` | The `<method>_all` iterators, written once over the cursor and once for history |
 | `cent/_http.py` | The HTTP handlers' framework-free core and its ASGI and WSGI adapters |
 | `cent/endpoints.py`, `cent/proxy/`, `cent/token.py`, `cent/sharedpoll.py` | Endpoints for client SDKs, proxy handlers, tokens, shared poll signatures |
 | `tests/`, `tests/integration/` | Unit tests against a fake Centrifugo; integration tests against a real one |
@@ -129,5 +130,14 @@ which Centrifugo reaches as `host.docker.internal`.
   does not provide.
 - **`BoolValue` fields are `bool | None`.** `None` leaves the server's setting
   alone, which `False` cannot say.
+- **An empty `device_update` update is sent as `{}`**: `user_update`,
+  `timezone_update`, `locale_update` and `meta_update` are presence wrappers,
+  which an empty value detaches or clears; every other message with nothing
+  set is left out. The generator finds the wrappers in the comments, and
+  `tests/test_generate.py` pins them.
+- **The async `<method>_all` return a class, not an async generator**:
+  leaving an `async for` early then leaves nothing for the event loop to
+  finalize. They, and `history_all`'s refusals, run at the call: the methods
+  are not `async def`.
 - **An automatic batch always goes to `/api/batch`**, even with one command,
   and with `parallel: true`: its calls were made concurrently.

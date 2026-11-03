@@ -18,6 +18,18 @@ Migrating from cent 5: see [MIGRATING.md](MIGRATING.md).
 * Fields the protos mark required are required keyword arguments. `cent.to_dict` renders results and errors with Centrifugo's field names. `Pending.resolved` and the public constructors of results and partial-failure errors make test doubles; the README shows a fake transport.
 * An `AsyncClient` used from a second event loop raises `InvalidConfigError`; a `Client` in a forked process starts its own connections.
 
+Spec 0.3:
+
+* `api.proto` and `proxy.proto` from Centrifugo master (centrifugal/centrifugo#1308, #1309, #1310), which no release has yet: they are synced again from a Centrifugo tag before this release. `proxy.ConnectResult` gains `profile`.
+* A field the protos mark required is checked for a value before sending, by the client, a batch and `cent.command`: given empty - `channel=""`, a nested message with nothing set - it raises `InvalidRequestError` naming its path, such as `limit_strategy.rate_limit.policies[0].rate`, where Centrifugo used to refuse the call with code 107. A payload set to JSON null, `cent.RawJSON("null")`, is a value. Fields whose empty value has a meaning are sent empty: `invalidate_user_tokens(user="")`, `user_topic_update(user="")`.
+* The nested types take their required fields as required keyword arguments: `DeviceTopicsUpdate(op=...)`, `RateLimitPolicy(rate=..., interval_ms=...)`, `PushTimeLimitStrategy(...)`, the push notifications' `message` and `payload`, and the device updates' values - `DeviceUserUpdate(user="")`.
+* `device_update`'s `user_update`, `timezone_update`, `locale_update` and `meta_update` are sent whenever set, even empty: an empty one detaches the devices from their user or clears the value, which could not be written before. Any other nested message with nothing set is still not sent.
+* Constants for the string fields with a fixed set of values: `cent.PROVIDER_FCM`, `cent.PLATFORM_IOS`, `cent.OP_ADD`, `cent.STATUS_DELIVERED`, `cent.KEY_MODE_IF_NEW`, `cent.CMP_EQ`, `cent.FILTER_NODE_OP_AND`, and in `cent.proxy` `ENCODING_BINARY`, `PROTOCOL_JSON`, `ALLOW_SUB`, `TYPE_OCCUPIED` and the rest. The fields stay strings.
+* `history_all`, `device_list_all`, `device_topic_list_all`, `user_topic_list_all` and `map_read_state_all`: the items of every page, a generator on `Client`, an async iterator on `AsyncClient`. `history_all` refuses a `limit` below 1 and `reverse`; `map_read_state_all` reads later pages at the first one's revision.
+* `position()`, a `StreamPosition`, on the results of `publish`, `history`, `map_read_state`, `map_read_stream`, `map_publish` and `map_remove`.
+* `token.ConnectionClaims.profile`: the dictionary compression profile claim (Centrifugo PRO).
+* Docs: the redirect hint says Centrifugo's API never redirects a call - check the scheme and the path of `api_endpoint`; a command's payload is written as the JSON itself where the method goes apart; what Centrifugo makes of a proxy response with nothing in it.
+
 v4.1.0
 ======
 
