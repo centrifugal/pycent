@@ -1,5 +1,6 @@
 """The rules the client checks before sending: those which hold for every
-Centrifugo. Everything else Centrifugo checks itself."""
+Centrifugo - the protos' "Required." marks, generated as each request's
+_required, and the data rules. Everything else Centrifugo checks itself."""
 
 from __future__ import annotations
 
@@ -21,15 +22,18 @@ def method_of(request: Any) -> str:
 
 
 def validate(request: Any) -> None:
-    """InvalidRequestError for a request the client can tell is wrong."""
+    """InvalidRequestError for a request the client can tell is wrong: a field
+    the proto marks "Required." without a value - unset, or given empty, which
+    is not sent - named by its path, such as
+    limit_strategy.rate_limit.policies[0].rate; and the data rules of publish
+    and broadcast (spec 3.5). A required field whose empty value has a
+    meaning - invalidate_user_tokens' user, say - is not checked."""
+    if path := request._required():
+        raise InvalidRequestError(f"invalid {request.api_method} request: {path} is required")
     if isinstance(request, PublishRequest):
-        if not request.channel:
-            raise InvalidRequestError("invalid publish request: channel is required")
         if request.data is None and not request.b64data:
             raise InvalidRequestError(f"invalid publish request: data or b64data is required{_NULL_HINT}")
     elif isinstance(request, BroadcastRequest):
-        if not request.channels:
-            raise InvalidRequestError("invalid broadcast request: channels is required")
         if request.data is None and not request.b64data:
             raise InvalidRequestError(f"invalid broadcast request: data or b64data is required{_NULL_HINT}")
         for i, ch in enumerate(request.channels):

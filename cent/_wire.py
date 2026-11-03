@@ -28,6 +28,12 @@ def payload(value: JSON, where: str) -> _Payload:
     return _Payload(value, where)
 
 
+def is_set(message: Any) -> bool:
+    """Whether a nested message is set: not None, and not empty - an empty one
+    is not sent, so it is as good as unset."""
+    return message is not None and bool(message._to_wire())
+
+
 def encode(wire: dict[str, Any], method: str) -> bytes:
     """The JSON body of a request, from its _to_wire form.
 

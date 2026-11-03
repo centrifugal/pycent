@@ -5302,7 +5302,7 @@ needs a blocking function.
 ApnsPushNotification is a notification for APNs. Centrifugo PRO only.
 
 - `headers: dict[str, str] = {}` - headers are the APNs request headers.
-- `payload: JSON = None` - payload is the APNs payload as JSON. Required.
+- `payload: JSON` - payload is the APNs payload as JSON. Required.
 
 #### `BlockUserResult`
 
@@ -5427,13 +5427,13 @@ Centrifugo PRO only.
 
 DeviceLocaleUpdate sets the locale of devices. Centrifugo PRO only.
 
-- `locale: str = ''` - locale is the locale to set. Required. "" clears it.
+- `locale: str` - locale is the locale to set. Required. "" clears it.
 
 #### `DeviceMetaUpdate`
 
 DeviceMetaUpdate sets the meta of devices. Centrifugo PRO only.
 
-- `meta: dict[str, str] = {}` - meta is the meta to set. Required. An empty map clears it.
+- `meta: dict[str, str]` - meta is the meta to set. Required. An empty map clears it.
 
 #### `DeviceRegisterResult`
 
@@ -5451,7 +5451,7 @@ moment. Centrifugo PRO only.
 
 DeviceTimezoneUpdate sets the timezone of devices. Centrifugo PRO only.
 
-- `timezone: str = ''` - timezone is the IANA time zone to set. Required. "" clears it.
+- `timezone: str` - timezone is the IANA time zone to set. Required. "" clears it.
 
 #### `DeviceTopic`
 
@@ -5490,7 +5490,7 @@ Empty at the moment. Centrifugo PRO only.
 
 DeviceTopicsUpdate changes the topics of devices. Centrifugo PRO only.
 
-- `op: str = ''` - op is the operation. Required. One of: add, remove, set.
+- `op: str` - op is the operation. Required. One of: add, remove, set.
 - `topics: list[str] = []` - topics are the topics for the operation.
 
 #### `DeviceUpdateResult`
@@ -5502,7 +5502,7 @@ moment. Centrifugo PRO only.
 
 DeviceUserUpdate sets the user of devices. Centrifugo PRO only.
 
-- `user: str = ''` - user is the user ID to set. Required. "" detaches the devices from their user.
+- `user: str` - user is the user ID to set. Required. "" detaches the devices from their user.
 
 #### `Disconnect`
 
@@ -5519,7 +5519,7 @@ DisconnectResult is the result of a disconnect call. Empty at the moment.
 
 FcmPushNotification is a notification for FCM. Centrifugo PRO only.
 
-- `message: JSON = None` - message is the FCM Message object as JSON. Required.
+- `message: JSON` - message is the FCM Message object as JSON. Required.
 
 #### `FilterNode`
 
@@ -5561,7 +5561,7 @@ HistoryResult is the result of a history call.
 
 HmsPushNotification is a notification for HMS. Centrifugo PRO only.
 
-- `message: JSON = None` - message is the HMS Message object as JSON. Required.
+- `message: JSON` - message is the HMS Message object as JSON. Required.
 
 #### `InfoResult`
 
@@ -5743,16 +5743,16 @@ of its fields. Centrifugo PRO only.
 PushTimeLimitStrategy sends pushes within a window of the device local
 time. Centrifugo PRO only.
 
-- `send_after_time: str = ''` - send_after_time is the local time, as HH:MM:SS, after which the push may be sent. Required.
-- `send_before_time: str = ''` - send_before_time is the local time, as HH:MM:SS, before which the push must be sent. Required.
+- `send_after_time: str` - send_after_time is the local time, as HH:MM:SS, after which the push may be sent. Required.
+- `send_before_time: str` - send_before_time is the local time, as HH:MM:SS, before which the push must be sent. Required.
 - `no_tz_send_now: bool = False` - no_tz_send_now sends the push immediately if the device timezone is not set. By default such pushes are dropped.
 
 #### `RateLimitPolicy`
 
 RateLimitPolicy allows rate pushes per interval_ms. Centrifugo PRO only.
 
-- `rate: int = 0` - rate is the allowed number of pushes per interval. Required.
-- `interval_ms: int = 0` - interval_ms is the interval in milliseconds. Required.
+- `rate: int` - rate is the allowed number of pushes per interval. Required.
+- `interval_ms: int` - interval_ms is the interval in milliseconds. Required.
 
 #### `RefreshResult`
 
@@ -5870,7 +5870,7 @@ WebPushPushNotification is a notification for Web Push.
 Centrifugo PRO only.
 
 - `headers: dict[str, str] = {}` - headers are Web Push HTTP headers. Recognized keys: TTL (seconds, default 4 weeks), Urgency (very-low, low, normal, high) and Topic.
-- `payload: JSON = None` - payload is the JSON payload delivered to the browser service worker. Required.
+- `payload: JSON` - payload is the JSON payload delivered to the browser service worker. Required.
 
 </details>
 

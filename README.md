@@ -48,6 +48,16 @@ Every API method takes its request's fields as keyword arguments - generated
 from Centrifugo's `api.proto`, each documented - and returns its result, a
 dataclass, raising unless Centrifugo did everything asked. A batch and
 commands have the same methods: `batch.publish(...)`, `cent.command.publish(...)`.
+A field the protos mark required is a required argument, of the method and of
+a nested type alike - `cent.DeviceTopicsUpdate(op=...)` - and is checked for a
+value before sending: `channel=""`, given empty, raises `InvalidRequestError`
+naming it, `limit_strategy.rate_limit.policies[0].rate` for a nested one, as a
+missing one would - an empty value is not sent. The fields whose empty value
+means something are sent empty: `invalidate_user_tokens(user="")` is anonymous
+users, and `device_update`'s `user_update=cent.DeviceUserUpdate(user="")`
+detaches the devices from their user, as an empty timezone, locale or meta
+update clears it; an update left `None` changes nothing. Any other nested
+message with nothing set is not sent.
 Create the client once and share it: it is safe for concurrent use. An
 `AsyncClient` belongs to the event loop of its first call - one per loop, so
 not across `asyncio.run` calls; in code which is not async use `Client`. A

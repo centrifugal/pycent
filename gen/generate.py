@@ -146,6 +146,9 @@ def find_presence(s: Schema, name: str) -> None:
     """Records the presence wrappers of s in PRESENCE. A *Value wrapper must be
     one of WRAPPERS, which say its Python type."""
     PRESENCE.clear()
+    SCHEMA.clear()
+    SCHEMA.update(s.by_name)
+    _NEEDS.clear()
     for m in s.messages:
         if not is_presence(m):
             continue
@@ -214,6 +217,75 @@ def required(f: Field) -> bool:
     """Whether the proto marks the field "Required." without a condition -
     "Required unless b64data is set." stays optional (spec 3.3)."""
     return re.search(r"\bRequired\.", " ".join(f.doc)) is not None
+
+
+# The messages of the proto being generated, for the required-field checks:
+# set by find_presence.
+SCHEMA: dict[str, Message] = {}
+_NEEDS: dict[str, bool] = {}
+
+
+def is_message(f: Field) -> bool:
+    return f.type in SCHEMA and f.type not in WRAPPERS
+
+
+def checked(f: Field) -> bool:
+    """Whether the client checks before sending that f has a value: a field
+    the proto marks "Required." whose empty value has no meaning (spec 3.3,
+    3.5)."""
+    return required(f) and not empty_has_meaning(f)
+
+
+def needs_check(name: str) -> bool:
+    """Whether a message has fields to check, itself or in a message it
+    holds. A presence wrapper has none: its field may be empty."""
+    if name in _NEEDS:
+        return _NEEDS[name]
+    _NEEDS[name] = False  # a message holding itself adds nothing
+    m = SCHEMA[name]
+    v = any(checked(f) or (is_message(f) and f.type not in PRESENCE and needs_check(f.type)) for f in m.fields)
+    _NEEDS[name] = v
+    return v
+
+
+def emit_required(out: list[str], m: Message) -> None:
+    """The _required method of a message: the path of a field the proto marks
+    "Required." which it leaves without a value, or "" - nested messages
+    checked when set, a required one when unset too, list elements each."""
+    p = out.append
+    p("")
+    p("    def _required(self) -> str:")
+    body: list[str] = []
+    for f in m.fields:
+        n, name = f"self.{f.name}", f.name
+        if checked(f):
+            if f.type == "bool" and not f.repeated and not f.map_key:
+                raise SystemExit(
+                    f"api.proto: {m.name}.{f.name}: a bool cannot be required: false and unset are one value"
+                )
+            if f.repeated or f.map_key or f.type in PY_TYPES:
+                cond = f"not {n}"
+            elif f.type == "bytes":
+                cond = f"{n} is None"
+            else:
+                cond = f"not _w.is_set({n})"
+            body += [f"if {cond}:", f"    return {name!r}"]
+        if not is_message(f) or f.type in PRESENCE or not needs_check(f.type):
+            continue
+        if f.map_key:
+            raise SystemExit(f"api.proto: {m.name}.{f.name}: a map of messages with required fields is not supported")
+        if f.repeated:
+            body += [
+                f"for i, v in enumerate({n}):",
+                "    if p := v._required():",
+                f"        return f'{name}[{{i}}].{{p}}'",
+            ]
+        else:
+            body += [
+                f"if {n} is not None and _w.is_set({n}) and (p := {n}._required()):",
+                f"    return {name + '.'!r} + p",
+            ]
+    out.extend("        " + line for line in [*body, "return ''"])
 
 
 # The fields made required arguments, as "Message.field": checked against
@@ -333,7 +405,14 @@ def emit_message(out: list[str], m: Message, api_method: str | None, protocol: s
     for f in m.fields:
         ann, default = field_type(f)
         p("")
-        p(f"    {f.name}: {ann} = {default}")
+        if required(f) and not is_message(f):
+            # A field the proto marks "Required." is a required argument of
+            # the dataclass too: DeviceTopicsUpdate(op=...).
+            if protocol == "server API":
+                REQUIRED.add(f"{m.name}.{f.name}")
+            p(f"    {f.name}: {ann}")
+        else:
+            p(f"    {f.name}: {ann} = {default}")
         out.extend(docstring(f.doc, "    "))
     p("")
     p("    def _to_wire(self) -> dict[str, Any]:")
@@ -344,6 +423,8 @@ def emit_message(out: list[str], m: Message, api_method: str | None, protocol: s
         for f in m.fields:
             out.extend("        " + line for line in encoder(f))
         p("        return w")
+    if protocol == "server API" and (api_method is not None or needs_check(m.name)):
+        emit_required(out, m)
     p("")
     p("    @classmethod")
     p(f"    def _from_wire(cls, v: Any, where: str = {m.name!r}) -> {m.name}:")

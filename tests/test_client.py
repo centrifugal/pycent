@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import asyncio
-import inspect
+import dataclasses
 import json
 import os
 import re
 import sys
 import time
+import types
+import typing
 from collections.abc import Callable, Iterator
 from typing import Any
 
@@ -95,25 +97,146 @@ def test_publish(api: Api, fake: Fake) -> None:
     assert json.loads(req.content) == {"channel": "news", "data": {"text": "hi"}, "idempotency_key": "k1"}
 
 
-def required_args(method: str) -> dict[str, Any]:
-    """Values for the required arguments of an API method."""
-    out: dict[str, Any] = {}
-    for name, p in inspect.signature(getattr(cent.Client, method)).parameters.items():
-        if name == "self" or p.default is not inspect.Parameter.empty:
-            continue
-        ann = str(p.annotation)
-        out[name] = {"str": "x", "int": 1, "list[str]": ["x"]}.get(ann) or getattr(cent, ann)()
-    if method == "publish":
-        out["data"] = 1
-    return out
+def _request_type(method: str) -> type[Any]:
+    (cls,) = [r for r in cent._api.REQUESTS if r.api_method == method]
+    return cls
+
+
+def _fill(tp: Any, depth: int = 0) -> Any:
+    """A value with nothing empty in it for a field of type tp: messages with
+    every field filled, to a depth, lists and maps with one element."""
+    origin, args = typing.get_origin(tp), typing.get_args(tp)
+    if tp is Any:  # a payload
+        return {"k": 1}
+    if origin in (typing.Union, types.UnionType):
+        return _fill(next(a for a in args if a is not type(None)), depth)
+    if origin is list:
+        return [_fill(args[0], depth)]
+    if origin is dict:
+        return {"k": _fill(args[1], depth)}
+    if tp in (str, int, float, bool):
+        return {str: "x", int: 1, float: 1.5, bool: True}[tp]
+    hints = typing.get_type_hints(tp, vars(cent._api))
+    kw = {}
+    for f in dataclasses.fields(tp):
+        nested = typing.get_origin(hints[f.name]) is not None and dataclasses.is_dataclass(
+            next((a for a in typing.get_args(hints[f.name]) if dataclasses.is_dataclass(a)), None)
+        )
+        if depth < 2 or not nested:
+            kw[f.name] = _fill(hints[f.name], depth + 1)
+    return tp(**kw)
+
+
+def every_field(method: str) -> dict[str, Any]:
+    """The keyword arguments of an API method, every field of its request
+    filled: the required-field checks let them through (spec 15)."""
+    return {f.name: getattr(_fill(_request_type(method)), f.name) for f in dataclasses.fields(_request_type(method))}
 
 
 def test_every_method_reaches_its_endpoint(api: Api, fake: Fake) -> None:
-    methods = [m for m in cent._api.METHODS if m not in ("batch", "broadcast")]
+    methods = [m for m in cent._api.METHODS if m != "batch"]
     for m in methods:
-        getattr(api, m)(**required_args(m))
+        getattr(api, m)(**every_field(m))
     paths = [r.url.path.rsplit("/", 1)[-1] for r in fake.requests]
     assert paths == methods
+    # Every field is sent: none is dropped as empty.
+    for m, body in zip(methods, (json.loads(r.content) for r in fake.requests), strict=True):
+        assert set(body) == {f.name for f in dataclasses.fields(_request_type(m))}, m
+
+
+def test_required_fields_checked_before_sending(api: Api, fake: Fake) -> None:
+    # A required field given empty fails as a missing one, named by its path,
+    # nested ones and list elements included; nothing is sent (spec 3.3, 3.5).
+    push = every_field("send_push_notification")
+    policy = cent.RateLimitPolicy(rate=0, interval_ms=1000)
+    cases: list[tuple[str, dict[str, Any], str]] = [
+        ("presence", {"channel": ""}, "invalid presence request: channel is required"),
+        ("shared_poll_publish", {"channel": "c", "key": "k", "version": 0}, "version is required"),
+        ("update_user_status", {"users": []}, "users is required"),
+        ("send_push_notification", {**push, "recipient": cent.PushRecipient()}, "recipient is required"),
+        (
+            "send_push_notification",
+            {**push, "notification": cent.PushNotification(fcm=cent.FcmPushNotification(message=None))},
+            # Nothing in it set: as empty as an unset one.
+            "notification is required",
+        ),
+        (
+            "send_push_notification",
+            {
+                **push,
+                "limit_strategy": cent.PushLimitStrategy(
+                    time_limit=cent.PushTimeLimitStrategy(send_after_time="09:00", send_before_time="")
+                ),
+            },
+            "limit_strategy.time_limit.send_before_time is required",
+        ),
+        (
+            "send_push_notification",
+            {
+                **push,
+                "limit_strategy": cent.PushLimitStrategy(
+                    rate_limit=cent.PushRateLimitStrategy(
+                        policies=[cent.RateLimitPolicy(rate=1, interval_ms=1), policy]
+                    )
+                ),
+            },
+            "limit_strategy.rate_limit.policies[1].rate is required",
+        ),
+        (
+            "device_update",
+            {"ids": ["d"], "topics_update": cent.DeviceTopicsUpdate(op="", topics=["t"])},
+            "invalid device_update request: topics_update.op is required",
+        ),
+        ("device_register", {"provider": "fcm", "token": "t", "platform": ""}, "platform is required"),
+    ]
+    for method, fields, msg in cases:
+        with pytest.raises(cent.InvalidRequestError, match=re.escape(msg)):
+            getattr(api, method)(**fields)
+    assert fake.requests == []
+
+
+def test_optional_nested_message_unset_is_not_checked(api: Api, fake: Fake) -> None:
+    push = every_field("send_push_notification")
+    # Unset, or set but empty - which is not sent - nested messages with
+    # required fields are not checked.
+    api.send_push_notification(**{**push, "limit_strategy": None})
+    api.send_push_notification(
+        **{
+            **push,
+            "limit_strategy": cent.PushLimitStrategy(
+                time_limit=cent.PushTimeLimitStrategy(send_after_time="", send_before_time="")
+            ),
+        }
+    )
+    assert len(fake.requests) == 2
+    assert "limit_strategy" not in fake.bodies()[1]
+
+
+def test_empty_value_with_a_meaning_is_sent(api: Api, fake: Fake) -> None:
+    # "" means anonymous users, the global binding: sent, not refused.
+    api.invalidate_user_tokens(user="")
+    api.user_topic_update(user="", op="add", topics=["t"])
+    assert [r.url.path.rsplit("/", 1)[-1] for r in fake.requests] == ["invalidate_user_tokens", "user_topic_update"]
+    assert fake.bodies("user_topic_update") == [{"op": "add", "topics": ["t"]}]
+
+
+def test_required_in_the_signature_of_nested_messages() -> None:
+    with pytest.raises(TypeError, match="op"):
+        cent.DeviceTopicsUpdate(topics=["t"])  # type: ignore[call-arg]
+    with pytest.raises(TypeError, match="user"):
+        cent.DeviceUserUpdate()  # type: ignore[call-arg]
+
+
+def test_batch_and_command_check_required_fields(api: Api, fake: Fake) -> None:
+    with pytest.raises(cent.InvalidRequestError, match=re.escape("topics_update.op is required")):
+        cent.command.device_update(ids=["d"], topics_update=cent.DeviceTopicsUpdate(op="", topics=["t"]))
+    b = api.client.new_batch()
+    b.presence(channel="")
+    with pytest.raises(
+        cent.InvalidRequestError, match=re.escape("batch command #0: invalid presence request: channel is required")
+    ):
+        api.send(b)
+    assert fake.requests == []
 
 
 def test_empty_request_methods_take_no_argument(api: Api, fake: Fake) -> None:
@@ -415,7 +538,7 @@ def test_empty_message_not_sent(api: Api, fake: Fake) -> None:
         notification=cent.PushNotification(fcm=cent.FcmPushNotification(message={"k": 1})),
         limit_strategy=cent.PushLimitStrategy(rate_limit=cent.PushRateLimitStrategy()),
     )
-    api.device_update(ids=["d1"], topics_update=cent.DeviceTopicsUpdate())
+    api.device_update(ids=["d1"], topics_update=cent.DeviceTopicsUpdate(op=""))
     (push,) = fake.bodies("send_push_notification")
     assert "limit_strategy" not in push
     (upd,) = fake.bodies("device_update")

@@ -103,7 +103,7 @@ class PublishRequest:
     api_method: ClassVar[str] = "publish"
     """The server API method the request is sent to."""
 
-    channel: str = ""
+    channel: str
     """channel is the name of the channel to publish into. Required."""
 
     data: JSON = None
@@ -170,6 +170,11 @@ class PublishRequest:
             w["version_epoch"] = self.version_epoch
         return w
 
+    def _required(self) -> str:
+        if not self.channel:
+            return "channel"
+        return ""
+
     @classmethod
     def _from_wire(cls, v: Any, where: str = "PublishRequest") -> PublishRequest:
         d = _w.obj(v, where)
@@ -220,7 +225,7 @@ class BroadcastRequest:
     api_method: ClassVar[str] = "broadcast"
     """The server API method the request is sent to."""
 
-    channels: list[str] = field(default_factory=list)
+    channels: list[str]
     """channels is the list of channels to publish into. Required."""
 
     data: JSON = None
@@ -287,6 +292,11 @@ class BroadcastRequest:
         if self.version_epoch:
             w["version_epoch"] = self.version_epoch
         return w
+
+    def _required(self) -> str:
+        if not self.channels:
+            return "channels"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "BroadcastRequest") -> BroadcastRequest:
@@ -375,7 +385,7 @@ class SubscribeRequest:
     api_method: ClassVar[str] = "subscribe"
     """The server API method the request is sent to."""
 
-    channel: str = ""
+    channel: str
     """channel is the name of the channel to subscribe to. Required."""
 
     user: str = ""
@@ -460,6 +470,11 @@ class SubscribeRequest:
         if self.all_users:
             w["all_users"] = self.all_users
         return w
+
+    def _required(self) -> str:
+        if not self.channel:
+            return "channel"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "SubscribeRequest") -> SubscribeRequest:
@@ -554,7 +569,7 @@ class UnsubscribeRequest:
     api_method: ClassVar[str] = "unsubscribe"
     """The server API method the request is sent to."""
 
-    channel: str = ""
+    channel: str
     """channel is the name of the channel to unsubscribe from. Required."""
 
     user: str = ""
@@ -595,6 +610,11 @@ class UnsubscribeRequest:
         if self.all_users:
             w["all_users"] = self.all_users
         return w
+
+    def _required(self) -> str:
+        if not self.channel:
+            return "channel"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "UnsubscribeRequest") -> UnsubscribeRequest:
@@ -707,6 +727,9 @@ class DisconnectRequest:
             w["all_users"] = self.all_users
         return w
 
+    def _required(self) -> str:
+        return ""
+
     @classmethod
     def _from_wire(cls, v: Any, where: str = "DisconnectRequest") -> DisconnectRequest:
         d = _w.obj(v, where)
@@ -743,7 +766,7 @@ class PresenceRequest:
     api_method: ClassVar[str] = "presence"
     """The server API method the request is sent to."""
 
-    channel: str = ""
+    channel: str
     """channel is the name of the channel. Required."""
 
     def _to_wire(self) -> dict[str, Any]:
@@ -751,6 +774,11 @@ class PresenceRequest:
         if self.channel:
             w["channel"] = self.channel
         return w
+
+    def _required(self) -> str:
+        if not self.channel:
+            return "channel"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "PresenceRequest") -> PresenceRequest:
@@ -830,7 +858,7 @@ class PresenceStatsRequest:
     api_method: ClassVar[str] = "presence_stats"
     """The server API method the request is sent to."""
 
-    channel: str = ""
+    channel: str
     """channel is the name of the channel. Required."""
 
     def _to_wire(self) -> dict[str, Any]:
@@ -838,6 +866,11 @@ class PresenceStatsRequest:
         if self.channel:
             w["channel"] = self.channel
         return w
+
+    def _required(self) -> str:
+        if not self.channel:
+            return "channel"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "PresenceStatsRequest") -> PresenceStatsRequest:
@@ -910,7 +943,7 @@ class HistoryRequest:
     api_method: ClassVar[str] = "history"
     """The server API method the request is sent to."""
 
-    channel: str = ""
+    channel: str
     """channel is the name of the channel. Required."""
 
     limit: int = 0
@@ -936,6 +969,11 @@ class HistoryRequest:
         if self.reverse:
             w["reverse"] = self.reverse
         return w
+
+    def _required(self) -> str:
+        if not self.channel:
+            return "channel"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "HistoryRequest") -> HistoryRequest:
@@ -1030,7 +1068,7 @@ class HistoryRemoveRequest:
     api_method: ClassVar[str] = "history_remove"
     """The server API method the request is sent to."""
 
-    channel: str = ""
+    channel: str
     """channel is the name of the channel. Required."""
 
     def _to_wire(self) -> dict[str, Any]:
@@ -1038,6 +1076,11 @@ class HistoryRemoveRequest:
         if self.channel:
             w["channel"] = self.channel
         return w
+
+    def _required(self) -> str:
+        if not self.channel:
+            return "channel"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "HistoryRemoveRequest") -> HistoryRemoveRequest:
@@ -1071,6 +1114,9 @@ class InfoRequest:
 
     def _to_wire(self) -> dict[str, Any]:
         return {}
+
+    def _required(self) -> str:
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "InfoRequest") -> InfoRequest:
@@ -1162,6 +1208,9 @@ class RefreshRequest:
         if self.all_users:
             w["all_users"] = self.all_users
         return w
+
+    def _required(self) -> str:
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "RefreshRequest") -> RefreshRequest:
@@ -1340,6 +1389,9 @@ class ChannelsRequest:
             w["pattern"] = self.pattern
         return w
 
+    def _required(self) -> str:
+        return ""
+
     @classmethod
     def _from_wire(cls, v: Any, where: str = "ChannelsRequest") -> ChannelsRequest:
         d = _w.obj(v, where)
@@ -1420,6 +1472,9 @@ class ConnectionsRequest:
         if self.label_filter is not None and (v := self.label_filter._to_wire()):
             w["label_filter"] = v
         return w
+
+    def _required(self) -> str:
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "ConnectionsRequest") -> ConnectionsRequest:
@@ -1678,7 +1733,7 @@ class UpdateUserStatusRequest:
     api_method: ClassVar[str] = "update_user_status"
     """The server API method the request is sent to."""
 
-    users: list[str] = field(default_factory=list)
+    users: list[str]
     """users is the list of user IDs to update the status for. Required."""
 
     state: str = ""
@@ -1693,6 +1748,11 @@ class UpdateUserStatusRequest:
         if self.state:
             w["state"] = self.state
         return w
+
+    def _required(self) -> str:
+        if not self.users:
+            return "users"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "UpdateUserStatusRequest") -> UpdateUserStatusRequest:
@@ -1725,7 +1785,7 @@ class GetUserStatusRequest:
     api_method: ClassVar[str] = "get_user_status"
     """The server API method the request is sent to."""
 
-    users: list[str] = field(default_factory=list)
+    users: list[str]
     """users is the list of user IDs to get the status for. Required."""
 
     def _to_wire(self) -> dict[str, Any]:
@@ -1733,6 +1793,11 @@ class GetUserStatusRequest:
         if self.users:
             w["users"] = list(self.users)
         return w
+
+    def _required(self) -> str:
+        if not self.users:
+            return "users"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "GetUserStatusRequest") -> GetUserStatusRequest:
@@ -1815,7 +1880,7 @@ class DeleteUserStatusRequest:
     api_method: ClassVar[str] = "delete_user_status"
     """The server API method the request is sent to."""
 
-    users: list[str] = field(default_factory=list)
+    users: list[str]
     """users is the list of user IDs to delete the status for. Required."""
 
     def _to_wire(self) -> dict[str, Any]:
@@ -1823,6 +1888,11 @@ class DeleteUserStatusRequest:
         if self.users:
             w["users"] = list(self.users)
         return w
+
+    def _required(self) -> str:
+        if not self.users:
+            return "users"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "DeleteUserStatusRequest") -> DeleteUserStatusRequest:
@@ -1862,7 +1932,7 @@ class BlockUserRequest:
     users small.
     """
 
-    user: str = ""
+    user: str
     """user is the ID of the user to block. Required."""
 
     def _to_wire(self) -> dict[str, Any]:
@@ -1872,6 +1942,11 @@ class BlockUserRequest:
         if self.user:
             w["user"] = self.user
         return w
+
+    def _required(self) -> str:
+        if not self.user:
+            return "user"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "BlockUserRequest") -> BlockUserRequest:
@@ -1904,7 +1979,7 @@ class UnblockUserRequest:
     api_method: ClassVar[str] = "unblock_user"
     """The server API method the request is sent to."""
 
-    user: str = ""
+    user: str
     """user is the ID of the user to unblock. Required."""
 
     def _to_wire(self) -> dict[str, Any]:
@@ -1912,6 +1987,11 @@ class UnblockUserRequest:
         if self.user:
             w["user"] = self.user
         return w
+
+    def _required(self) -> str:
+        if not self.user:
+            return "user"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "UnblockUserRequest") -> UnblockUserRequest:
@@ -1951,7 +2031,7 @@ class RevokeTokenRequest:
     Optional, but a value matching the token expiration is recommended.
     """
 
-    uid: str = ""
+    uid: str
     """uid is the unique ID of the token to revoke (jti claim). Required."""
 
     def _to_wire(self) -> dict[str, Any]:
@@ -1961,6 +2041,11 @@ class RevokeTokenRequest:
         if self.uid:
             w["uid"] = self.uid
         return w
+
+    def _required(self) -> str:
+        if not self.uid:
+            return "uid"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "RevokeTokenRequest") -> RevokeTokenRequest:
@@ -2000,7 +2085,7 @@ class InvalidateUserTokensRequest:
     Optional, but a value matching the token expiration is recommended.
     """
 
-    user: str = ""
+    user: str
     """user is the ID of the user whose tokens to invalidate. Required. ""
     invalidates the tokens of anonymous users.
     """
@@ -2026,6 +2111,9 @@ class InvalidateUserTokensRequest:
         if self.channel:
             w["channel"] = self.channel
         return w
+
+    def _required(self) -> str:
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "InvalidateUserTokensRequest") -> InvalidateUserTokensRequest:
@@ -2068,17 +2156,17 @@ class DeviceRegisterRequest:
     device.
     """
 
-    provider: str = ""
+    provider: str
     """provider is the provider of the device token. Required. One of: fcm,
     hms, apns, webpush.
     """
 
-    token: str = ""
+    token: str
     """token is the push token of the device. For webpush, it is the browser
     PushSubscription serialized as a JSON string. Required.
     """
 
-    platform: str = ""
+    platform: str
     """platform is the device platform. Required. One of: ios, android, web."""
 
     user: str = ""
@@ -2123,6 +2211,15 @@ class DeviceRegisterRequest:
         if self.locale:
             w["locale"] = self.locale
         return w
+
+    def _required(self) -> str:
+        if not self.provider:
+            return "provider"
+        if not self.token:
+            return "token"
+        if not self.platform:
+            return "platform"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "DeviceRegisterRequest") -> DeviceRegisterRequest:
@@ -2191,6 +2288,11 @@ class DeviceUpdateRequest:
             w["locale_update"] = self.locale_update._to_wire()
         return w
 
+    def _required(self) -> str:
+        if self.topics_update is not None and _w.is_set(self.topics_update) and (p := self.topics_update._required()):
+            return "topics_update." + p
+        return ""
+
     @classmethod
     def _from_wire(cls, v: Any, where: str = "DeviceUpdateRequest") -> DeviceUpdateRequest:
         d = _w.obj(v, where)
@@ -2234,6 +2336,9 @@ class DeviceRemoveRequest:
             w["users"] = list(self.users)
         return w
 
+    def _required(self) -> str:
+        return ""
+
     @classmethod
     def _from_wire(cls, v: Any, where: str = "DeviceRemoveRequest") -> DeviceRemoveRequest:
         d = _w.obj(v, where)
@@ -2247,7 +2352,7 @@ class DeviceRemoveRequest:
 class DeviceUserUpdate:
     """DeviceUserUpdate sets the user of devices. Centrifugo PRO only."""
 
-    user: str = ""
+    user: str
     """user is the user ID to set. Required. "" detaches the devices from their
     user.
     """
@@ -2270,7 +2375,7 @@ class DeviceUserUpdate:
 class DeviceTimezoneUpdate:
     """DeviceTimezoneUpdate sets the timezone of devices. Centrifugo PRO only."""
 
-    timezone: str = ""
+    timezone: str
     """timezone is the IANA time zone to set. Required. "" clears it."""
 
     def _to_wire(self) -> dict[str, Any]:
@@ -2291,7 +2396,7 @@ class DeviceTimezoneUpdate:
 class DeviceLocaleUpdate:
     """DeviceLocaleUpdate sets the locale of devices. Centrifugo PRO only."""
 
-    locale: str = ""
+    locale: str
     """locale is the locale to set. Required. "" clears it."""
 
     def _to_wire(self) -> dict[str, Any]:
@@ -2312,7 +2417,7 @@ class DeviceLocaleUpdate:
 class DeviceMetaUpdate:
     """DeviceMetaUpdate sets the meta of devices. Centrifugo PRO only."""
 
-    meta: dict[str, str] = field(default_factory=dict)
+    meta: dict[str, str]
     """meta is the meta to set. Required. An empty map clears it."""
 
     def _to_wire(self) -> dict[str, Any]:
@@ -2333,7 +2438,7 @@ class DeviceMetaUpdate:
 class DeviceTopicsUpdate:
     """DeviceTopicsUpdate changes the topics of devices. Centrifugo PRO only."""
 
-    op: str = ""
+    op: str
     """op is the operation. Required. One of: add, remove, set."""
 
     topics: list[str] = field(default_factory=list)
@@ -2346,6 +2451,11 @@ class DeviceTopicsUpdate:
         if self.topics:
             w["topics"] = list(self.topics)
         return w
+
+    def _required(self) -> str:
+        if not self.op:
+            return "op"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "DeviceTopicsUpdate") -> DeviceTopicsUpdate:
@@ -2454,6 +2564,9 @@ class DeviceListRequest:
         if self.limit:
             w["limit"] = self.limit
         return w
+
+    def _required(self) -> str:
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "DeviceListRequest") -> DeviceListRequest:
@@ -2566,6 +2679,9 @@ class DeviceTopicListRequest:
             w["limit"] = self.limit
         return w
 
+    def _required(self) -> str:
+        return ""
+
     @classmethod
     def _from_wire(cls, v: Any, where: str = "DeviceTopicListRequest") -> DeviceTopicListRequest:
         d = _w.obj(v, where)
@@ -2650,6 +2766,9 @@ class UserTopicListRequest:
             w["limit"] = self.limit
         return w
 
+    def _required(self) -> str:
+        return ""
+
     @classmethod
     def _from_wire(cls, v: Any, where: str = "UserTopicListRequest") -> UserTopicListRequest:
         d = _w.obj(v, where)
@@ -2673,10 +2792,10 @@ class DeviceTopicUpdateRequest:
     api_method: ClassVar[str] = "device_topic_update"
     """The server API method the request is sent to."""
 
-    device_id: str = ""
+    device_id: str
     """device_id is the ID of the device. Required."""
 
-    op: str = ""
+    op: str
     """op is the operation. Required. One of: add, remove, set."""
 
     topics: list[str] = field(default_factory=list)
@@ -2700,6 +2819,13 @@ class DeviceTopicUpdateRequest:
             w["user"] = self.user
         return w
 
+    def _required(self) -> str:
+        if not self.device_id:
+            return "device_id"
+        if not self.op:
+            return "op"
+        return ""
+
     @classmethod
     def _from_wire(cls, v: Any, where: str = "DeviceTopicUpdateRequest") -> DeviceTopicUpdateRequest:
         d = _w.obj(v, where)
@@ -2720,12 +2846,12 @@ class UserTopicUpdateRequest:
     api_method: ClassVar[str] = "user_topic_update"
     """The server API method the request is sent to."""
 
-    user: str = ""
+    user: str
     """user is the user ID. Required. "" updates the global binding, which every
     device - anonymous ones included - gets on its next device_register.
     """
 
-    op: str = ""
+    op: str
     """op is the operation. Required. One of: add, remove, set."""
 
     topics: list[str] = field(default_factory=list)
@@ -2740,6 +2866,11 @@ class UserTopicUpdateRequest:
         if self.topics:
             w["topics"] = list(self.topics)
         return w
+
+    def _required(self) -> str:
+        if not self.op:
+            return "op"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "UserTopicUpdateRequest") -> UserTopicUpdateRequest:
@@ -3227,6 +3358,17 @@ class PushNotification:
             w["expire_at"] = self.expire_at
         return w
 
+    def _required(self) -> str:
+        if self.fcm is not None and _w.is_set(self.fcm) and (p := self.fcm._required()):
+            return "fcm." + p
+        if self.hms is not None and _w.is_set(self.hms) and (p := self.hms._required()):
+            return "hms." + p
+        if self.apns is not None and _w.is_set(self.apns) and (p := self.apns._required()):
+            return "apns." + p
+        if self.webpush is not None and _w.is_set(self.webpush) and (p := self.webpush._required()):
+            return "webpush." + p
+        return ""
+
     @classmethod
     def _from_wire(cls, v: Any, where: str = "PushNotification") -> PushNotification:
         d = _w.obj(v, where)
@@ -3243,7 +3385,7 @@ class PushNotification:
 class FcmPushNotification:
     """FcmPushNotification is a notification for FCM. Centrifugo PRO only."""
 
-    message: JSON = None
+    message: JSON
     """message is the FCM Message object as JSON. Required."""
 
     def _to_wire(self) -> dict[str, Any]:
@@ -3251,6 +3393,11 @@ class FcmPushNotification:
         if self.message is not None:
             w["message"] = _w.payload(self.message, "message")
         return w
+
+    def _required(self) -> str:
+        if self.message is None:
+            return "message"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "FcmPushNotification") -> FcmPushNotification:
@@ -3264,7 +3411,7 @@ class FcmPushNotification:
 class HmsPushNotification:
     """HmsPushNotification is a notification for HMS. Centrifugo PRO only."""
 
-    message: JSON = None
+    message: JSON
     """message is the HMS Message object as JSON. Required."""
 
     def _to_wire(self) -> dict[str, Any]:
@@ -3272,6 +3419,11 @@ class HmsPushNotification:
         if self.message is not None:
             w["message"] = _w.payload(self.message, "message")
         return w
+
+    def _required(self) -> str:
+        if self.message is None:
+            return "message"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "HmsPushNotification") -> HmsPushNotification:
@@ -3288,7 +3440,7 @@ class ApnsPushNotification:
     headers: dict[str, str] = field(default_factory=dict)
     """headers are the APNs request headers."""
 
-    payload: JSON = None
+    payload: JSON
     """payload is the APNs payload as JSON. Required."""
 
     def _to_wire(self) -> dict[str, Any]:
@@ -3298,6 +3450,11 @@ class ApnsPushNotification:
         if self.payload is not None:
             w["payload"] = _w.payload(self.payload, "payload")
         return w
+
+    def _required(self) -> str:
+        if self.payload is None:
+            return "payload"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "ApnsPushNotification") -> ApnsPushNotification:
@@ -3319,7 +3476,7 @@ class WebPushPushNotification:
     default 4 weeks), Urgency (very-low, low, normal, high) and Topic.
     """
 
-    payload: JSON = None
+    payload: JSON
     """payload is the JSON payload delivered to the browser service worker.
     Required.
     """
@@ -3331,6 +3488,11 @@ class WebPushPushNotification:
         if self.payload is not None:
             w["payload"] = _w.payload(self.payload, "payload")
         return w
+
+    def _required(self) -> str:
+        if self.payload is None:
+            return "payload"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "WebPushPushNotification") -> WebPushPushNotification:
@@ -3425,6 +3587,21 @@ class SendPushNotificationRequest:
             w["use_meta"] = self.use_meta
         return w
 
+    def _required(self) -> str:
+        if not _w.is_set(self.recipient):
+            return "recipient"
+        if not _w.is_set(self.notification):
+            return "notification"
+        if self.notification is not None and _w.is_set(self.notification) and (p := self.notification._required()):
+            return "notification." + p
+        if (
+            self.limit_strategy is not None
+            and _w.is_set(self.limit_strategy)
+            and (p := self.limit_strategy._required())
+        ):
+            return "limit_strategy." + p
+        return ""
+
     @classmethod
     def _from_wire(cls, v: Any, where: str = "SendPushNotificationRequest") -> SendPushNotificationRequest:
         d = _w.obj(v, where)
@@ -3495,6 +3672,13 @@ class PushLimitStrategy:
             w["time_limit"] = v
         return w
 
+    def _required(self) -> str:
+        if self.rate_limit is not None and _w.is_set(self.rate_limit) and (p := self.rate_limit._required()):
+            return "rate_limit." + p
+        if self.time_limit is not None and _w.is_set(self.time_limit) and (p := self.time_limit._required()):
+            return "time_limit." + p
+        return ""
+
     @classmethod
     def _from_wire(cls, v: Any, where: str = "PushLimitStrategy") -> PushLimitStrategy:
         d = _w.obj(v, where)
@@ -3510,12 +3694,12 @@ class PushTimeLimitStrategy:
     time. Centrifugo PRO only.
     """
 
-    send_after_time: str = ""
+    send_after_time: str
     """send_after_time is the local time, as HH:MM:SS, after which the push
     may be sent. Required.
     """
 
-    send_before_time: str = ""
+    send_before_time: str
     """send_before_time is the local time, as HH:MM:SS, before which the push
     must be sent. Required.
     """
@@ -3534,6 +3718,13 @@ class PushTimeLimitStrategy:
         if self.no_tz_send_now:
             w["no_tz_send_now"] = self.no_tz_send_now
         return w
+
+    def _required(self) -> str:
+        if not self.send_after_time:
+            return "send_after_time"
+        if not self.send_before_time:
+            return "send_before_time"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "PushTimeLimitStrategy") -> PushTimeLimitStrategy:
@@ -3572,6 +3763,12 @@ class PushRateLimitStrategy:
             w["drop_if_rate_limited"] = self.drop_if_rate_limited
         return w
 
+    def _required(self) -> str:
+        for i, v in enumerate(self.policies):
+            if p := v._required():
+                return f"policies[{i}].{p}"
+        return ""
+
     @classmethod
     def _from_wire(cls, v: Any, where: str = "PushRateLimitStrategy") -> PushRateLimitStrategy:
         d = _w.obj(v, where)
@@ -3588,10 +3785,10 @@ class PushRateLimitStrategy:
 class RateLimitPolicy:
     """RateLimitPolicy allows rate pushes per interval_ms. Centrifugo PRO only."""
 
-    rate: int = 0
+    rate: int
     """rate is the allowed number of pushes per interval. Required."""
 
-    interval_ms: int = 0
+    interval_ms: int
     """interval_ms is the interval in milliseconds. Required."""
 
     def _to_wire(self) -> dict[str, Any]:
@@ -3601,6 +3798,13 @@ class RateLimitPolicy:
         if self.interval_ms:
             w["interval_ms"] = self.interval_ms
         return w
+
+    def _required(self) -> str:
+        if not self.rate:
+            return "rate"
+        if not self.interval_ms:
+            return "interval_ms"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "RateLimitPolicy") -> RateLimitPolicy:
@@ -3645,17 +3849,17 @@ class UpdatePushStatusRequest:
     api_method: ClassVar[str] = "update_push_status"
     """The server API method the request is sent to."""
 
-    analytics_uid: str = ""
+    analytics_uid: str
     """analytics_uid is the analytics_uid of the push notification (as in
     SendPushNotificationRequest). Required.
     """
 
-    status: str = ""
+    status: str
     """status is the status of the push notification. Required. One of:
     delivered, interacted.
     """
 
-    device_id: str = ""
+    device_id: str
     """device_id is the Centrifugo device ID. Required."""
 
     msg_id: str = ""
@@ -3672,6 +3876,15 @@ class UpdatePushStatusRequest:
         if self.msg_id:
             w["msg_id"] = self.msg_id
         return w
+
+    def _required(self) -> str:
+        if not self.analytics_uid:
+            return "analytics_uid"
+        if not self.status:
+            return "status"
+        if not self.device_id:
+            return "device_id"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "UpdatePushStatusRequest") -> UpdatePushStatusRequest:
@@ -3708,7 +3921,7 @@ class CancelPushRequest:
     api_method: ClassVar[str] = "cancel_push"
     """The server API method the request is sent to."""
 
-    uid: str = ""
+    uid: str
     """uid is the uid of the push notification to cancel. Required."""
 
     def _to_wire(self) -> dict[str, Any]:
@@ -3716,6 +3929,11 @@ class CancelPushRequest:
         if self.uid:
             w["uid"] = self.uid
         return w
+
+    def _required(self) -> str:
+        if not self.uid:
+            return "uid"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "CancelPushRequest") -> CancelPushRequest:
@@ -3747,10 +3965,10 @@ class MapPublishRequest:
     api_method: ClassVar[str] = "map_publish"
     """The server API method the request is sent to."""
 
-    channel: str = ""
+    channel: str
     """channel is the name of the map channel. Required."""
 
-    key: str = ""
+    key: str
     """key is the entry key. Required."""
 
     data: JSON = None
@@ -3833,6 +4051,13 @@ class MapPublishRequest:
             w["key_mode"] = self.key_mode
         return w
 
+    def _required(self) -> str:
+        if not self.channel:
+            return "channel"
+        if not self.key:
+            return "key"
+        return ""
+
     @classmethod
     def _from_wire(cls, v: Any, where: str = "MapPublishRequest") -> MapPublishRequest:
         d = _w.obj(v, where)
@@ -3903,10 +4128,10 @@ class MapRemoveRequest:
     api_method: ClassVar[str] = "map_remove"
     """The server API method the request is sent to."""
 
-    channel: str = ""
+    channel: str
     """channel is the name of the map channel. Required."""
 
-    key: str = ""
+    key: str
     """key is the key to remove. Required."""
 
     idempotency_key: str = ""
@@ -3925,6 +4150,13 @@ class MapRemoveRequest:
         if self.idempotency_key:
             w["idempotency_key"] = self.idempotency_key
         return w
+
+    def _required(self) -> str:
+        if not self.channel:
+            return "channel"
+        if not self.key:
+            return "key"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "MapRemoveRequest") -> MapRemoveRequest:
@@ -3988,7 +4220,7 @@ class MapReadStateRequest:
     api_method: ClassVar[str] = "map_read_state"
     """The server API method the request is sent to."""
 
-    channel: str = ""
+    channel: str
     """channel is the name of the map channel. Required."""
 
     cursor: str = ""
@@ -4040,6 +4272,11 @@ class MapReadStateRequest:
         if self.revision_epoch:
             w["revision_epoch"] = self.revision_epoch
         return w
+
+    def _required(self) -> str:
+        if not self.channel:
+            return "channel"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "MapReadStateRequest") -> MapReadStateRequest:
@@ -4160,7 +4397,7 @@ class MapReadStreamRequest:
     api_method: ClassVar[str] = "map_read_stream"
     """The server API method the request is sent to."""
 
-    channel: str = ""
+    channel: str
     """channel is the name of the map channel. Required."""
 
     since_offset: int = 0
@@ -4194,6 +4431,11 @@ class MapReadStreamRequest:
         if self.reverse:
             w["reverse"] = self.reverse
         return w
+
+    def _required(self) -> str:
+        if not self.channel:
+            return "channel"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "MapReadStreamRequest") -> MapReadStreamRequest:
@@ -4247,7 +4489,7 @@ class MapStatsRequest:
     api_method: ClassVar[str] = "map_stats"
     """The server API method the request is sent to."""
 
-    channel: str = ""
+    channel: str
     """channel is the name of the map channel. Required."""
 
     def _to_wire(self) -> dict[str, Any]:
@@ -4255,6 +4497,11 @@ class MapStatsRequest:
         if self.channel:
             w["channel"] = self.channel
         return w
+
+    def _required(self) -> str:
+        if not self.channel:
+            return "channel"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "MapStatsRequest") -> MapStatsRequest:
@@ -4292,7 +4539,7 @@ class MapClearRequest:
     api_method: ClassVar[str] = "map_clear"
     """The server API method the request is sent to."""
 
-    channel: str = ""
+    channel: str
     """channel is the name of the map channel. Required."""
 
     def _to_wire(self) -> dict[str, Any]:
@@ -4300,6 +4547,11 @@ class MapClearRequest:
         if self.channel:
             w["channel"] = self.channel
         return w
+
+    def _required(self) -> str:
+        if not self.channel:
+            return "channel"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "MapClearRequest") -> MapClearRequest:
@@ -4332,10 +4584,10 @@ class SharedPollPublishRequest:
     api_method: ClassVar[str] = "shared_poll_publish"
     """The server API method the request is sent to."""
 
-    channel: str = ""
+    channel: str
     """channel is the name of the shared poll channel. Required."""
 
-    key: str = ""
+    key: str
     """key is the item key. Required."""
 
     data: JSON = None
@@ -4344,7 +4596,7 @@ class SharedPollPublishRequest:
     b64data: str = ""
     """b64data is data as base64, for binary payloads. Centrifugo decodes it."""
 
-    version: int = 0
+    version: int
     """version is the item version, must be >= 1. Required. A version not
     higher than the current one within the same epoch is silently dropped.
     """
@@ -4369,6 +4621,15 @@ class SharedPollPublishRequest:
         if self.epoch:
             w["epoch"] = self.epoch
         return w
+
+    def _required(self) -> str:
+        if not self.channel:
+            return "channel"
+        if not self.key:
+            return "key"
+        if not self.version:
+            return "version"
+        return ""
 
     @classmethod
     def _from_wire(cls, v: Any, where: str = "SharedPollPublishRequest") -> SharedPollPublishRequest:
