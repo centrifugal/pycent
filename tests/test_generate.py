@@ -70,17 +70,13 @@ def test_listed_values() -> None:
             generate.listed_values(doc)
 
 
-def _groups(text: str) -> dict[str, str]:
+def _groups(text: str, pins: dict[str, str]) -> dict[str, str]:
     s = proto.parse(text, "test.proto")
-    groups = generate.const_groups(s, {m.name for m in s.messages})
+    groups = generate.const_groups(s, {m.name for m in s.messages}, pins)
     return {g.name(v): v for g in groups for v in g.values}
 
 
-def test_constant_names() -> None:
-    # The set listed in the most messages keeps the short name; the others are
-    # named by their message too.
-    consts = _groups(
-        """
+_PROTO = """
 message A {
   // One of: add, remove.
   string op = 1;
@@ -96,8 +92,11 @@ message FilterNode {
   string op = 1;
 }
 """
-    )
-    assert consts == {
+
+
+def test_constant_names_are_pinned() -> None:
+    pins = {"A.op": "Op", "B.op": "Op", "*.key_mode": "KeyMode", "FilterNode.op": "FilterNodeOp"}
+    assert _groups(_PROTO, pins) == {
         "OP_ADD": "add",
         "OP_REMOVE": "remove",
         "KEY_MODE_IF_NEW": "if_new",
@@ -107,32 +106,46 @@ message FilterNode {
     }
 
 
-def test_constant_names_tie() -> None:
-    # A tie names every set by its message.
-    consts = _groups(
-        """
-message A {
-  // One of: x, y.
-  string kind = 1;
-}
-message B {
-  // One of: z.
-  string kind = 1;
-}
-"""
-    )
-    assert consts == {"A_KIND_X": "x", "A_KIND_Y": "y", "B_KIND_Z": "z"}
+@pytest.mark.parametrize(
+    ("pins", "msg"),
+    [
+        # A field with a "One of:" sentence the list lacks.
+        ({"A.op": "Op", "*.key_mode": "KeyMode", "FilterNode.op": "FilterNodeOp"}, "B.op lists its values"),
+        # A pin no field uses.
+        (
+            {"*.op": "Op", "*.key_mode": "KeyMode", "FilterNode.op": "FilterNodeOp", "Gone.f": "Gone"},
+            "no field uses: Gone.f",
+        ),
+        # One name over different values.
+        ({"*.op": "Op", "*.key_mode": "KeyMode"}, "Op names"),
+    ],
+)
+def test_constant_pins_checked(pins: dict[str, str], msg: str) -> None:
+    with pytest.raises(generate.ConstError, match=msg):
+        _groups(_PROTO, pins)
 
 
-def test_constants_per_proto() -> None:
-    # The rule runs over each proto on its own: FilterNode.op is the API's
-    # FILTER_NODE_OP_AND, the proxy's OP_AND.
+def test_pins_of_the_protos() -> None:
+    # The names spec 0.3 section 3.3 pins, in both protos alike.
     import cent
     from cent import proxy
 
-    assert cent.FILTER_NODE_OP_AND == proxy.OP_AND == "and"
-    assert not hasattr(proxy, "FILTER_NODE_OP_AND")
-    assert not hasattr(cent, "OP_AND")
+    assert cent.FILTER_NODE_OP_AND == proxy.FILTER_NODE_OP_AND == "and"
+    assert cent.CMP_EQ == proxy.CMP_EQ == "eq"
+    assert cent.KEY_MODE_IF_NEW == proxy.KEY_MODE_IF_NEW == "if_new"
+    assert (cent.PROVIDER_FCM, cent.PLATFORM_IOS, cent.OP_ADD, cent.STATUS_DELIVERED) == (
+        "fcm",
+        "ios",
+        "add",
+        "delivered",
+    )
+    assert (proxy.PROTOCOL_PROTOBUF, proxy.ENCODING_BINARY, proxy.ALLOW_SUB) == ("protobuf", "binary", "sub")
+    assert (proxy.CAPABILITY_MATCH_WILDCARD, proxy.CHANNEL_EVENT_TYPE_OCCUPIED) == ("wildcard", "occupied")
+    for gone in ("OP_AND", "MATCH_WILDCARD", "TYPE_OCCUPIED"):
+        assert not hasattr(proxy, gone)
+    # Each pinned list as the generator reads it: every line used.
+    for path in ("constants_api.txt", "constants_proxy.txt"):
+        assert generate.read_pins(ROOT / "gen" / path)
 
 
 def test_each_constant_equals_its_value() -> None:

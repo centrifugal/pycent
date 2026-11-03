@@ -139,19 +139,6 @@ FILTER_NODE_OP_OR: Final = "or"
 FILTER_NODE_OP_NOT: Final = "not"
 """A value of the op field of FilterNode."""
 
-OP_ADD: Final = "add"
-"""A value of the op field of DeviceTopicsUpdate, device_topic_update and
-user_topic_update.
-"""
-OP_REMOVE: Final = "remove"
-"""A value of the op field of DeviceTopicsUpdate, device_topic_update and
-user_topic_update.
-"""
-OP_SET: Final = "set"
-"""A value of the op field of DeviceTopicsUpdate, device_topic_update and
-user_topic_update.
-"""
-
 CMP_EQ: Final = "eq"
 """A value of the cmp field of FilterNode."""
 CMP_NEQ: Final = "neq"
@@ -194,6 +181,19 @@ PLATFORM_ANDROID: Final = "android"
 """A value of the platform field of device_register."""
 PLATFORM_WEB: Final = "web"
 """A value of the platform field of device_register."""
+
+OP_ADD: Final = "add"
+"""A value of the op field of DeviceTopicsUpdate, device_topic_update and
+user_topic_update.
+"""
+OP_REMOVE: Final = "remove"
+"""A value of the op field of DeviceTopicsUpdate, device_topic_update and
+user_topic_update.
+"""
+OP_SET: Final = "set"
+"""A value of the op field of DeviceTopicsUpdate, device_topic_update and
+user_topic_update.
+"""
 
 STATUS_DELIVERED: Final = "delivered"
 """A value of the status field of update_push_status."""

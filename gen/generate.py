@@ -311,28 +311,43 @@ def snake(name: str) -> str:
 
 @dataclass
 class ConstGroup:
-    """The constants of a string field with listed values: the values, and the
-    messages whose field of that name lists exactly them."""
+    """The constants of the fields one pinned name covers: the name, the
+    values, and the messages and field holding them."""
 
+    pinned: str  # as gen/constants_*.txt spells it: FilterNodeOp
     field: str
     values: list[str]
     messages: list[str]
-    prefix: str = ""  # the message, when the field name alone is ambiguous
 
     def name(self, value: str) -> str:
-        """PROVIDER_FCM for the provider field's "fcm"."""
-        prefix = snake(self.prefix) + "_" if self.prefix else ""
-        return f"{prefix}{self.field}_{value}".upper()
+        """FILTER_NODE_OP_AND for FilterNodeOp's "and"."""
+        return f"{snake(self.pinned)}_{value}".upper()
 
 
-def const_groups(s: Schema, include: set[str]) -> list[ConstGroup]:
-    """The fields of the messages in include which list their values, grouped,
-    in the order of the proto. A constant is named by its field and value;
-    where fields of one name list different values in different messages, the
-    set listed in the most messages keeps the short name and the others are
-    named by their message too - OP_ADD for the topic updates, FILTER_NODE_OP_AND
-    for FilterNode - and a tie names all of them so (spec 3.3)."""
-    by_field: dict[str, list[ConstGroup]] = {}
+def read_pins(path: Path) -> dict[str, str]:
+    """The pinned constant names of a proto (spec 3.3): selector -
+    Message.field, or *.field for every message which has it - to name."""
+    pins: dict[str, str] = {}
+    for i, raw in enumerate(path.read_text().splitlines(), 1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) != 2 or "." not in parts[0] or not re.fullmatch(r"[A-Z][A-Za-z]*", parts[1]):
+            raise ConstError(f"{path.name}:{i}: want 'Message.field Name' or '*.field Name', got {line!r}")
+        if parts[0] in pins:
+            raise ConstError(f"{path.name}:{i}: {parts[0]} pinned twice")
+        pins[parts[0]] = parts[1]
+    return pins
+
+
+def const_groups(s: Schema, include: set[str], pins: dict[str, str]) -> list[ConstGroup]:
+    """The fields of the messages in include which list their values, named
+    as pins say, in the order of the proto. Fails on a field with a "One of:"
+    sentence pins lack, on a pin no field uses, and on one name over different
+    values: a name never changes because an unrelated message appeared."""
+    used: set[str] = set()
+    groups: dict[str, ConstGroup] = {}
     for m in s.messages:
         if m.name not in include:
             continue
@@ -343,35 +358,25 @@ def const_groups(s: Schema, include: set[str]) -> list[ConstGroup]:
                 raise ConstError(f"{m.name}.{f.name}: {e}") from None
             if values is None:
                 continue
-            groups = by_field.setdefault(f.name, [])
-            for g in groups:
-                if g.values == values:
-                    g.messages.append(m.name)
-                    break
+            selector = next((k for k in (f"{m.name}.{f.name}", f"*.{f.name}") if k in pins), None)
+            if selector is None:
+                raise ConstError(
+                    f"{m.name}.{f.name} lists its values but has no pinned name: name it in gen/constants_*.txt"
+                    " as spec.md section 3.3 does"
+                )
+            used.add(selector)
+            name = pins[selector]
+            g = groups.get(name)
+            if g is None:
+                groups[name] = ConstGroup(name, f.name, values, [m.name])
+            elif g.values != values:
+                raise ConstError(f"{name} names {g.values} in {g.messages} and {values} in {m.name}")
             else:
-                groups.append(ConstGroup(f.name, values, [m.name]))
-    out: list[ConstGroup] = []
-    for name, groups in by_field.items():
-        if len(groups) > 1:
-            most = max(len(g.messages) for g in groups)
-            tie = sum(len(g.messages) == most for g in groups) > 1
-            for g in groups:
-                if tie or len(g.messages) < most:
-                    if len(g.messages) > 1:
-                        raise ConstError(
-                            f"field {name} lists {g.values} in {g.messages} and other values elsewhere:"
-                            " cannot name its constants"
-                        )
-                    g.prefix = g.messages[0]
-        out.extend(groups)
-    names: dict[str, str] = {}
-    for g in out:
-        for v in g.values:
-            n = g.name(v)
-            if n in names:
-                raise ConstError(f"constant {n} names {v!r} of {g.messages} and {names[n]}")
-            names[n] = f"{g.messages}"
-    return out
+                g.messages.append(m.name)
+    unused = sorted(set(pins) - used)
+    if unused:
+        raise ConstError(f"pinned constant names no field uses: {', '.join(unused)}")
+    return list(groups.values())
 
 
 def emit_consts(out: list[str], groups: list[ConstGroup], methods: dict[str, str] | None = None) -> None:
@@ -772,7 +777,7 @@ def generate_proxy(s: Schema) -> str:
     p("")
     p("from cent import _wire as _w")
     p("from cent._payload import JSON")
-    groups = const_groups(s, {m.name for m in msgs})
+    groups = const_groups(s, {m.name for m in msgs}, read_pins(ROOT / "gen" / "constants_proxy.txt"))
     p("")
     p("__all__ = [")
     for name in sorted(const_names(groups)) + sorted(m.name for m in msgs):
@@ -822,7 +827,9 @@ def generate(s: Schema) -> str:
     # internal. Nested messages and results are public.
     request_names = {c.request.name for c in cmds}
     public = [m.name for m in s.messages if m.name not in skip and m.name not in request_names]
-    groups = const_groups(s, {m.name for m in s.messages if m.name not in skip})
+    groups = const_groups(
+        s, {m.name for m in s.messages if m.name not in skip}, read_pins(ROOT / "gen" / "constants_api.txt")
+    )
     p("")
     p("__all__ = [")
     for name in sorted(const_names(groups)) + sorted(public):

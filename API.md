@@ -5657,6 +5657,10 @@ The values of the string fields with a fixed set, generated from the proto's "On
 | `ALLOW_PRS` | `'prs'` | allow field of ChannelsCapability and SubscribeResult |
 | `ALLOW_PUB` | `'pub'` | allow field of ChannelsCapability and SubscribeResult |
 | `ALLOW_SUB` | `'sub'` | allow field of ChannelsCapability and SubscribeResult |
+| `CAPABILITY_MATCH_REGEX` | `'regex'` | match field of ChannelsCapability |
+| `CAPABILITY_MATCH_WILDCARD` | `'wildcard'` | match field of ChannelsCapability |
+| `CHANNEL_EVENT_TYPE_OCCUPIED` | `'occupied'` | type field of ChannelEvent |
+| `CHANNEL_EVENT_TYPE_VACATED` | `'vacated'` | type field of ChannelEvent |
 | `CMP_CT` | `'ct'` | cmp field of FilterNode |
 | `CMP_EQ` | `'eq'` | cmp field of FilterNode |
 | `CMP_EW` | `'ew'` | cmp field of FilterNode |
@@ -5672,17 +5676,13 @@ The values of the string fields with a fixed set, generated from the proto's "On
 | `CMP_SW` | `'sw'` | cmp field of FilterNode |
 | `ENCODING_BINARY` | `'binary'` | encoding field of ConnectRequest, RefreshRequest, SubscribeRequest, PublishRequest, MapPublishRequest, MapRemoveRequest, RPCRequest and SubRefreshRequest |
 | `ENCODING_JSON` | `'json'` | encoding field of ConnectRequest, RefreshRequest, SubscribeRequest, PublishRequest, MapPublishRequest, MapRemoveRequest, RPCRequest and SubRefreshRequest |
+| `FILTER_NODE_OP_AND` | `'and'` | op field of FilterNode |
+| `FILTER_NODE_OP_NOT` | `'not'` | op field of FilterNode |
+| `FILTER_NODE_OP_OR` | `'or'` | op field of FilterNode |
 | `KEY_MODE_IF_EXISTS` | `'if_exists'` | key_mode field of MapPublishResult |
 | `KEY_MODE_IF_NEW` | `'if_new'` | key_mode field of MapPublishResult |
-| `MATCH_REGEX` | `'regex'` | match field of ChannelsCapability |
-| `MATCH_WILDCARD` | `'wildcard'` | match field of ChannelsCapability |
-| `OP_AND` | `'and'` | op field of FilterNode |
-| `OP_NOT` | `'not'` | op field of FilterNode |
-| `OP_OR` | `'or'` | op field of FilterNode |
 | `PROTOCOL_JSON` | `'json'` | protocol field of ConnectRequest, RefreshRequest, SubscribeRequest, PublishRequest, MapPublishRequest, MapRemoveRequest, RPCRequest and SubRefreshRequest |
 | `PROTOCOL_PROTOBUF` | `'protobuf'` | protocol field of ConnectRequest, RefreshRequest, SubscribeRequest, PublishRequest, MapPublishRequest, MapRemoveRequest, RPCRequest and SubRefreshRequest |
-| `TYPE_OCCUPIED` | `'occupied'` | type field of ChannelEvent |
-| `TYPE_VACATED` | `'vacated'` | type field of ChannelEvent |
 
 ## cent: request and result types
 

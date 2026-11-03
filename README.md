@@ -60,9 +60,9 @@ update clears it; an update left `None` changes nothing. Any other nested
 message with nothing set is not sent.
 A string field with a fixed set of values has a constant per value, generated
 from the protos: `cent.PROVIDER_FCM`, `cent.PLATFORM_IOS`, `cent.OP_ADD`,
-`cent.STATUS_DELIVERED`, `cent.KEY_MODE_IF_NEW`, `cent.CMP_EQ` - and
-`cent.FILTER_NODE_OP_AND` for a filter's `op`, as `op` names the topic
-operations elsewhere. The fields stay `str`: a value Centrifugo added since
+`cent.STATUS_DELIVERED`, `cent.KEY_MODE_IF_NEW`, `cent.CMP_EQ` and
+`cent.FILTER_NODE_OP_AND` for a filter's `op` - the names the spec pins for
+every SDK. The fields stay `str`: a value Centrifugo added since
 is still sent.
 Create the client once and share it: it is safe for concurrent use. An
 `AsyncClient` belongs to the event loop of its first call - one per loop, so
@@ -493,7 +493,9 @@ map publish or map remove as sent, as refusing a connect unless anonymous
 connections are allowed, and as a refresh or sub refresh which expired. Error codes are in [400, 1999],
 disconnect codes in [4000, 4999], and a disconnect reason is at most 32 bytes.
 The values of a request's fixed-set fields have constants in `cent.proxy`:
-`req.encoding == proxy.ENCODING_BINARY`, `proxy.ALLOW_SUB`, `proxy.TYPE_OCCUPIED`. Keep proxy endpoints reachable by Centrifugo only: whoever can call
+`req.encoding == proxy.ENCODING_BINARY`, `proxy.ALLOW_SUB`, `proxy.CAPABILITY_MATCH_WILDCARD`,
+`proxy.CHANNEL_EVENT_TYPE_OCCUPIED`, `proxy.FILTER_NODE_OP_AND` - the names the API's
+constants have for the same field. Keep proxy endpoints reachable by Centrifugo only: whoever can call
 them can claim to be any user.
 
 ## Tokens
