@@ -61,6 +61,91 @@ DECODERS = {
 }
 
 
+# The paged methods (spec 3.8): the result field holding a page's items, and
+# the one holding the next page's cursor - None for history, paged by since -
+# and the docs of their <method>_all iterators.
+PAGED: dict[str, tuple[str, str | None, list[str]]] = {
+    "history": (
+        "publications",
+        None,
+        [
+            "The publications of a channel's history, oldest first, a page of limit",
+            "at a time: from since when it is set, from the start of what the channel",
+            "keeps otherwise. A page is read when the iteration reaches it, and the",
+            "iteration ends after a page shorter than limit::",
+            "",
+            '    for pub in client.history_all(channel="news", limit=100):',
+            "        handle(pub)",
+            "",
+            "limit is the page size, so it must be 1 or more, and reverse is refused:",
+            "since reads forward only. Both raise InvalidRequestError at the call,",
+            "before anything is sent. A publication made while iterating may or may",
+            "not be seen. An epoch which changed since a page was read - the history",
+            "was lost, with a Redis restart say - raises UnrecoverablePositionError:",
+            "the publications after the last one seen are gone, and reading again",
+            "from the start is the only way on.",
+        ],
+    ),
+    "device_list": (
+        "items",
+        "next_cursor",
+        [
+            "Every device the request selects, a page at a time, each page read when",
+            "the iteration reaches it: limit is the page size, the server's default",
+            "when unset. A device registered or removed while iterating may or may",
+            "not be seen.",
+        ],
+    ),
+    "device_topic_list": (
+        "items",
+        "next_cursor",
+        [
+            "Every device topic the request selects, a page at a time, as",
+            "device_list_all reads devices. A topic added or removed while iterating",
+            "may or may not be seen.",
+        ],
+    ),
+    "user_topic_list": (
+        "items",
+        "next_cursor",
+        [
+            "Every user topic the request selects, a page at a time, as",
+            "device_list_all reads devices. A topic added or removed while iterating",
+            "may or may not be seen.",
+        ],
+    ),
+    "map_read_state": (
+        "entries",
+        "cursor",
+        [
+            "Every entry of a map channel's state, a page at a time, each page read",
+            "when the iteration reaches it: limit is the page size. Every page after",
+            "the first is read at the first one's revision - its position(), as",
+            "revision_offset and revision_epoch, unless the call sets them - so that",
+            "a state reset between pages raises UnrecoverablePositionError instead",
+            "of mixing two states: read again from the start then. Entries changed",
+            "while iterating may be seen in either version; for a consistent view,",
+            "read the changes since the first page's position with map_read_stream.",
+        ],
+    ),
+}
+
+# The results holding a stream position as offset and epoch (spec 3.8), and
+# the docs of their position().
+POSITIONS: dict[str, list[str]] = {
+    "PublishResult": [
+        "Where the publication went in the channel's stream: the since of a",
+        "history call reading what came after it.",
+    ],
+    "HistoryResult": ["The channel's stream position when the history was read."],
+    "MapReadStateResult": [
+        "The map channel's stream position when its state was read: as",
+        "map_read_stream's since_offset and since_epoch, it reads the changes since.",
+    ],
+    "MapReadStreamResult": ["The map channel's stream position when its stream was read."],
+}
+
+
 class Command:
     def __init__(self, method: str, request: Message, result: str, pro_only: bool) -> None:
         self.method = method
@@ -542,6 +627,14 @@ def emit_message(out: list[str], m: Message, api_method: str | None, protocol: s
         p("        return w")
     if protocol == "server API" and (api_method is not None or needs_check(m.name)):
         emit_required(out, m)
+    if protocol == "server API" and m.name in POSITIONS:
+        names = {f.name: f.type for f in m.fields}
+        if names.get("offset") != "uint64" or names.get("epoch") != "string":
+            raise SystemExit(f"api.proto: {m.name} has no offset and epoch for its position()")
+        p("")
+        p("    def position(self) -> StreamPosition:")
+        out.extend(docstring(POSITIONS[m.name], "        "))
+        p("        return StreamPosition(offset=self.offset, epoch=self.epoch)")
     p("")
     p("    @classmethod")
     p(f"    def _from_wire(cls, v: Any, where: str = {m.name!r}) -> {m.name}:")
@@ -685,6 +778,8 @@ def generate(s: Schema) -> str:
     p("from cent._payload import JSON")
     p("")
     p("if TYPE_CHECKING:")
+    p("    from collections.abc import AsyncIterator, Iterator")
+    p("")
     p("    from cent._batch import Pending")
     p("    from cent._broadcast import BroadcastResult")
     p("    from cent._client import BroadcastAttemptCallback")
@@ -743,6 +838,10 @@ def generate(s: Schema) -> str:
             p("    if TYPE_CHECKING:")
             p("")
             p("        def _invoke(self, request: Any, result: type[_R], timeout: float | None) -> _R: ...")
+            p("        def _history_all(self, request: HistoryRequest, timeout: float | None) -> Iterator[Any]: ...")
+            p("        def _cursor_all(")
+            p("            self, request: Any, result: type[Any], items: str, cursor: str, timeout: float | None")
+            p("        ) -> Iterator[Any]: ...")
             p("        def _broadcast(self, request: BroadcastRequest, timeout: float | None) -> BroadcastResult: ...")
             p("        def _broadcast_with_retry(")
             p("            self, request: BroadcastRequest, max_attempts: int, attempt_timeout: float | None,")
@@ -755,6 +854,12 @@ def generate(s: Schema) -> str:
             p("    if TYPE_CHECKING:")
             p("")
             p("        async def _invoke(self, request: Any, result: type[_R], timeout: float | None) -> _R: ...")
+            p(
+                "        def _history_all(self, request: HistoryRequest, timeout: float | None) -> AsyncIterator[Any]: ..."
+            )
+            p("        def _cursor_all(")
+            p("            self, request: Any, result: type[Any], items: str, cursor: str, timeout: float | None")
+            p("        ) -> AsyncIterator[Any]: ...")
             p(
                 "        async def _broadcast(self, request: BroadcastRequest, timeout: float | None) -> BroadcastResult: ..."
             )
@@ -816,6 +921,30 @@ def generate(s: Schema) -> str:
             p(f"    {df} {c.method}(" + ", ".join(["self", "*", *params, *extra]) + f") -> {res}:")
             out.extend(docstring([*doc, *fdocs, *tdoc] if fdocs else [*doc, "", "Args:", *tdoc], "        "))
             p(f"        return {aw}{call}")
+            if c.method in PAGED:
+                items, cursor, pdoc = PAGED[c.method]
+                rmsg = s.by_name[c.result]
+                (item_field,) = [f for f in rmsg.fields if f.name == items and f.repeated]
+                if cursor is not None and not any(f.name == cursor for f in rmsg.fields):
+                    raise SystemExit(f"api.proto: {c.result} has no {cursor}")
+                it = "AsyncIterator" if kind == "async" else "Iterator"
+                doc = list(pdoc)
+                if kind == "async":
+                    doc = [line.replace("    for pub in client.", "    async for pub in client.") for line in doc]
+                if c.pro_only:
+                    doc.append("Centrifugo PRO only.")
+                p("")
+                p(
+                    f"    def {c.method}_all("
+                    + ", ".join(["self", "*", *params, *extra])
+                    + f") -> {it}[{item_field.type}]:"
+                )
+                tdoc_all = ["    timeout: Seconds bounding each page's call: request_timeout when None."]
+                out.extend(docstring([*doc, *fdocs, *tdoc_all], "        "))
+                if cursor is None:
+                    p(f"        return self._history_all({build}, timeout)")
+                else:
+                    p(f"        return self._cursor_all({build}, {c.result}, {items!r}, {cursor!r}, timeout)")
             if c.method == "broadcast":
                 p("")
                 p(

@@ -18,70 +18,9 @@ import httpx2
 import pytest
 
 import cent
-from tests.conftest import ENDPOINT, Fake
+from tests.conftest import ENDPOINT, Api, Fake
 
 pytestmark = pytest.mark.filterwarnings("error")
-
-
-class Api:
-    """Runs a client's calls the same way for Client and AsyncClient."""
-
-    def __init__(self, kind: str, fake: Fake, **opts: Any) -> None:
-        self.kind = kind
-        self.fake = fake
-        self.loop = asyncio.new_event_loop() if kind == "async" else None
-        if kind == "async":
-            http_a = opts.pop("http_client", None) or httpx2.AsyncClient(transport=httpx2.MockTransport(fake))
-            opts.setdefault("api_endpoint", ENDPOINT)
-            self.client: Any = cent.AsyncClient(http_client=http_a, **opts)
-        else:
-            http_s = opts.pop("http_client", None) or httpx2.Client(transport=httpx2.MockTransport(fake))
-            opts.setdefault("api_endpoint", ENDPOINT)
-            self.client = cent.Client(http_client=http_s, **opts)
-
-    def run(self, v: Any) -> Any:
-        if self.loop is not None:
-            return self.loop.run_until_complete(v)
-        return v
-
-    def __getattr__(self, name: str) -> Callable[..., Any]:
-        method = getattr(self.client, name)
-        return lambda *a, **kw: self.run(method(*a, **kw))
-
-    def send(self, batch: Any, **kw: Any) -> Any:
-        return self.run(batch.send(**kw))
-
-    def close(self, timeout: float | None = None) -> None:
-        if self.kind == "async":
-            self.run(self.client.aclose(timeout))
-        else:
-            self.client.close(timeout)
-
-
-@pytest.fixture(params=["sync", "async"])
-def kind(request: pytest.FixtureRequest) -> str:
-    return str(request.param)
-
-
-@pytest.fixture
-def new_api(kind: str, fake: Fake) -> Iterator[Callable[..., Api]]:
-    """Makes Apis of the test's kind, and closes their event loops."""
-    made: list[Api] = []
-
-    def make(**opts: Any) -> Api:
-        a = Api(kind, fake, **opts)
-        made.append(a)
-        return a
-
-    yield make
-    for a in made:
-        if a.loop is not None:
-            a.loop.close()
-
-
-@pytest.fixture
-def api(new_api: Callable[..., Api]) -> Api:
-    return new_api(api_key="key")
 
 
 def test_publish(api: Api, fake: Fake) -> None:

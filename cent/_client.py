@@ -16,9 +16,9 @@ from typing import Any, TypeVar
 
 import httpx2
 
-from cent import _broadcast, _core
+from cent import _broadcast, _core, _pages
 from cent import _wire as _w
-from cent._api import BroadcastRequest, _AsyncClientAPI, _ClientAPI
+from cent._api import BroadcastRequest, HistoryRequest, _AsyncClientAPI, _ClientAPI
 from cent._autobatch import AsyncBatcher, AutoBatch, BatchContext, SyncBatcher
 from cent._batch import AsyncBatch, Batch
 from cent._broadcast import BroadcastResult, ChannelResult
@@ -429,6 +429,18 @@ class Client(_ClientAPI):
         out: _T = result._from_wire(self._result(request, timeout))  # type: ignore[attr-defined]
         return out
 
+    # Pages: the <method>_all iterators, each page a call of its own.
+
+    def _history_all(self, request: HistoryRequest, timeout: float | None) -> Iterator[Any]:
+        validate(request)
+        return _pages.history_all(self._invoke, request, timeout)
+
+    def _cursor_all(
+        self, request: Any, result: type[Any], items: str, cursor: str, timeout: float | None
+    ) -> Iterator[Any]:
+        validate(request)
+        return _pages.cursor_all(self._invoke, request, result, items=items, cursor=cursor, timeout=timeout)
+
     def _send_batch(
         self,
         body: bytes | None,
@@ -686,6 +698,18 @@ class AsyncClient(_AsyncClientAPI):
     async def _invoke(self, request: Any, result: type[_T], timeout: float | None) -> _T:
         out: _T = result._from_wire(await self._result(request, timeout))  # type: ignore[attr-defined]
         return out
+
+    # Pages: the <method>_all iterators, each page a call of its own.
+
+    def _history_all(self, request: HistoryRequest, timeout: float | None) -> AsyncIterator[Any]:
+        validate(request)
+        return _pages.ahistory_all(self._invoke, request, timeout)
+
+    def _cursor_all(
+        self, request: Any, result: type[Any], items: str, cursor: str, timeout: float | None
+    ) -> AsyncIterator[Any]:
+        validate(request)
+        return _pages.acursor_all(self._invoke, request, result, items=items, cursor=cursor, timeout=timeout)
 
     async def _send_batch(
         self,

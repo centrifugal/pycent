@@ -94,6 +94,43 @@ Write integers which may pass 2^53 - a 64-bit ID, say - as JSON strings:
 browsers and JavaScript backends decode JSON numbers as doubles, and round
 larger integers silently.
 
+## Pages and stream positions
+
+`history_all`, `device_list_all`, `device_topic_list_all`, `user_topic_list_all`
+and `map_read_state_all` take the arguments of their method and return the
+items of every page - a generator, an async iterator on `AsyncClient` - reading
+a page when the loop reaches it; leaving the loop early reads no further page:
+
+```python
+for device in client.device_list_all(filter=cent.DeviceFilter(users=["42"]), limit=100):
+    ...
+
+async for pub in aclient.history_all(channel="news", limit=100):
+    ...
+```
+
+`history_all` pages by `since` and refuses a `limit` below 1 and `reverse` at
+the call. `map_read_state_all` reads every page after the first at the first
+one's revision, so that a map reset between pages raises
+`UnrecoverablePositionError` instead of mixing two states: read again from the
+start then. What a paged method lists changes under the iteration: a device
+registered while listing may or may not be seen. `timeout` bounds each page's
+call.
+
+`publish`, `history`, `map_read_state` and `map_read_stream` results give their
+`offset` and `epoch` as `position()`, a `cent.StreamPosition` - what came after
+a publication is `history`'s `since`:
+
+```python
+res = client.publish(channel="news", data={"text": "hi"})
+later = client.history(channel="news", limit=100, since=res.position())
+```
+
+A position whose epoch is no longer the stream's raises
+`UnrecoverablePositionError`: the stream was reset, and reading from its start
+is the only recovery. `map_read_stream` takes a position apart:
+`since_offset=pos.offset, since_epoch=pos.epoch`.
+
 ## Timeouts
 
 Each call takes a `timeout`, in seconds; without one, `request_timeout` - ten

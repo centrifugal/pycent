@@ -243,6 +243,35 @@ Arguments:
 - `limit` - The maximum number of devices to return.
 - `timeout` - Seconds bounding the call: request_timeout when None.
 
+#### `device_list_all(
+    *,
+    filter: DeviceFilter | None = None,
+    include_total_count: bool = False,
+    include_meta: bool = False,
+    include_topics: bool = False,
+    include_webpush_keys: bool = False,
+    cursor: str = '',
+    limit: int = 0,
+    timeout: float | None = None,
+) -> Iterator[Device]`
+
+Every device the request selects, a page at a time, each page read when
+the iteration reaches it: limit is the page size, the server's default
+when unset. A device registered or removed while iterating may or may
+not be seen.
+Centrifugo PRO only.
+
+Arguments:
+
+- `filter` - Selects the devices to list: all of them when unset.
+- `include_total_count` - Includes the total count for the filter in the result.
+- `include_meta` - Includes meta of each device.
+- `include_topics` - Includes topics of each device.
+- `include_webpush_keys` - Includes webpush_keys of each device (webpush only).
+- `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
+- `limit` - The maximum number of devices to return.
+- `timeout` - Seconds bounding each page's call: request_timeout when None.
+
 #### `device_register(
     *,
     id: str = '',
@@ -310,6 +339,30 @@ Arguments:
 - `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
 - `limit` - The maximum number of items to return.
 - `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `device_topic_list_all(
+    *,
+    filter: DeviceTopicFilter | None = None,
+    include_total_count: bool = False,
+    include_device: bool = False,
+    cursor: str = '',
+    limit: int = 0,
+    timeout: float | None = None,
+) -> Iterator[DeviceTopic]`
+
+Every device topic the request selects, a page at a time, as
+device_list_all reads devices. A topic added or removed while iterating
+may or may not be seen.
+Centrifugo PRO only.
+
+Arguments:
+
+- `filter` - Selects the device topics to list.
+- `include_total_count` - Includes the total count for the filter in the result.
+- `include_device` - Includes the Device of each item.
+- `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
+- `limit` - The maximum number of items to return.
+- `timeout` - Seconds bounding each page's call: request_timeout when None.
 
 #### `device_topic_update(
     *,
@@ -411,6 +464,41 @@ Arguments:
 - `since` - Returns publications after this stream position.
 - `reverse` - Iterates in reverse order, from latest to earliest.
 - `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `history_all(
+    *,
+    channel: str,
+    limit: int = 0,
+    since: StreamPosition | None = None,
+    reverse: bool = False,
+    timeout: float | None = None,
+) -> Iterator[Publication]`
+
+The publications of a channel's history, oldest first, a page of limit
+at a time: from since when it is set, from the start of what the channel
+keeps otherwise. A page is read when the iteration reaches it, and the
+iteration ends after a page shorter than limit:
+
+```python
+for pub in client.history_all(channel="news", limit=100):
+    handle(pub)
+```
+
+limit is the page size, so it must be 1 or more, and reverse is refused:
+since reads forward only. Both raise InvalidRequestError at the call,
+before anything is sent. A publication made while iterating may or may
+not be seen. An epoch which changed since a page was read - the history
+was lost, with a Redis restart say - raises UnrecoverablePositionError:
+the publications after the last one seen are gone, and reading again
+from the start is the only way on.
+
+Arguments:
+
+- `channel` - The name of the channel. Required.
+- `limit` - The maximum number of publications to return; -1 returns all the channel keeps. If not set, only the current stream position is returned, without publications.
+- `since` - Returns publications after this stream position.
+- `reverse` - Iterates in reverse order, from latest to earliest.
+- `timeout` - Seconds bounding each page's call: request_timeout when None.
 
 #### `history_remove(*, channel: str, timeout: float | None = None) -> HistoryRemoveResult`
 
@@ -522,6 +610,38 @@ Arguments:
 - `revision_offset` - The offset of the position from a previous state read, used with revision_epoch.
 - `revision_epoch` - The epoch of the position from a previous state read. If the epoch changed, the call fails with an unrecoverable position error.
 - `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `map_read_state_all(
+    *,
+    channel: str,
+    cursor: str = '',
+    limit: int = 0,
+    key: str = '',
+    asc: bool = False,
+    revision_offset: int = 0,
+    revision_epoch: str = '',
+    timeout: float | None = None,
+) -> Iterator[MapEntry]`
+
+Every entry of a map channel's state, a page at a time, each page read
+when the iteration reaches it: limit is the page size. Every page after
+the first is read at the first one's revision - its position(), as
+revision_offset and revision_epoch, unless the call sets them - so that
+a state reset between pages raises UnrecoverablePositionError instead
+of mixing two states: read again from the start then. Entries changed
+while iterating may be seen in either version; for a consistent view,
+read the changes since the first page's position with map_read_stream.
+
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `cursor` - The pagination cursor from the previous page. Empty starts from the beginning.
+- `limit` - The maximum number of entries per page: -1 means no limit, 0 returns only the stream position. Page sizes may exceed it with the Redis map broker.
+- `key` - Reads a single entry by exact key. cursor and limit are ignored when it is set.
+- `asc` - Sorts ordered state by score ascending instead of descending. Ignored for unordered channels.
+- `revision_offset` - The offset of the position from a previous state read, used with revision_epoch.
+- `revision_epoch` - The epoch of the position from a previous state read. If the epoch changed, the call fails with an unrecoverable position error.
+- `timeout` - Seconds bounding each page's call: request_timeout when None.
 
 #### `map_read_stream(
     *,
@@ -854,6 +974,28 @@ Arguments:
 - `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
 - `limit` - The maximum number of items to return.
 - `timeout` - Seconds bounding the call: request_timeout when None.
+
+#### `user_topic_list_all(
+    *,
+    filter: UserTopicFilter | None = None,
+    include_total_count: bool = False,
+    cursor: str = '',
+    limit: int = 0,
+    timeout: float | None = None,
+) -> Iterator[UserTopic]`
+
+Every user topic the request selects, a page at a time, as
+device_list_all reads devices. A topic added or removed while iterating
+may or may not be seen.
+Centrifugo PRO only.
+
+Arguments:
+
+- `filter` - Selects the user topics to list.
+- `include_total_count` - Includes the total count for the filter in the result.
+- `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
+- `limit` - The maximum number of items to return.
+- `timeout` - Seconds bounding each page's call: request_timeout when None.
 
 #### `user_topic_update(
     *,
@@ -1697,9 +1839,151 @@ Arguments:
 - `topics` - The topics for the operation.
 - `timeout` - Seconds bounding the call: request_timeout when None.
 
+#### `device_list_all(
+    *,
+    filter: DeviceFilter | None = None,
+    include_total_count: bool = False,
+    include_meta: bool = False,
+    include_topics: bool = False,
+    include_webpush_keys: bool = False,
+    cursor: str = '',
+    limit: int = 0,
+    timeout: float | None = None,
+) -> AsyncIterator[Device]`
+
+Every device the request selects, a page at a time, each page read when
+the iteration reaches it: limit is the page size, the server's default
+when unset. A device registered or removed while iterating may or may
+not be seen.
+Centrifugo PRO only.
+
+Arguments:
+
+- `filter` - Selects the devices to list: all of them when unset.
+- `include_total_count` - Includes the total count for the filter in the result.
+- `include_meta` - Includes meta of each device.
+- `include_topics` - Includes topics of each device.
+- `include_webpush_keys` - Includes webpush_keys of each device (webpush only).
+- `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
+- `limit` - The maximum number of devices to return.
+- `timeout` - Seconds bounding each page's call: request_timeout when None.
+
+#### `device_topic_list_all(
+    *,
+    filter: DeviceTopicFilter | None = None,
+    include_total_count: bool = False,
+    include_device: bool = False,
+    cursor: str = '',
+    limit: int = 0,
+    timeout: float | None = None,
+) -> AsyncIterator[DeviceTopic]`
+
+Every device topic the request selects, a page at a time, as
+device_list_all reads devices. A topic added or removed while iterating
+may or may not be seen.
+Centrifugo PRO only.
+
+Arguments:
+
+- `filter` - Selects the device topics to list.
+- `include_total_count` - Includes the total count for the filter in the result.
+- `include_device` - Includes the Device of each item.
+- `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
+- `limit` - The maximum number of items to return.
+- `timeout` - Seconds bounding each page's call: request_timeout when None.
+
+#### `history_all(
+    *,
+    channel: str,
+    limit: int = 0,
+    since: StreamPosition | None = None,
+    reverse: bool = False,
+    timeout: float | None = None,
+) -> AsyncIterator[Publication]`
+
+The publications of a channel's history, oldest first, a page of limit
+at a time: from since when it is set, from the start of what the channel
+keeps otherwise. A page is read when the iteration reaches it, and the
+iteration ends after a page shorter than limit:
+
+```python
+async for pub in client.history_all(channel="news", limit=100):
+    handle(pub)
+```
+
+limit is the page size, so it must be 1 or more, and reverse is refused:
+since reads forward only. Both raise InvalidRequestError at the call,
+before anything is sent. A publication made while iterating may or may
+not be seen. An epoch which changed since a page was read - the history
+was lost, with a Redis restart say - raises UnrecoverablePositionError:
+the publications after the last one seen are gone, and reading again
+from the start is the only way on.
+
+Arguments:
+
+- `channel` - The name of the channel. Required.
+- `limit` - The maximum number of publications to return; -1 returns all the channel keeps. If not set, only the current stream position is returned, without publications.
+- `since` - Returns publications after this stream position.
+- `reverse` - Iterates in reverse order, from latest to earliest.
+- `timeout` - Seconds bounding each page's call: request_timeout when None.
+
+#### `map_read_state_all(
+    *,
+    channel: str,
+    cursor: str = '',
+    limit: int = 0,
+    key: str = '',
+    asc: bool = False,
+    revision_offset: int = 0,
+    revision_epoch: str = '',
+    timeout: float | None = None,
+) -> AsyncIterator[MapEntry]`
+
+Every entry of a map channel's state, a page at a time, each page read
+when the iteration reaches it: limit is the page size. Every page after
+the first is read at the first one's revision - its position(), as
+revision_offset and revision_epoch, unless the call sets them - so that
+a state reset between pages raises UnrecoverablePositionError instead
+of mixing two states: read again from the start then. Entries changed
+while iterating may be seen in either version; for a consistent view,
+read the changes since the first page's position with map_read_stream.
+
+Arguments:
+
+- `channel` - The name of the map channel. Required.
+- `cursor` - The pagination cursor from the previous page. Empty starts from the beginning.
+- `limit` - The maximum number of entries per page: -1 means no limit, 0 returns only the stream position. Page sizes may exceed it with the Redis map broker.
+- `key` - Reads a single entry by exact key. cursor and limit are ignored when it is set.
+- `asc` - Sorts ordered state by score ascending instead of descending. Ignored for unordered channels.
+- `revision_offset` - The offset of the position from a previous state read, used with revision_epoch.
+- `revision_epoch` - The epoch of the position from a previous state read. If the epoch changed, the call fails with an unrecoverable position error.
+- `timeout` - Seconds bounding each page's call: request_timeout when None.
+
 #### `new_batch(*, parallel: bool = False) -> AsyncBatch`
 
 An empty AsyncBatch sent by this client, as Client.new_batch.
+
+#### `user_topic_list_all(
+    *,
+    filter: UserTopicFilter | None = None,
+    include_total_count: bool = False,
+    cursor: str = '',
+    limit: int = 0,
+    timeout: float | None = None,
+) -> AsyncIterator[UserTopic]`
+
+Every user topic the request selects, a page at a time, as
+device_list_all reads devices. A topic added or removed while iterating
+may or may not be seen.
+Centrifugo PRO only.
+
+Arguments:
+
+- `filter` - Selects the user topics to list.
+- `include_total_count` - Includes the total count for the filter in the result.
+- `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
+- `limit` - The maximum number of items to return.
+- `timeout` - Seconds bounding each page's call: request_timeout when None.
 
 ### `AutoBatch`
 
@@ -5631,6 +5915,10 @@ HistoryResult is the result of a history call.
 - `epoch: str = ''` - epoch is the epoch of the current stream.
 - `offset: int = 0` - offset is the top offset of the history stream.
 
+#### `position() -> StreamPosition`
+
+The channel's stream position when the history was read.
+
 #### `HmsPushNotification`
 
 HmsPushNotification is a notification for HMS. Centrifugo PRO only.
@@ -5682,6 +5970,11 @@ MapReadStateResult is the result of a map read state call.
 - `epoch: str = ''` - epoch is the epoch of the channel stream position.
 - `cursor: str = ''` - cursor is the cursor of the next page. Empty if there are no more entries.
 
+#### `position() -> StreamPosition`
+
+The map channel's stream position when its state was read: as
+map_read_stream's since_offset and since_epoch, it reads the changes since.
+
 #### `MapReadStreamResult`
 
 MapReadStreamResult is the result of a map read stream call.
@@ -5689,6 +5982,10 @@ MapReadStreamResult is the result of a map read stream call.
 - `entries: list[MapEntry] = []` - entries are the stream entries.
 - `offset: int = 0` - offset is the top offset of the channel stream.
 - `epoch: str = ''` - epoch is the epoch of the channel stream.
+
+#### `position() -> StreamPosition`
+
+The map channel's stream position when its stream was read.
 
 #### `MapRemoveResult`
 
@@ -5762,6 +6059,11 @@ PublishResult is the result of a successful publish.
 
 - `offset: int = 0` - offset is the offset of the publication in the channel history stream.
 - `epoch: str = ''` - epoch is the epoch of the channel history stream.
+
+#### `position() -> StreamPosition`
+
+Where the publication went in the channel's stream: the since of a
+history call reading what came after it.
 
 #### `PushLimitStrategy`
 
