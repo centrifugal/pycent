@@ -43,7 +43,12 @@ def test_history_all_and_positions(client: cent.Client, unique: Callable[[str], 
     for i in range(1, 7):
         client.publish(channel=ch, data=i)
     # Every publication once, in order, three to a page.
-    assert [p.data for p in client.history_all(channel=ch, limit=3)] == list(range(7))
+    items = list(client.history_all(channel=ch, limit=3))
+    assert [p.data for p in items] == list(range(7))
+    # Each item's position resumes after it.
+    assert items[0].position() == first.position()
+    resumed = client.history(channel=ch, limit=10, since=items[3].position())
+    assert [p.data for p in resumed.publications] == [4, 5, 6]
     # What came after a publication, from its position.
     after = client.history(channel=ch, limit=10, since=first.position())
     assert [p.data for p in after.publications] == list(range(1, 7))
@@ -157,7 +162,11 @@ def test_map_read_state_all(client: cent.Client, unique: Callable[[str], str]) -
     ch = "map:" + unique("")
     published = [client.map_publish(channel=ch, key=f"k{i}", data={}) for i in range(5)]
     assert published[-1].position().offset > published[0].position().offset
-    assert sorted(e.key for e in client.map_read_state_all(channel=ch, limit=2)) == [f"k{i}" for i in range(5)]
+    entries = list(client.map_read_state_all(channel=ch, limit=2))
+    assert sorted(e.key for e in entries) == [f"k{i}" for i in range(5)]
+    # Every entry carries the position the state was read at: the first page's.
+    assert len({(e.state.offset, e.state.epoch) for e in entries}) == 1
+    assert entries[0].state == published[-1].position()
     state = client.map_read_state(channel=ch, limit=10)
     stream = client.map_read_stream(channel=ch, since_offset=state.position().offset, since_epoch=state.epoch)
     assert stream.position() == state.position()

@@ -110,7 +110,18 @@ async for pub in aclient.history_all(channel="news", limit=100):
 ```
 
 `history_all` pages by `since` and refuses a `limit` below 1 and `reverse` at
-the call. `map_read_state_all` reads every page after the first at the first
+the call. It yields `cent.HistoryItem`s - each a `Publication`, `pub.data` and
+`pub.offset` as ever, with `position()` to resume from:
+
+```python
+for pub in client.history_all(channel="news", limit=100, since=last):
+    handle(pub.data)
+    last = pub.position()
+```
+
+`map_read_state_all` yields `cent.MapStateItem`s - each a `MapEntry`, with
+`state`, the position the state was read at, which `map_read_stream` follows
+it from. `map_read_state_all` reads every page after the first at the first
 one's revision, so that a map reset between pages raises
 `UnrecoverablePositionError` instead of mixing two states: read again from the
 start then. What a paged method lists changes under the iteration: a device

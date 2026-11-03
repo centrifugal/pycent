@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from cent._batch import Pending
     from cent._broadcast import BroadcastResult
     from cent._client import BroadcastAttemptCallback
+    from cent._pages import HistoryItem, MapStateItem
 
 _R = TypeVar("_R")
 
@@ -5327,14 +5328,16 @@ class _ClientAPI:
         since: StreamPosition | None = None,
         reverse: bool = False,
         timeout: float | None = None,
-    ) -> Iterator[Publication]:
+    ) -> Iterator[HistoryItem]:
         """The publications of a channel's history, oldest first, a page of limit
         at a time: from since when it is set, from the start of what the channel
         keeps otherwise. A page is read when the iteration reaches it, and the
-        iteration ends after a page shorter than limit::
+        iteration ends after a page shorter than limit. Each is a HistoryItem:
+        the Publication, with position() - where to resume from::
 
             for pub in client.history_all(channel="news", limit=100):
-                handle(pub)
+                handle(pub.data)
+                last = pub.position()
 
         limit is the page size, so it must be 1 or more, and reverse is refused:
         since reads forward only. Both raise InvalidRequestError at the call,
@@ -6158,7 +6161,7 @@ class _ClientAPI:
         revision_offset: int = 0,
         revision_epoch: str = "",
         timeout: float | None = None,
-    ) -> Iterator[MapEntry]:
+    ) -> Iterator[MapStateItem]:
         """Every entry of a map channel's state, a page at a time, each page read
         when the iteration reaches it: limit is the page size. Every page after
         the first is read at the first one's revision - its position(), as
@@ -6167,6 +6170,8 @@ class _ClientAPI:
         of mixing two states: read again from the start then. Entries changed
         while iterating may be seen in either version; for a consistent view,
         read the changes since the first page's position with map_read_stream.
+        Each is a MapStateItem: the MapEntry, with state, the position the state
+        was read at.
 
         Args:
             channel: The name of the map channel. Required.
@@ -6684,14 +6689,16 @@ class _AsyncClientAPI:
         since: StreamPosition | None = None,
         reverse: bool = False,
         timeout: float | None = None,
-    ) -> AsyncIterator[Publication]:
+    ) -> AsyncIterator[HistoryItem]:
         """The publications of a channel's history, oldest first, a page of limit
         at a time: from since when it is set, from the start of what the channel
         keeps otherwise. A page is read when the iteration reaches it, and the
-        iteration ends after a page shorter than limit::
+        iteration ends after a page shorter than limit. Each is a HistoryItem:
+        the Publication, with position() - where to resume from::
 
             async for pub in client.history_all(channel="news", limit=100):
-                handle(pub)
+                handle(pub.data)
+                last = pub.position()
 
         limit is the page size, so it must be 1 or more, and reverse is refused:
         since reads forward only. Both raise InvalidRequestError at the call,
@@ -7515,7 +7522,7 @@ class _AsyncClientAPI:
         revision_offset: int = 0,
         revision_epoch: str = "",
         timeout: float | None = None,
-    ) -> AsyncIterator[MapEntry]:
+    ) -> AsyncIterator[MapStateItem]:
         """Every entry of a map channel's state, a page at a time, each page read
         when the iteration reaches it: limit is the page size. Every page after
         the first is read at the first one's revision - its position(), as
@@ -7524,6 +7531,8 @@ class _AsyncClientAPI:
         of mixing two states: read again from the start then. Entries changed
         while iterating may be seen in either version; for a consistent view,
         read the changes since the first page's position with map_read_stream.
+        Each is a MapStateItem: the MapEntry, with state, the position the state
+        was read at.
 
         Args:
             channel: The name of the map channel. Required.

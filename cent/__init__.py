@@ -44,6 +44,7 @@ from cent._errors import (
     retryable,
 )
 from cent._http import HTTPRequest, HTTPResponse
+from cent._pages import HistoryItem, MapStateItem
 from cent._payload import JSON, RawJSON
 from cent._retry import BroadcastAttempt, exponential_backoff
 
@@ -77,9 +78,11 @@ __all__ = [
     "HTTPError",
     "HTTPRequest",
     "HTTPResponse",
+    "HistoryItem",
     "InternalError",
     "InvalidConfigError",
     "InvalidRequestError",
+    "MapStateItem",
     "NetworkError",
     "NotAvailableError",
     "NotFoundError",

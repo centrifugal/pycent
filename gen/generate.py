@@ -72,10 +72,12 @@ PAGED: dict[str, tuple[str, str | None, list[str]]] = {
             "The publications of a channel's history, oldest first, a page of limit",
             "at a time: from since when it is set, from the start of what the channel",
             "keeps otherwise. A page is read when the iteration reaches it, and the",
-            "iteration ends after a page shorter than limit::",
+            "iteration ends after a page shorter than limit. Each is a HistoryItem:",
+            "the Publication, with position() - where to resume from::",
             "",
             '    for pub in client.history_all(channel="news", limit=100):',
-            "        handle(pub)",
+            "        handle(pub.data)",
+            "        last = pub.position()",
             "",
             "limit is the page size, so it must be 1 or more, and reverse is refused:",
             "since reads forward only. Both raise InvalidRequestError at the call,",
@@ -126,9 +128,15 @@ PAGED: dict[str, tuple[str, str | None, list[str]]] = {
             "of mixing two states: read again from the start then. Entries changed",
             "while iterating may be seen in either version; for a consistent view,",
             "read the changes since the first page's position with map_read_stream.",
+            "Each is a MapStateItem: the MapEntry, with state, the position the state",
+            "was read at.",
         ],
     ),
 }
+
+# The items history_all and map_read_state_all yield: each with its position,
+# types of cent/_pages.py.
+PAGED_ITEMS = {"history": "HistoryItem", "map_read_state": "MapStateItem"}
 
 # The results holding a stream position as offset and epoch (spec 3.8), and
 # the docs of their position().
@@ -805,6 +813,7 @@ def generate(s: Schema) -> str:
     p("    from collections.abc import AsyncIterator, Iterator")
     p("")
     p("    from cent._batch import Pending")
+    p("    from cent._pages import HistoryItem, MapStateItem")
     p("    from cent._broadcast import BroadcastResult")
     p("    from cent._client import BroadcastAttemptCallback")
     p("")
@@ -952,17 +961,14 @@ def generate(s: Schema) -> str:
                 if cursor is not None and not any(f.name == cursor for f in rmsg.fields):
                     raise SystemExit(f"api.proto: {c.result} has no {cursor}")
                 it = "AsyncIterator" if kind == "async" else "Iterator"
+                item_type = PAGED_ITEMS.get(c.method, item_field.type)
                 doc = list(pdoc)
                 if kind == "async":
                     doc = [line.replace("    for pub in client.", "    async for pub in client.") for line in doc]
                 if c.pro_only:
                     doc.append("Centrifugo PRO only.")
                 p("")
-                p(
-                    f"    def {c.method}_all("
-                    + ", ".join(["self", "*", *params, *extra])
-                    + f") -> {it}[{item_field.type}]:"
-                )
+                p(f"    def {c.method}_all(" + ", ".join(["self", "*", *params, *extra]) + f") -> {it}[{item_type}]:")
                 tdoc_all = [
                     "    timeout: Seconds bounding each page's call, replacing request_timeout:",
                     "        request_timeout when None.",

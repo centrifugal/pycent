@@ -474,16 +474,18 @@ Arguments:
     since: StreamPosition | None = None,
     reverse: bool = False,
     timeout: float | None = None,
-) -> Iterator[Publication]`
+) -> Iterator[HistoryItem]`
 
 The publications of a channel's history, oldest first, a page of limit
 at a time: from since when it is set, from the start of what the channel
 keeps otherwise. A page is read when the iteration reaches it, and the
-iteration ends after a page shorter than limit:
+iteration ends after a page shorter than limit. Each is a HistoryItem:
+the Publication, with position() - where to resume from:
 
 ```python
 for pub in client.history_all(channel="news", limit=100):
-    handle(pub)
+    handle(pub.data)
+    last = pub.position()
 ```
 
 limit is the page size, so it must be 1 or more, and reverse is refused:
@@ -623,7 +625,7 @@ Arguments:
     revision_offset: int = 0,
     revision_epoch: str = '',
     timeout: float | None = None,
-) -> Iterator[MapEntry]`
+) -> Iterator[MapStateItem]`
 
 Every entry of a map channel's state, a page at a time, each page read
 when the iteration reaches it: limit is the page size. Every page after
@@ -633,6 +635,8 @@ a state reset between pages raises UnrecoverablePositionError instead
 of mixing two states: read again from the start then. Entries changed
 while iterating may be seen in either version; for a consistent view,
 read the changes since the first page's position with map_read_stream.
+Each is a MapStateItem: the MapEntry, with state, the position the state
+was read at.
 
 Arguments:
 
@@ -1903,16 +1907,18 @@ Arguments:
     since: StreamPosition | None = None,
     reverse: bool = False,
     timeout: float | None = None,
-) -> AsyncIterator[Publication]`
+) -> AsyncIterator[HistoryItem]`
 
 The publications of a channel's history, oldest first, a page of limit
 at a time: from since when it is set, from the start of what the channel
 keeps otherwise. A page is read when the iteration reaches it, and the
-iteration ends after a page shorter than limit:
+iteration ends after a page shorter than limit. Each is a HistoryItem:
+the Publication, with position() - where to resume from:
 
 ```python
 async for pub in client.history_all(channel="news", limit=100):
-    handle(pub)
+    handle(pub.data)
+    last = pub.position()
 ```
 
 limit is the page size, so it must be 1 or more, and reverse is refused:
@@ -1941,7 +1947,7 @@ Arguments:
     revision_offset: int = 0,
     revision_epoch: str = '',
     timeout: float | None = None,
-) -> AsyncIterator[MapEntry]`
+) -> AsyncIterator[MapStateItem]`
 
 Every entry of a map channel's state, a page at a time, each page read
 when the iteration reaches it: limit is the page size. Every page after
@@ -1951,6 +1957,8 @@ a state reset between pages raises UnrecoverablePositionError instead
 of mixing two states: read again from the start then. Entries changed
 while iterating may be seen in either version; for a consistent view,
 read the changes since the first page's position with map_read_stream.
+Each is a MapStateItem: the MapEntry, with state, the position the state
+was read at.
 
 Arguments:
 
@@ -4058,6 +4066,27 @@ A handler's answer.
 - `status: int`
 - `headers: list[tuple[str, str]]`
 - `body: bytes`
+
+### `HistoryItem`
+
+A publication history_all yields: the Publication, its fields read as
+they are - item.data, item.offset - and the epoch of the stream it is
+in, which position() gives with its offset.
+
+- `epoch: str = ''` - The epoch of the channel's stream when the page was read.
+
+#### `position() -> StreamPosition`
+
+The publication's place in the stream: the since of a history call,
+or a client's recover_since, reading what came after it.
+
+### `MapStateItem`
+
+An entry map_read_state_all yields: the MapEntry, its fields read as
+they are - item.key, item.data - and state, the position the map's state
+was read at.
+
+- `state: StreamPosition = field(default_factory=StreamPosition)` - The revision the state was read at: the first page's, or the call's revision_offset and revision_epoch - what map_read_stream follows the state from, as since_offset and since_epoch.
 
 ### `RawJSON`
 

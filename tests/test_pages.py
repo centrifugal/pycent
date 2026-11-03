@@ -187,6 +187,36 @@ def test_history_pages(api: Api, fake: Fake, total: int, requests: int) -> None:
         assert b["since"] == {"offset": 3 * i, "epoch": "e"}
 
 
+def test_history_items_carry_their_position(api: Api, fake: Fake) -> None:
+    _history(fake, 5, epoch="ep")
+    got = collect(api, "history", channel="ch", limit=2)
+    assert all(isinstance(p, cent.HistoryItem) and isinstance(p, cent.Publication) for p in got)
+    assert [p.position() for p in got] == [cent.StreamPosition(offset=o, epoch="ep") for o in range(1, 6)]
+    # Resuming from an item reads what came after it.
+    rest = collect(api, "history", channel="ch", limit=10, since=got[2].position())
+    assert [p.offset for p in rest] == [4, 5]
+
+
+def test_map_state_items_carry_the_states_position(api: Api, fake: Fake) -> None:
+    _pages(
+        fake,
+        "map_read_state",
+        [[{"key": "a"}], [{"key": "b"}]],
+        "entries",
+        "cursor",
+        extra=lambda i: {"offset": 10 + i, "epoch": f"e{i}"},
+    )
+    got = collect(api, "map_read_state", channel="m", limit=1)
+    assert all(isinstance(e, cent.MapStateItem) and isinstance(e, cent.MapEntry) for e in got)
+    assert [(e.key, e.state) for e in got] == [
+        ("a", cent.StreamPosition(offset=10, epoch="e0")),
+        ("b", cent.StreamPosition(offset=10, epoch="e0")),
+    ]
+    # With the caller's revision, that is the state's position.
+    got = collect(api, "map_read_state", channel="m", limit=1, revision_offset=5, revision_epoch="x")
+    assert [e.state for e in got] == [cent.StreamPosition(offset=5, epoch="x")] * 2
+
+
 def test_history_from_since(api: Api, fake: Fake) -> None:
     _history(fake, 5)
     got = collect(api, "history", channel="ch", limit=10, since=cent.StreamPosition(offset=3, epoch="e"))

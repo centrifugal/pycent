@@ -13,15 +13,73 @@ from __future__ import annotations
 import dataclasses
 from collections import deque
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
+from dataclasses import dataclass, field
 from typing import Any
 
-from cent._api import HistoryRequest, HistoryResult, MapReadStateRequest, StreamPosition
+from cent._api import (
+    HistoryRequest,
+    HistoryResult,
+    MapEntry,
+    MapReadStateRequest,
+    MapReadStateResult,
+    Publication,
+    StreamPosition,
+)
 from cent._errors import InvalidRequestError
 
 Invoke = Callable[[Any, type[Any], float | None], Any]
 AsyncInvoke = Callable[[Any, type[Any], float | None], Awaitable[Any]]
 # The request of the page after a reply, or None when there is none.
 NextPage = Callable[[Any, Any], Any]
+# The items a page yields, from its request and reply.
+Items = Callable[[Any, Any], list[Any]]
+
+
+@dataclass(slots=True, kw_only=True)
+class HistoryItem(Publication):
+    """A publication history_all yields: the Publication, its fields read as
+    they are - item.data, item.offset - and the epoch of the stream it is
+    in, which position() gives with its offset."""
+
+    epoch: str = ""
+    """The epoch of the channel's stream when the page was read."""
+
+    def position(self) -> StreamPosition:
+        """The publication's place in the stream: the since of a history call,
+        or a client's recover_since, reading what came after it."""
+        return StreamPosition(offset=self.offset, epoch=self.epoch)
+
+
+@dataclass(slots=True, kw_only=True)
+class MapStateItem(MapEntry):
+    """An entry map_read_state_all yields: the MapEntry, its fields read as
+    they are - item.key, item.data - and state, the position the map's state
+    was read at."""
+
+    state: StreamPosition = field(default_factory=StreamPosition)
+    """The revision the state was read at: the first page's, or the call's
+    revision_offset and revision_epoch - what map_read_stream follows the
+    state from, as since_offset and since_epoch."""
+
+
+def _fields(value: Any) -> dict[str, Any]:
+    return {f.name: getattr(value, f.name) for f in dataclasses.fields(value)}
+
+
+def _history_items(req: HistoryRequest, res: HistoryResult) -> list[Any]:
+    return [HistoryItem(**_fields(p), epoch=res.epoch) for p in res.publications]
+
+
+def _map_items(req: MapReadStateRequest, res: MapReadStateResult) -> list[Any]:
+    if req.revision_offset or req.revision_epoch:
+        state = StreamPosition(offset=req.revision_offset, epoch=req.revision_epoch)
+    else:
+        state = res.position()
+    return [MapStateItem(**_fields(e), state=state) for e in res.entries]
+
+
+def _attr(name: str) -> Items:
+    return lambda _req, res: list(getattr(res, name))
 
 
 def _check_history(req: HistoryRequest) -> None:
@@ -60,11 +118,11 @@ def _by_cursor(cursor: str) -> NextPage:
 
 
 def _pages(
-    invoke: Invoke, req: Any, result: type[Any], *, items: str, next_page: NextPage, timeout: float | None
+    invoke: Invoke, req: Any, result: type[Any], *, items: Items, next_page: NextPage, timeout: float | None
 ) -> Iterator[Any]:
     while req is not None:
         res = invoke(req, result, timeout)
-        yield from getattr(res, items)
+        yield from items(req, res)
         req = next_page(req, res)
 
 
@@ -80,7 +138,7 @@ class _AsyncPages:
         req: Any,
         result: type[Any],
         *,
-        items: str,
+        items: Items,
         next_page: NextPage,
         timeout: float | None,
     ) -> None:
@@ -97,28 +155,33 @@ class _AsyncPages:
             if req is None:
                 raise StopAsyncIteration
             res = await self._invoke(req, self._result, self._timeout)
-            self._buf.extend(getattr(res, self._items))
+            self._buf.extend(self._items(req, res))
             self._req = self._next(req, res)
         return self._buf.popleft()
 
 
 def history_all(invoke: Invoke, req: HistoryRequest, timeout: float | None) -> Iterator[Any]:
     _check_history(req)
-    return _pages(invoke, req, HistoryResult, items="publications", next_page=_next_history, timeout=timeout)
+    return _pages(invoke, req, HistoryResult, items=_history_items, next_page=_next_history, timeout=timeout)
 
 
 def ahistory_all(invoke: AsyncInvoke, req: HistoryRequest, timeout: float | None) -> AsyncIterator[Any]:
     _check_history(req)
-    return _AsyncPages(invoke, req, HistoryResult, items="publications", next_page=_next_history, timeout=timeout)
+    return _AsyncPages(invoke, req, HistoryResult, items=_history_items, next_page=_next_history, timeout=timeout)
 
 
 def cursor_all(
     invoke: Invoke, req: Any, result: type[Any], *, items: str, cursor: str, timeout: float | None
 ) -> Iterator[Any]:
-    return _pages(invoke, req, result, items=items, next_page=_by_cursor(cursor), timeout=timeout)
+    return _pages(invoke, req, result, items=_items(result, items), next_page=_by_cursor(cursor), timeout=timeout)
 
 
 def acursor_all(
     invoke: AsyncInvoke, req: Any, result: type[Any], *, items: str, cursor: str, timeout: float | None
 ) -> AsyncIterator[Any]:
-    return _AsyncPages(invoke, req, result, items=items, next_page=_by_cursor(cursor), timeout=timeout)
+    return _AsyncPages(invoke, req, result, items=_items(result, items), next_page=_by_cursor(cursor), timeout=timeout)
+
+
+def _items(result: type[Any], name: str) -> Items:
+    """The items of a page: a map state's entries with the state's position."""
+    return _map_items if result is MapReadStateResult else _attr(name)
