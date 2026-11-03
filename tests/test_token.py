@@ -292,10 +292,12 @@ def test_api_token_refused(key: token.Key | None, claims: dict[str, Any], msg: s
         token.api(key or _ed(), token.APIClaims(**claims))
 
 
-def test_api_tokens_reused_for_half_the_ttl() -> None:
+def test_api_token_source_reuses_a_token_for_half_the_ttl() -> None:
     keys = [_ed(), token.Key.ed25519(ed25519.Ed25519PrivateKey.generate()).with_key_id("api-2")]
     current = [0]
-    tokens = token.APITokens(claims=token.APIClaims(audience="aud"), current_key=lambda: keys[current[0]], ttl=3600)
+    tokens = token.APITokenSource(
+        claims=token.APIClaims(audience="aud"), current_key=lambda: keys[current[0]], ttl=3600
+    )
     first = tokens.token()
     _, c, _, _ = parts(first)
     assert c["exp"] - c["iat"] == 3600
@@ -314,14 +316,14 @@ def test_api_tokens_reused_for_half_the_ttl() -> None:
     assert set(got) == {nxt}
 
 
-def test_api_tokens_default_ttl_and_refusals() -> None:
-    _, c, _, _ = parts(token.APITokens(key=_ed(), claims=token.APIClaims(audience="a")).token())
+def test_api_token_source_default_ttl_and_refusals() -> None:
+    _, c, _, _ = parts(token.APITokenSource(key=_ed(), claims=token.APIClaims(audience="a")).token())
     assert c["exp"] - c["iat"] == 300
     with pytest.raises(ValueError, match="sets expires_at"):
-        token.APITokens(key=_ed(), claims=token.APIClaims(audience="a", expires_at=EXP))
+        token.APITokenSource(key=_ed(), claims=token.APIClaims(audience="a", expires_at=EXP))
     with pytest.raises(ValueError, match="positive"):
-        token.APITokens(key=_ed(), claims=token.APIClaims(audience="a"), ttl=-1)
+        token.APITokenSource(key=_ed(), claims=token.APIClaims(audience="a"), ttl=-1)
     with pytest.raises(ValueError, match="one of them"):
-        token.APITokens(claims=token.APIClaims(audience="a"))
+        token.APITokenSource(claims=token.APIClaims(audience="a"))
     with pytest.raises(ValueError, match="audience or scope"):
-        token.APITokens(key=_ed(), claims=token.APIClaims()).token()
+        token.APITokenSource(key=_ed(), claims=token.APIClaims()).token()

@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 __all__ = [
     "NEVER",
     "APIClaims",
-    "APITokens",
+    "APITokenSource",
     "ChannelsCapability",
     "ConnectionClaims",
     "Key",
@@ -589,7 +589,7 @@ def api(key: Key, claims: APIClaims) -> str:
     """A token for Centrifugo PRO's server API with claims, signed with key - an
     asymmetric key with an ID, published by jwks: Centrifugo PRO finds it by
     the "kid". See APIClaims for keeping it apart from client tokens, and
-    APITokens for one to send with every call."""
+    APITokenSource for one to send with every call."""
     c = claims
     if not isinstance(key, Key):
         raise TypeError("token: key must be a token.Key")
@@ -627,13 +627,13 @@ def api(key: Key, claims: APIClaims) -> str:
     return _sign(key, w)
 
 
-class APITokens:
+class APITokenSource:
     """Issues the tokens a Client sends to Centrifugo PRO: its token method is
     the client's bearer_token_func. It signs a token with api and reuses it for
     half its lifetime, so a token sent has at least half of it left. Safe for
     concurrent use.
 
-    >>> tokens = token.APITokens(key=api_key,   # its own key, not the client tokens'
+    >>> tokens = token.APITokenSource(key=api_key,   # its own key, not the client tokens'
     ...     claims=token.APIClaims(audience="centrifugo-api", scope=["centrifugo:api"]))
     >>> client = cent.Client("https://centrifugo.example.com/api", bearer_token_func=tokens.token)
 
@@ -653,13 +653,13 @@ class APITokens:
         ttl: float = 300.0,
     ) -> None:
         if (key is None) == (current_key is None):
-            raise InvalidRequestError("token: APITokens takes key or current_key, one of them")
+            raise InvalidRequestError("token: APITokenSource takes key or current_key, one of them")
         if claims.expires_at is not None or claims.issued_at is not None:
             raise InvalidRequestError(
-                "token: APITokens sets expires_at and issued_at itself: leave them unset, and set ttl"
+                "token: APITokenSource sets expires_at and issued_at itself: leave them unset, and set ttl"
             )
         if isinstance(ttl, bool) or not isinstance(ttl, (int, float)) or ttl <= 0:
-            raise InvalidRequestError("token: APITokens ttl must be a positive number of seconds")
+            raise InvalidRequestError("token: APITokenSource ttl must be a positive number of seconds")
         self._claims = claims
         self._key = key
         self._current_key = current_key
@@ -677,7 +677,7 @@ class APITokens:
                 return self._token
             key = self._current_key() if self._current_key is not None else self._key
             if key is None:  # pragma: no cover - one of them is set, see __init__
-                raise InvalidRequestError("token: APITokens without a key")
+                raise InvalidRequestError("token: APITokenSource without a key")
             issued = datetime.fromtimestamp(now, UTC)
             c = APIClaims(
                 audience=self._claims.audience,

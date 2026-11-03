@@ -280,7 +280,7 @@ client = cent.AsyncClient(api_url, api_key=api_key, request_timeout=5.0, http_cl
 ```
 
 - `api_key` is a keyword argument. `bearer_token_func` authenticates with
-  Centrifugo PRO's API tokens instead - see `cent.token.APITokens`.
+  Centrifugo PRO's API tokens instead - see `cent.token.APITokenSource`.
 - `timeout` per call stays: `client.publish(channel=..., data=..., timeout=1.0)`.
 - An `http_client` you pass is never changed - cent 5 set the API key in the
   headers of the session you gave it.

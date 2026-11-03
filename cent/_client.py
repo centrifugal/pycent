@@ -278,7 +278,7 @@ class Client(_ClientAPI):
       at all.
     - bearer_token_func: returns the token sent as "Authorization: Bearer"
       with each request, for Centrifugo PRO's JWKS authentication of the API
-      - cent.token.APITokens.token, say. Not together with api_key. An empty
+      - cent.token.APITokenSource.token, say. Not together with api_key. An empty
       token, or one with control characters, fails the call with
       InvalidConfigError, and an exception of the function with
       FunctionError, before sending.

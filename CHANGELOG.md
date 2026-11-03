@@ -12,7 +12,7 @@ Migrating from cent 5: see [MIGRATING.md](MIGRATING.md).
 * Payloads: native values or `RawJSON`, sent as the same JSON value; NaN, infinities and bytes refused before sending; a payload from a reply sent back unchanged is the same JSON value.
 * `broadcast_with_retry`, `exponential_backoff`; automatic batching of concurrent calls (`auto_batch`); `on_request` for metrics; `close()` and `aclose()` waiting for calls in progress.
 * `cent.command.publish(...)` and the like for Centrifugo's async consumers.
-* `cent.token`: connection, subscription and Centrifugo PRO server API tokens (HS256, RS256, ES256/384/512, EdDSA), JWKS, `APITokens`.
+* `cent.token`: connection, subscription and Centrifugo PRO server API tokens (HS256, RS256, ES256/384/512, EdDSA), JWKS, `APITokenSource`.
 * `cent.endpoints`: the token and shared poll signature endpoints client SDKs call, and the JWKS endpoint. `cent.proxy`: a handler for every proxy type, generated from `proxy.proto`. Each is a framework-free core with ASGI and WSGI adapters.
 * `cent.sharedpoll.sign` for shared poll signatures, its expiry required: a datetime, or `token.NEVER`.
 * Fields the protos mark required are required keyword arguments. `cent.to_dict` renders results and errors with Centrifugo's field names. `Pending.resolved` and the public constructors of results and partial-failure errors make test doubles; the README shows a fake transport.

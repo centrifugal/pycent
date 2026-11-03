@@ -219,8 +219,8 @@ def test_pro_batch(pro: cent.Client, unique: Callable[[str], str]) -> None:
     pro.device_remove(ids=[r.id])
 
 
-def test_api_tokens(pro: cent.Client, unique: Callable[[str], str], serve: Callable[[int, Any], None]) -> None:
-    """Tokens from token.APITokens authenticate API calls to Centrifugo PRO,
+def test_api_token_source(pro: cent.Client, unique: Callable[[str], str], serve: Callable[[int, Any], None]) -> None:
+    """Tokens from token.APITokenSource authenticate API calls to Centrifugo PRO,
     which verifies them with the keys served here, at the endpoint of
     testdata/centrifugo-pro.compose.yml: port 3101 of the host. Tokens without
     the audience and scope it requires are refused, as are tokens signed with
@@ -246,7 +246,9 @@ def test_api_tokens(pro: cent.Client, unique: Callable[[str], str], serve: Calla
         with cent.Client(ADDR, bearer_token_func=token_func) as c:
             c.publish(channel=unique(""), data={})
 
-    tokens = token.APITokens(key=api_key, claims=token.APIClaims(audience="centrifugo-api", scope=["centrifugo:api"]))
+    tokens = token.APITokenSource(
+        key=api_key, claims=token.APIClaims(audience="centrifugo-api", scope=["centrifugo:api"])
+    )
     publish(tokens.token)
 
     exp = datetime.now(UTC) + timedelta(minutes=1)
@@ -263,7 +265,9 @@ def test_api_tokens(pro: cent.Client, unique: Callable[[str], str], serve: Calla
     with pytest.raises(cent.UnauthorizedError):
         publish(lambda: conn)
 
-    unpublished = token.APITokens(key=key("gocent-unpublished", 2), claims=token.APIClaims(audience="centrifugo-api"))
+    unpublished = token.APITokenSource(
+        key=key("gocent-unpublished", 2), claims=token.APIClaims(audience="centrifugo-api")
+    )
     with pytest.raises(cent.UnauthorizedError):
         publish(unpublished.token)
 

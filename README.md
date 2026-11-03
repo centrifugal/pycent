@@ -351,17 +351,17 @@ token as `Authorization: Bearer`, for Centrifugo PRO's JWKS authentication - it
 is called for every request, so return a cached token. Leave both unset when
 mutual TLS, set up in `http_client`, or a proxy authenticates instead.
 
-To sign the tokens yourself, `token.APITokens` issues them and reuses each for
+To sign the tokens yourself, `token.APITokenSource` issues them and reuses each for
 half its lifetime:
 
 ```python
 from cent import token
 
-api_tokens = token.APITokens(
+api_tokens = token.APITokenSource(
     key=api_key,  # its own key - never one of the client tokens
     claims=token.APIClaims(audience="centrifugo-api", scope=["centrifugo:api"]),
 )
-client = cent.Client("https://centrifugo.example.com/api", bearer_token_func=api_tokens.token)
+client = cent.Client("https://centrifugo.example.com/api", bearer_token_func=api_token_source.token)
 ```
 
 Centrifugo PRO accepts a token signed with any key of `http_api.jwks.endpoint`,
@@ -593,7 +593,7 @@ disconnect them with the server API if needed.
 
 Centrifugo PRO's API tokens rotate the same way, from a set of their own at
 `http_api.jwks.endpoint` (see [Authentication](#authentication)).
-`token.APITokens(current_key=...)` takes the key to sign with from a
+`token.APITokenSource(current_key=...)` takes the key to sign with from a
 function, so it can switch to the new key at step 2. Each API token is reused
 for half its `ttl`, so in step 3 wait at least `ttl` after the switch.
 

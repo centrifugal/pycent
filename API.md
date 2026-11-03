@@ -52,7 +52,7 @@ Options:
   at all.
 - bearer_token_func: returns the token sent as "Authorization: Bearer"
   with each request, for Centrifugo PRO's JWKS authentication of the API
-  - cent.token.APITokens.token, say. Not together with api_key. An empty
+  - cent.token.APITokenSource.token, say. Not together with api_key. An empty
   token, or one with control characters, fails the call with
   InvalidConfigError, and an exception of the function with
   FunctionError, before sending.
@@ -4582,10 +4582,10 @@ the connection and subscription tokens users hold:
 - `issued_at: datetime | None = None` - The "iat" claim; None for now.
 - `id: str = ''` - The "jti" claim.
 
-### `APITokens`
+### `APITokenSource`
 
 ```python
-APITokens(
+APITokenSource(
     *,
     claims: APIClaims,
     key: Key | None = None,
@@ -4600,7 +4600,7 @@ half its lifetime, so a token sent has at least half of it left. Safe for
 concurrent use.
 
 ```python
-tokens = token.APITokens(key=api_key,   # its own key, not the client tokens'
+tokens = token.APITokenSource(key=api_key,   # its own key, not the client tokens'
     claims=token.APIClaims(audience="centrifugo-api", scope=["centrifugo:api"]))
 client = cent.Client("https://centrifugo.example.com/api", bearer_token_func=tokens.token)
 ```
@@ -4738,7 +4738,7 @@ https://centrifugal.dev/docs/server/channel_token_auth.
 A token for Centrifugo PRO's server API with claims, signed with key - an
 asymmetric key with an ID, published by jwks: Centrifugo PRO finds it by
 the "kid". See APIClaims for keeping it apart from client tokens, and
-APITokens for one to send with every call.
+APITokenSource for one to send with every call.
 
 ### `connection(key: Key, claims: ConnectionClaims) -> str`
 
