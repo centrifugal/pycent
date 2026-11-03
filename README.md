@@ -125,8 +125,11 @@ it from. `map_read_state_all` reads every page after the first at the first
 one's revision, so that a map reset between pages raises
 `UnrecoverablePositionError` instead of mixing two states: read again from the
 start then. What a paged method lists changes under the iteration: a device
-registered while listing may or may not be seen. `timeout` bounds each page's
-call.
+registered while listing may or may not be seen. An iteration lasts as long
+as your loop, so the iterators take no `timeout`: `page_timeout` bounds each
+page's request, replacing `request_timeout` for it, as `attempt_timeout` does
+for a retry's attempt. Cancelling the task, or an `asyncio.timeout` around the
+loop, ends the iteration.
 
 Every result holding an `offset` and `epoch` - `publish`'s, `history`'s,
 `map_read_state`'s, `map_read_stream`'s, `map_publish`'s and `map_remove`'s -

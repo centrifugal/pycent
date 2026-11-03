@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import http.server
+import inspect
 import json
 import os
 import re
@@ -453,6 +454,55 @@ def test_attempt_timeout_replaces_request_timeout(new_api: Callable[..., Api], s
     with pytest.raises(cent.CentTimeoutError):
         b.broadcast_with_retry(channels=["a"], data=1, attempt_timeout=5, timeout=0.2)
     assert time.monotonic() - start < 1
+
+
+_HISTORY = {"result": {"publications": [{"data": 1, "offset": 1}], "epoch": "e", "offset": 1}}
+
+
+def _all(a: Api, **kw: Any) -> list[Any]:
+    """The items of history_all(**kw), blocking or async alike."""
+    it = a.client.history_all(channel="x", limit=10, **kw)
+    if a.kind == "sync":
+        return list(it)
+
+    async def run() -> list[Any]:
+        return [x async for x in it]
+
+    out: list[Any] = a.run(run())
+    return out
+
+
+def test_page_timeout_replaces_request_timeout(new_api: Callable[..., Api], slow: Any) -> None:
+    # Longer: a slow page finishes past request_timeout.
+    a = new_api(request_timeout=0.1, **slow(0.3, _HISTORY))
+    assert [p.data for p in _all(a, page_timeout=2)] == [1]
+    # Shorter: the page gives up before request_timeout.
+    b = new_api(request_timeout=5, **slow(2, _HISTORY))
+    start = time.monotonic()
+    with pytest.raises(cent.CentTimeoutError):
+        _all(b, page_timeout=0.1)
+    assert time.monotonic() - start < 1
+    # Without it, each page gets request_timeout.
+    c = new_api(request_timeout=0.1, **slow(2, _HISTORY))
+    start = time.monotonic()
+    with pytest.raises(cent.CentTimeoutError):
+        _all(c)
+    assert time.monotonic() - start < 1
+
+
+def test_iterators_take_no_per_call_timeout(api: Api) -> None:
+    # A per-call timeout bounds a whole call; an iteration lasts as long as
+    # the loop, so the iterators take page_timeout instead.
+    for name in (
+        "history_all",
+        "device_list_all",
+        "device_topic_list_all",
+        "user_topic_list_all",
+        "map_read_state_all",
+    ):
+        params = inspect.signature(getattr(api.client, name)).parameters
+        assert "timeout" not in params
+        assert "page_timeout" in params
 
 
 def test_validation(api: Api, fake: Fake) -> None:

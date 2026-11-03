@@ -259,7 +259,7 @@ Arguments:
     include_webpush_keys: bool = False,
     cursor: str = '',
     limit: int = 0,
-    timeout: float | None = None,
+    page_timeout: float | None = None,
 ) -> Iterator[Device]`
 
 Every device the request selects, a page at a time, each page read when
@@ -277,7 +277,7 @@ Arguments:
 - `include_webpush_keys` - Includes webpush_keys of each device (webpush only).
 - `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
 - `limit` - The maximum number of devices to return.
-- `timeout` - Seconds bounding each page's call, replacing request_timeout: request_timeout when None.
+- `page_timeout` - Seconds bounding each page's request, replacing request_timeout for it: request_timeout when None. Nothing bounds the iteration as a whole: it lasts as long as the loop does.
 
 #### `device_register(
     *,
@@ -354,7 +354,7 @@ Arguments:
     include_device: bool = False,
     cursor: str = '',
     limit: int = 0,
-    timeout: float | None = None,
+    page_timeout: float | None = None,
 ) -> Iterator[DeviceTopic]`
 
 Every device topic the request selects, a page at a time, as
@@ -369,7 +369,7 @@ Arguments:
 - `include_device` - Includes the Device of each item.
 - `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
 - `limit` - The maximum number of items to return.
-- `timeout` - Seconds bounding each page's call, replacing request_timeout: request_timeout when None.
+- `page_timeout` - Seconds bounding each page's request, replacing request_timeout for it: request_timeout when None. Nothing bounds the iteration as a whole: it lasts as long as the loop does.
 
 #### `device_topic_update(
     *,
@@ -478,7 +478,7 @@ Arguments:
     limit: int = 0,
     since: StreamPosition | None = None,
     reverse: bool = False,
-    timeout: float | None = None,
+    page_timeout: float | None = None,
 ) -> Iterator[HistoryItem]`
 
 The publications of a channel's history, oldest first, a page of limit
@@ -507,7 +507,7 @@ Arguments:
 - `limit` - The maximum number of publications to return; -1 returns all the channel keeps. If not set, only the current stream position is returned, without publications.
 - `since` - Returns publications after this stream position.
 - `reverse` - Iterates in reverse order, from latest to earliest.
-- `timeout` - Seconds bounding each page's call, replacing request_timeout: request_timeout when None.
+- `page_timeout` - Seconds bounding each page's request, replacing request_timeout for it: request_timeout when None. Nothing bounds the iteration as a whole: it lasts as long as the loop does.
 
 #### `history_remove(*, channel: str, timeout: float | None = None) -> HistoryRemoveResult`
 
@@ -629,7 +629,7 @@ Arguments:
     asc: bool = False,
     revision_offset: int = 0,
     revision_epoch: str = '',
-    timeout: float | None = None,
+    page_timeout: float | None = None,
 ) -> Iterator[MapStateItem]`
 
 Every entry of a map channel's state, a page at a time, each page read
@@ -652,7 +652,7 @@ Arguments:
 - `asc` - Sorts ordered state by score ascending instead of descending. Ignored for unordered channels.
 - `revision_offset` - The offset of the position from a previous state read, used with revision_epoch.
 - `revision_epoch` - The epoch of the position from a previous state read. If the epoch changed, the call fails with an unrecoverable position error.
-- `timeout` - Seconds bounding each page's call, replacing request_timeout: request_timeout when None.
+- `page_timeout` - Seconds bounding each page's request, replacing request_timeout for it: request_timeout when None. Nothing bounds the iteration as a whole: it lasts as long as the loop does.
 
 #### `map_read_stream(
     *,
@@ -992,7 +992,7 @@ Arguments:
     include_total_count: bool = False,
     cursor: str = '',
     limit: int = 0,
-    timeout: float | None = None,
+    page_timeout: float | None = None,
 ) -> Iterator[UserTopic]`
 
 Every user topic the request selects, a page at a time, as
@@ -1006,7 +1006,7 @@ Arguments:
 - `include_total_count` - Includes the total count for the filter in the result.
 - `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
 - `limit` - The maximum number of items to return.
-- `timeout` - Seconds bounding each page's call, replacing request_timeout: request_timeout when None.
+- `page_timeout` - Seconds bounding each page's request, replacing request_timeout for it: request_timeout when None. Nothing bounds the iteration as a whole: it lasts as long as the loop does.
 
 #### `user_topic_update(
     *,
@@ -1861,7 +1861,7 @@ Arguments:
     include_webpush_keys: bool = False,
     cursor: str = '',
     limit: int = 0,
-    timeout: float | None = None,
+    page_timeout: float | None = None,
 ) -> AsyncIterator[Device]`
 
 Every device the request selects, a page at a time, each page read when
@@ -1879,7 +1879,7 @@ Arguments:
 - `include_webpush_keys` - Includes webpush_keys of each device (webpush only).
 - `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
 - `limit` - The maximum number of devices to return.
-- `timeout` - Seconds bounding each page's call, replacing request_timeout: request_timeout when None.
+- `page_timeout` - Seconds bounding each page's request, replacing request_timeout for it: request_timeout when None. Nothing bounds the iteration as a whole: it lasts as long as the loop does.
 
 #### `device_topic_list_all(
     *,
@@ -1888,7 +1888,7 @@ Arguments:
     include_device: bool = False,
     cursor: str = '',
     limit: int = 0,
-    timeout: float | None = None,
+    page_timeout: float | None = None,
 ) -> AsyncIterator[DeviceTopic]`
 
 Every device topic the request selects, a page at a time, as
@@ -1903,7 +1903,7 @@ Arguments:
 - `include_device` - Includes the Device of each item.
 - `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
 - `limit` - The maximum number of items to return.
-- `timeout` - Seconds bounding each page's call, replacing request_timeout: request_timeout when None.
+- `page_timeout` - Seconds bounding each page's request, replacing request_timeout for it: request_timeout when None. Nothing bounds the iteration as a whole: it lasts as long as the loop does.
 
 #### `history_all(
     *,
@@ -1911,7 +1911,7 @@ Arguments:
     limit: int = 0,
     since: StreamPosition | None = None,
     reverse: bool = False,
-    timeout: float | None = None,
+    page_timeout: float | None = None,
 ) -> AsyncIterator[HistoryItem]`
 
 The publications of a channel's history, oldest first, a page of limit
@@ -1940,7 +1940,7 @@ Arguments:
 - `limit` - The maximum number of publications to return; -1 returns all the channel keeps. If not set, only the current stream position is returned, without publications.
 - `since` - Returns publications after this stream position.
 - `reverse` - Iterates in reverse order, from latest to earliest.
-- `timeout` - Seconds bounding each page's call, replacing request_timeout: request_timeout when None.
+- `page_timeout` - Seconds bounding each page's request, replacing request_timeout for it: request_timeout when None. Nothing bounds the iteration as a whole: it lasts as long as the loop does.
 
 #### `map_read_state_all(
     *,
@@ -1951,7 +1951,7 @@ Arguments:
     asc: bool = False,
     revision_offset: int = 0,
     revision_epoch: str = '',
-    timeout: float | None = None,
+    page_timeout: float | None = None,
 ) -> AsyncIterator[MapStateItem]`
 
 Every entry of a map channel's state, a page at a time, each page read
@@ -1974,7 +1974,7 @@ Arguments:
 - `asc` - Sorts ordered state by score ascending instead of descending. Ignored for unordered channels.
 - `revision_offset` - The offset of the position from a previous state read, used with revision_epoch.
 - `revision_epoch` - The epoch of the position from a previous state read. If the epoch changed, the call fails with an unrecoverable position error.
-- `timeout` - Seconds bounding each page's call, replacing request_timeout: request_timeout when None.
+- `page_timeout` - Seconds bounding each page's request, replacing request_timeout for it: request_timeout when None. Nothing bounds the iteration as a whole: it lasts as long as the loop does.
 
 #### `new_batch(*, parallel: bool = False) -> AsyncBatch`
 
@@ -1986,7 +1986,7 @@ An empty AsyncBatch sent by this client, as Client.new_batch.
     include_total_count: bool = False,
     cursor: str = '',
     limit: int = 0,
-    timeout: float | None = None,
+    page_timeout: float | None = None,
 ) -> AsyncIterator[UserTopic]`
 
 Every user topic the request selects, a page at a time, as
@@ -2000,7 +2000,7 @@ Arguments:
 - `include_total_count` - Includes the total count for the filter in the result.
 - `cursor` - The pagination cursor: next_cursor of the previous page, empty for the first page.
 - `limit` - The maximum number of items to return.
-- `timeout` - Seconds bounding each page's call, replacing request_timeout: request_timeout when None.
+- `page_timeout` - Seconds bounding each page's request, replacing request_timeout for it: request_timeout when None. Nothing bounds the iteration as a whole: it lasts as long as the loop does.
 
 ### `AutoBatch`
 

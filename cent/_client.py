@@ -450,12 +450,14 @@ class Client(_ClientAPI):
 
     def _history_all(self, request: HistoryRequest, timeout: float | None) -> Iterator[Any]:
         validate(request)
+        _pages.check_page_timeout(timeout)
         return _pages.history_all(self._invoke, request, timeout)
 
     def _cursor_all(
         self, request: Any, result: type[Any], items: str, cursor: str, timeout: float | None
     ) -> Iterator[Any]:
         validate(request)
+        _pages.check_page_timeout(timeout)
         return _pages.cursor_all(self._invoke, request, result, items=items, cursor=cursor, timeout=timeout)
 
     def _send_batch(
@@ -729,12 +731,14 @@ class AsyncClient(_AsyncClientAPI):
 
     def _history_all(self, request: HistoryRequest, timeout: float | None) -> AsyncIterator[Any]:
         validate(request)
+        _pages.check_page_timeout(timeout)
         return _pages.ahistory_all(self._invoke, request, timeout)
 
     def _cursor_all(
         self, request: Any, result: type[Any], items: str, cursor: str, timeout: float | None
     ) -> AsyncIterator[Any]:
         validate(request)
+        _pages.check_page_timeout(timeout)
         return _pages.acursor_all(self._invoke, request, result, items=items, cursor=cursor, timeout=timeout)
 
     async def _send_batch(

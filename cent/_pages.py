@@ -5,7 +5,10 @@ and AsyncClient alike.
 Each takes the client's _invoke, sends the request as given, then the next
 page, and yields each page's items in order. A page is read when the
 iteration reaches it; leaving the loop early reads no further page; an error
-ends the iteration, raised where the page would have been.
+ends the iteration, raised where the page would have been. page_timeout -
+request_timeout when None - bounds each page's request; nothing bounds the
+iteration as a whole, which lasts as long as the caller's loop, but a
+cancelled task ends it.
 """
 
 from __future__ import annotations
@@ -80,6 +83,15 @@ def _map_items(req: MapReadStateRequest, res: MapReadStateResult) -> list[Any]:
 
 def _attr(name: str) -> Items:
     return lambda _req, res: list(getattr(res, name))
+
+
+def check_page_timeout(page_timeout: float | None) -> None:
+    """page_timeout's refusals, at the call: anything but None or a positive
+    number of seconds - zero refused as a negative is."""
+    if page_timeout is None:
+        return
+    if isinstance(page_timeout, bool) or not isinstance(page_timeout, (int, float)) or page_timeout <= 0:
+        raise InvalidRequestError("page_timeout must be a positive number of seconds: None for request_timeout")
 
 
 def _check_history(req: HistoryRequest) -> None:

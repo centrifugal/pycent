@@ -5327,7 +5327,7 @@ class _ClientAPI:
         limit: int = 0,
         since: StreamPosition | None = None,
         reverse: bool = False,
-        timeout: float | None = None,
+        page_timeout: float | None = None,
     ) -> Iterator[HistoryItem]:
         """The publications of a channel's history, oldest first, a page of limit
         at a time: from since when it is set, from the start of what the channel
@@ -5354,10 +5354,13 @@ class _ClientAPI:
                 returned, without publications.
             since: Returns publications after this stream position.
             reverse: Iterates in reverse order, from latest to earliest.
-            timeout: Seconds bounding each page's call, replacing request_timeout:
-                request_timeout when None.
+            page_timeout: Seconds bounding each page's request, replacing
+                request_timeout for it: request_timeout when None. Nothing bounds
+                the iteration as a whole: it lasts as long as the loop does.
         """
-        return self._history_all(HistoryRequest(channel=channel, limit=limit, since=since, reverse=reverse), timeout)
+        return self._history_all(
+            HistoryRequest(channel=channel, limit=limit, since=since, reverse=reverse), page_timeout
+        )
 
     def history_remove(self, *, channel: str, timeout: float | None = None) -> HistoryRemoveResult:
         """Removes publications from the history of a channel.
@@ -5711,7 +5714,7 @@ class _ClientAPI:
         include_webpush_keys: bool = False,
         cursor: str = "",
         limit: int = 0,
-        timeout: float | None = None,
+        page_timeout: float | None = None,
     ) -> Iterator[Device]:
         """Every device the request selects, a page at a time, each page read when
         the iteration reaches it: limit is the page size, the server's default
@@ -5730,8 +5733,9 @@ class _ClientAPI:
             cursor: The pagination cursor: next_cursor of the previous page,
                 empty for the first page.
             limit: The maximum number of devices to return.
-            timeout: Seconds bounding each page's call, replacing request_timeout:
-                request_timeout when None.
+            page_timeout: Seconds bounding each page's request, replacing
+                request_timeout for it: request_timeout when None. Nothing bounds
+                the iteration as a whole: it lasts as long as the loop does.
         """
         return self._cursor_all(
             DeviceListRequest(
@@ -5746,7 +5750,7 @@ class _ClientAPI:
             DeviceListResult,
             "items",
             "next_cursor",
-            timeout,
+            page_timeout,
         )
 
     def device_topic_list(
@@ -5792,7 +5796,7 @@ class _ClientAPI:
         include_device: bool = False,
         cursor: str = "",
         limit: int = 0,
-        timeout: float | None = None,
+        page_timeout: float | None = None,
     ) -> Iterator[DeviceTopic]:
         """Every device topic the request selects, a page at a time, as
         device_list_all reads devices. A topic added or removed while iterating
@@ -5807,8 +5811,9 @@ class _ClientAPI:
             cursor: The pagination cursor: next_cursor of the previous page,
                 empty for the first page.
             limit: The maximum number of items to return.
-            timeout: Seconds bounding each page's call, replacing request_timeout:
-                request_timeout when None.
+            page_timeout: Seconds bounding each page's request, replacing
+                request_timeout for it: request_timeout when None. Nothing bounds
+                the iteration as a whole: it lasts as long as the loop does.
         """
         return self._cursor_all(
             DeviceTopicListRequest(
@@ -5821,7 +5826,7 @@ class _ClientAPI:
             DeviceTopicListResult,
             "items",
             "next_cursor",
-            timeout,
+            page_timeout,
         )
 
     def device_topic_update(
@@ -5882,7 +5887,7 @@ class _ClientAPI:
         include_total_count: bool = False,
         cursor: str = "",
         limit: int = 0,
-        timeout: float | None = None,
+        page_timeout: float | None = None,
     ) -> Iterator[UserTopic]:
         """Every user topic the request selects, a page at a time, as
         device_list_all reads devices. A topic added or removed while iterating
@@ -5896,15 +5901,16 @@ class _ClientAPI:
             cursor: The pagination cursor: next_cursor of the previous page,
                 empty for the first page.
             limit: The maximum number of items to return.
-            timeout: Seconds bounding each page's call, replacing request_timeout:
-                request_timeout when None.
+            page_timeout: Seconds bounding each page's request, replacing
+                request_timeout for it: request_timeout when None. Nothing bounds
+                the iteration as a whole: it lasts as long as the loop does.
         """
         return self._cursor_all(
             UserTopicListRequest(filter=filter, include_total_count=include_total_count, cursor=cursor, limit=limit),
             UserTopicListResult,
             "items",
             "next_cursor",
-            timeout,
+            page_timeout,
         )
 
     def user_topic_update(
@@ -6160,7 +6166,7 @@ class _ClientAPI:
         asc: bool = False,
         revision_offset: int = 0,
         revision_epoch: str = "",
-        timeout: float | None = None,
+        page_timeout: float | None = None,
     ) -> Iterator[MapStateItem]:
         """Every entry of a map channel's state, a page at a time, each page read
         when the iteration reaches it: limit is the page size. Every page after
@@ -6189,8 +6195,9 @@ class _ClientAPI:
             revision_epoch: The epoch of the position from a previous state
                 read. If the epoch changed, the call fails with an unrecoverable
                 position error.
-            timeout: Seconds bounding each page's call, replacing request_timeout:
-                request_timeout when None.
+            page_timeout: Seconds bounding each page's request, replacing
+                request_timeout for it: request_timeout when None. Nothing bounds
+                the iteration as a whole: it lasts as long as the loop does.
         """
         return self._cursor_all(
             MapReadStateRequest(
@@ -6205,7 +6212,7 @@ class _ClientAPI:
             MapReadStateResult,
             "entries",
             "cursor",
-            timeout,
+            page_timeout,
         )
 
     def map_read_stream(
@@ -6688,7 +6695,7 @@ class _AsyncClientAPI:
         limit: int = 0,
         since: StreamPosition | None = None,
         reverse: bool = False,
-        timeout: float | None = None,
+        page_timeout: float | None = None,
     ) -> AsyncIterator[HistoryItem]:
         """The publications of a channel's history, oldest first, a page of limit
         at a time: from since when it is set, from the start of what the channel
@@ -6715,10 +6722,13 @@ class _AsyncClientAPI:
                 returned, without publications.
             since: Returns publications after this stream position.
             reverse: Iterates in reverse order, from latest to earliest.
-            timeout: Seconds bounding each page's call, replacing request_timeout:
-                request_timeout when None.
+            page_timeout: Seconds bounding each page's request, replacing
+                request_timeout for it: request_timeout when None. Nothing bounds
+                the iteration as a whole: it lasts as long as the loop does.
         """
-        return self._history_all(HistoryRequest(channel=channel, limit=limit, since=since, reverse=reverse), timeout)
+        return self._history_all(
+            HistoryRequest(channel=channel, limit=limit, since=since, reverse=reverse), page_timeout
+        )
 
     async def history_remove(self, *, channel: str, timeout: float | None = None) -> HistoryRemoveResult:
         """Removes publications from the history of a channel.
@@ -7072,7 +7082,7 @@ class _AsyncClientAPI:
         include_webpush_keys: bool = False,
         cursor: str = "",
         limit: int = 0,
-        timeout: float | None = None,
+        page_timeout: float | None = None,
     ) -> AsyncIterator[Device]:
         """Every device the request selects, a page at a time, each page read when
         the iteration reaches it: limit is the page size, the server's default
@@ -7091,8 +7101,9 @@ class _AsyncClientAPI:
             cursor: The pagination cursor: next_cursor of the previous page,
                 empty for the first page.
             limit: The maximum number of devices to return.
-            timeout: Seconds bounding each page's call, replacing request_timeout:
-                request_timeout when None.
+            page_timeout: Seconds bounding each page's request, replacing
+                request_timeout for it: request_timeout when None. Nothing bounds
+                the iteration as a whole: it lasts as long as the loop does.
         """
         return self._cursor_all(
             DeviceListRequest(
@@ -7107,7 +7118,7 @@ class _AsyncClientAPI:
             DeviceListResult,
             "items",
             "next_cursor",
-            timeout,
+            page_timeout,
         )
 
     async def device_topic_list(
@@ -7153,7 +7164,7 @@ class _AsyncClientAPI:
         include_device: bool = False,
         cursor: str = "",
         limit: int = 0,
-        timeout: float | None = None,
+        page_timeout: float | None = None,
     ) -> AsyncIterator[DeviceTopic]:
         """Every device topic the request selects, a page at a time, as
         device_list_all reads devices. A topic added or removed while iterating
@@ -7168,8 +7179,9 @@ class _AsyncClientAPI:
             cursor: The pagination cursor: next_cursor of the previous page,
                 empty for the first page.
             limit: The maximum number of items to return.
-            timeout: Seconds bounding each page's call, replacing request_timeout:
-                request_timeout when None.
+            page_timeout: Seconds bounding each page's request, replacing
+                request_timeout for it: request_timeout when None. Nothing bounds
+                the iteration as a whole: it lasts as long as the loop does.
         """
         return self._cursor_all(
             DeviceTopicListRequest(
@@ -7182,7 +7194,7 @@ class _AsyncClientAPI:
             DeviceTopicListResult,
             "items",
             "next_cursor",
-            timeout,
+            page_timeout,
         )
 
     async def device_topic_update(
@@ -7243,7 +7255,7 @@ class _AsyncClientAPI:
         include_total_count: bool = False,
         cursor: str = "",
         limit: int = 0,
-        timeout: float | None = None,
+        page_timeout: float | None = None,
     ) -> AsyncIterator[UserTopic]:
         """Every user topic the request selects, a page at a time, as
         device_list_all reads devices. A topic added or removed while iterating
@@ -7257,15 +7269,16 @@ class _AsyncClientAPI:
             cursor: The pagination cursor: next_cursor of the previous page,
                 empty for the first page.
             limit: The maximum number of items to return.
-            timeout: Seconds bounding each page's call, replacing request_timeout:
-                request_timeout when None.
+            page_timeout: Seconds bounding each page's request, replacing
+                request_timeout for it: request_timeout when None. Nothing bounds
+                the iteration as a whole: it lasts as long as the loop does.
         """
         return self._cursor_all(
             UserTopicListRequest(filter=filter, include_total_count=include_total_count, cursor=cursor, limit=limit),
             UserTopicListResult,
             "items",
             "next_cursor",
-            timeout,
+            page_timeout,
         )
 
     async def user_topic_update(
@@ -7521,7 +7534,7 @@ class _AsyncClientAPI:
         asc: bool = False,
         revision_offset: int = 0,
         revision_epoch: str = "",
-        timeout: float | None = None,
+        page_timeout: float | None = None,
     ) -> AsyncIterator[MapStateItem]:
         """Every entry of a map channel's state, a page at a time, each page read
         when the iteration reaches it: limit is the page size. Every page after
@@ -7550,8 +7563,9 @@ class _AsyncClientAPI:
             revision_epoch: The epoch of the position from a previous state
                 read. If the epoch changed, the call fails with an unrecoverable
                 position error.
-            timeout: Seconds bounding each page's call, replacing request_timeout:
-                request_timeout when None.
+            page_timeout: Seconds bounding each page's request, replacing
+                request_timeout for it: request_timeout when None. Nothing bounds
+                the iteration as a whole: it lasts as long as the loop does.
         """
         return self._cursor_all(
             MapReadStateRequest(
@@ -7566,7 +7580,7 @@ class _AsyncClientAPI:
             MapReadStateResult,
             "entries",
             "cursor",
-            timeout,
+            page_timeout,
         )
 
     async def map_read_stream(

@@ -975,16 +975,22 @@ def generate(s: Schema) -> str:
                 if c.pro_only:
                     doc.append("Centrifugo PRO only.")
                 p("")
-                p(f"    def {c.method}_all(" + ", ".join(["self", "*", *params, *extra]) + f") -> {it}[{item_type}]:")
+                page_extra = ["page_timeout: float | None = None"]
+                p(
+                    f"    def {c.method}_all("
+                    + ", ".join(["self", "*", *params, *page_extra])
+                    + f") -> {it}[{item_type}]:"
+                )
                 tdoc_all = [
-                    "    timeout: Seconds bounding each page's call, replacing request_timeout:",
-                    "        request_timeout when None.",
+                    "    page_timeout: Seconds bounding each page's request, replacing",
+                    "        request_timeout for it: request_timeout when None. Nothing bounds",
+                    "        the iteration as a whole: it lasts as long as the loop does.",
                 ]
                 out.extend(docstring([*doc, *fdocs, *tdoc_all], "        "))
                 if cursor is None:
-                    p(f"        return self._history_all({build}, timeout)")
+                    p(f"        return self._history_all({build}, page_timeout)")
                 else:
-                    p(f"        return self._cursor_all({build}, {c.result}, {items!r}, {cursor!r}, timeout)")
+                    p(f"        return self._cursor_all({build}, {c.result}, {items!r}, {cursor!r}, page_timeout)")
             if c.method == "broadcast":
                 p("")
                 p(

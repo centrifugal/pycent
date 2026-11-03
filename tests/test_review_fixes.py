@@ -265,8 +265,10 @@ def test_bad_call_timeout_is_an_invalid_request() -> None:
             c.publish(channel="x", data=1, timeout=bad)  # type: ignore[arg-type]
         with pytest.raises(cent.InvalidRequestError, match="timeout"):
             c.broadcast_with_retry(channels=["a"], data=1, timeout=bad)  # type: ignore[arg-type]
-        with pytest.raises(cent.InvalidRequestError, match="timeout"):
-            list(c.history_all(channel="x", limit=1, timeout=bad))  # type: ignore[arg-type]
+        with pytest.raises(cent.InvalidRequestError, match="page_timeout"):
+            c.history_all(channel="x", limit=1, page_timeout=bad)  # type: ignore[arg-type]
+        with pytest.raises(cent.InvalidRequestError, match="page_timeout"):
+            c.device_list_all(page_timeout=bad)  # type: ignore[arg-type]
     for bad in (-1, 0, 0.0):
         with pytest.raises(cent.InvalidRequestError, match="attempt_timeout"):
             c.broadcast_with_retry(channels=["a"], data=1, attempt_timeout=bad)
@@ -283,5 +285,9 @@ async def test_bad_call_timeout_is_an_invalid_request_async() -> None:
             await c.broadcast_with_retry(channels=["a"], data=1, timeout=bad)
         with pytest.raises(cent.InvalidRequestError, match="attempt_timeout"):
             await c.broadcast_with_retry(channels=["a"], data=1, attempt_timeout=bad)
+        with pytest.raises(cent.InvalidRequestError, match="page_timeout"):
+            c.history_all(channel="x", limit=1, page_timeout=bad)
+        with pytest.raises(cent.InvalidRequestError, match="page_timeout"):
+            c.map_read_state_all(channel="m", page_timeout=bad)
     assert fake.requests == []
     await c.aclose()
