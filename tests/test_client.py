@@ -386,6 +386,42 @@ def test_bool_value_fields(api: Api, fake: Fake) -> None:
     assert "override" not in second
 
 
+def test_presence_wrappers_sent_empty(api: Api, fake: Fake) -> None:
+    # An empty update detaches or clears; an unset one is not sent (spec 2).
+    api.device_update(
+        ids=["d1"],
+        user_update=cent.DeviceUserUpdate(user=""),
+        timezone_update=cent.DeviceTimezoneUpdate(timezone=""),
+        locale_update=cent.DeviceLocaleUpdate(locale=""),
+        meta_update=cent.DeviceMetaUpdate(meta={}),
+    )
+    api.device_update(ids=["d1"])
+    first, second = fake.bodies("device_update")
+    assert first == {
+        "ids": ["d1"],
+        "user_update": {},
+        "timezone_update": {},
+        "locale_update": {},
+        "meta_update": {},
+    }
+    assert second == {"ids": ["d1"]}
+
+
+def test_empty_message_not_sent(api: Api, fake: Fake) -> None:
+    # A message set but empty which is not a presence wrapper is not sent:
+    # Centrifugo PRO refuses "limit_strategy": {} (spec 2).
+    api.send_push_notification(
+        recipient=cent.PushRecipient(fcm_tokens=["t"]),
+        notification=cent.PushNotification(fcm=cent.FcmPushNotification(message={"k": 1})),
+        limit_strategy=cent.PushLimitStrategy(rate_limit=cent.PushRateLimitStrategy()),
+    )
+    api.device_update(ids=["d1"], topics_update=cent.DeviceTopicsUpdate())
+    (push,) = fake.bodies("send_push_notification")
+    assert "limit_strategy" not in push
+    (upd,) = fake.bodies("device_update")
+    assert upd == {"ids": ["d1"]}
+
+
 # Broadcast.
 
 

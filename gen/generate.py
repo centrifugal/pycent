@@ -116,6 +116,46 @@ def field_type(f: Field) -> tuple[str, str]:
     return base, default
 
 
+def empty_has_meaning(f: Field) -> bool:
+    """Whether a field's comment gives its empty value a meaning after
+    "Required." - `"" detaches the devices`, `An empty map clears it.` (spec
+    3.3). Such a field is required in the signature but not checked before
+    sending, since a check could not tell empty from missing."""
+    _, sep, after = " ".join(f.doc).partition("Required.")
+    return bool(sep) and ('""' in after or "empty" in after.lower())
+
+
+def is_presence(m: Message | None) -> bool:
+    """Whether a message is a presence wrapper (spec 2): one field, which
+    Centrifugo reads by whether the message is there - a *Value message whose
+    field is value, or one whose only field gives its empty value a meaning,
+    as device_update's user_update. Sent whenever set, even empty."""
+    if m is None or len(m.fields) != 1:
+        return False
+    if m.name.endswith("Value") and m.fields[0].name == "value":
+        return True
+    return empty_has_meaning(m.fields[0])
+
+
+# The presence wrappers of the proto being generated, but those of WRAPPERS,
+# which become optional scalars: set by find_presence.
+PRESENCE: set[str] = set()
+
+
+def find_presence(s: Schema, name: str) -> None:
+    """Records the presence wrappers of s in PRESENCE. A *Value wrapper must be
+    one of WRAPPERS, which say its Python type."""
+    PRESENCE.clear()
+    for m in s.messages:
+        if not is_presence(m):
+            continue
+        if m.name.endswith("Value") and m.fields[0].name == "value":
+            if m.name not in WRAPPERS:
+                raise SystemExit(f"{name}: {m.name} is a presence wrapper gen/generate.py has no Python type for")
+            continue
+        PRESENCE.add(m.name)
+
+
 def encoder(f: Field) -> list[str]:
     """Lines of _to_wire setting w[f.name] when the field is not zero."""
     n, key = f"self.{f.name}", repr(f.name)
@@ -142,7 +182,12 @@ def encoder(f: Field) -> list[str]:
         return [f"if {n} is not None:", f"    w[{key}] = _w.payload({n}, {key})"]
     if t in PY_TYPES:
         return [f"if {n}:", f"    w[{key}] = {n}"]
-    # A nested message, left out when nothing in it is set.
+    if t in PRESENCE:
+        # A presence wrapper: sent whenever set, even empty - an empty user
+        # update detaches the devices, an absent one changes nothing.
+        return [f"if {n} is not None:", f"    w[{key}] = {n}._to_wire()"]
+    # A nested message, left out when nothing in it is set: Centrifugo reads
+    # some by whether they are there, and refuses an empty limit_strategy.
     return [f"if {n} is not None and (v := {n}._to_wire()):", f"    w[{key}] = v"]
 
 
@@ -339,6 +384,7 @@ def proxy_messages(s: Schema) -> list[Message]:
 
 def generate_commands(s: Schema) -> str:
     """cent/_commands.py: a command per API method, from keyword arguments."""
+    find_presence(s, "api.proto")
     cmds = commands(s)
     out: list[str] = []
     p = out.append
@@ -390,6 +436,7 @@ def generate_commands(s: Schema) -> str:
 
 
 def generate_proxy(s: Schema) -> str:
+    find_presence(s, "proxy.proto")
     msgs = proxy_messages(s)
     out: list[str] = []
     p = out.append
@@ -415,6 +462,7 @@ def generate_proxy(s: Schema) -> str:
 
 
 def generate(s: Schema) -> str:
+    find_presence(s, "api.proto")
     cmds = commands(s)
     skip = skipped(s, cmds)
     out: list[str] = []

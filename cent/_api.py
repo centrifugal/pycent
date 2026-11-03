@@ -2179,16 +2179,16 @@ class DeviceUpdateRequest:
             w["ids"] = list(self.ids)
         if self.users:
             w["users"] = list(self.users)
-        if self.user_update is not None and (v := self.user_update._to_wire()):
-            w["user_update"] = v
-        if self.meta_update is not None and (v := self.meta_update._to_wire()):
-            w["meta_update"] = v
+        if self.user_update is not None:
+            w["user_update"] = self.user_update._to_wire()
+        if self.meta_update is not None:
+            w["meta_update"] = self.meta_update._to_wire()
         if self.topics_update is not None and (v := self.topics_update._to_wire()):
             w["topics_update"] = v
-        if self.timezone_update is not None and (v := self.timezone_update._to_wire()):
-            w["timezone_update"] = v
-        if self.locale_update is not None and (v := self.locale_update._to_wire()):
-            w["locale_update"] = v
+        if self.timezone_update is not None:
+            w["timezone_update"] = self.timezone_update._to_wire()
+        if self.locale_update is not None:
+            w["locale_update"] = self.locale_update._to_wire()
         return w
 
     @classmethod
