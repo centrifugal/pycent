@@ -6,8 +6,9 @@
 #
 # The configuration is testdata/centrifugo.json, with the PRO features added
 # through environment variables: Redis for the engine, user status, user
-# blocking and token revocation; PostgreSQL for devices; push notifications
-# through the webpush provider in dry run, so nothing is ever sent. The VAPID
+# blocking, token revocation and the push rate limiter; PostgreSQL for
+# devices; push notifications through the webpush provider in dry run, so
+# nothing is ever sent. The VAPID
 # keys are for these tests only.
 #
 # The tests use Centrifugo PRO in sandbox mode: no license key is set, so it
@@ -77,6 +78,10 @@ services:
       CENTRIFUGO_PUSH_NOTIFICATIONS_ENABLED_PROVIDERS: webpush
       CENTRIFUGO_PUSH_NOTIFICATIONS_QUEUE_TYPE: redis
       CENTRIFUGO_PUSH_NOTIFICATIONS_QUEUE_REDIS_REUSE_FROM_ENGINE: "true"
+      # For pushes with a rate limit strategy: the limiter's backend only,
+      # with no API rate limits configured.
+      CENTRIFUGO_DISTRIBUTED_RATE_LIMIT_ENABLED: "true"
+      CENTRIFUGO_DISTRIBUTED_RATE_LIMIT_REDIS_REUSE_FROM_ENGINE: "true"
       CENTRIFUGO_PUSH_NOTIFICATIONS_WEBPUSH_VAPID_PUBLIC_KEY: BJ16Mnup_xun6oJ4UW1JfCgY1QA5zeEoFqZ0VUbuu5ZXJkhsH2f7PGLcvhkJ_OAgFBDzkda_1LykKzXcVe99elg
       CENTRIFUGO_PUSH_NOTIFICATIONS_WEBPUSH_VAPID_PRIVATE_KEY: TqaHuW-sLvwKJlREuBvmg_UvWuqFZuuEYoYU6WWXJrc
       CENTRIFUGO_PUSH_NOTIFICATIONS_WEBPUSH_SUBJECT: mailto:test@example.com

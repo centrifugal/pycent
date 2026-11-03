@@ -37,6 +37,31 @@ def test_publish_and_history(client: cent.Client, unique: Callable[[str], str]) 
     assert client.history(channel=ch, limit=10).publications == []
 
 
+def test_history_all_and_positions(client: cent.Client, unique: Callable[[str], str]) -> None:
+    ch = unique("")
+    first = client.publish(channel=ch, data=0)
+    for i in range(1, 7):
+        client.publish(channel=ch, data=i)
+    # Every publication once, in order, three to a page.
+    assert [p.data for p in client.history_all(channel=ch, limit=3)] == list(range(7))
+    # What came after a publication, from its position.
+    after = client.history(channel=ch, limit=10, since=first.position())
+    assert [p.data for p in after.publications] == list(range(1, 7))
+    assert after.position() == cent.StreamPosition(offset=7, epoch=first.epoch)
+    assert [p.data for p in client.history_all(channel=ch, limit=2, since=first.position())] == list(range(1, 7))
+    # A position from another epoch: the stream was reset since.
+    with pytest.raises(cent.UnrecoverablePositionError):
+        list(client.history_all(channel=ch, limit=2, since=cent.StreamPosition(offset=1, epoch="gone")))
+
+
+async def test_async_history_all(unique: Callable[[str], str]) -> None:
+    ch = unique("")
+    async with cent.AsyncClient(ADDR, api_key=API_KEY) as c:
+        for i in range(5):
+            await c.publish(channel=ch, data=i)
+        assert [p.data async for p in c.history_all(channel=ch, limit=2)] == list(range(5))
+
+
 def test_idempotency_key(client: cent.Client, unique: Callable[[str], str]) -> None:
     ch = unique("")
     first = client.publish(channel=ch, data=1, idempotency_key="k1")
@@ -124,6 +149,32 @@ def test_map(client: cent.Client, unique: Callable[[str], str]) -> None:
     stats = client.map_stats(channel=ch)
     assert stats.num_keys == 1
     client.map_clear(channel=ch)
+
+
+def test_map_read_state_all(client: cent.Client, unique: Callable[[str], str]) -> None:
+    # Every page after the first carries the first one's revision, which
+    # Centrifugo accepts with a cursor.
+    ch = "map:" + unique("")
+    published = [client.map_publish(channel=ch, key=f"k{i}", data={}) for i in range(5)]
+    assert published[-1].position().offset > published[0].position().offset
+    assert sorted(e.key for e in client.map_read_state_all(channel=ch, limit=2)) == [f"k{i}" for i in range(5)]
+    state = client.map_read_state(channel=ch, limit=10)
+    stream = client.map_read_stream(channel=ch, since_offset=state.position().offset, since_epoch=state.epoch)
+    assert stream.position() == state.position()
+    # A revision from another epoch fails: the state was reset since.
+    with pytest.raises(cent.UnrecoverablePositionError):
+        list(client.map_read_state_all(channel=ch, limit=2, revision_offset=1, revision_epoch="gone"))
+    removed = client.map_remove(channel=ch, key="k0")
+    after = client.map_read_stream(
+        channel=ch, since_offset=published[-1].position().offset, since_epoch=published[-1].epoch, limit=10
+    )
+    assert after.position() == removed.position()
+    client.map_clear(channel=ch)
+
+
+def test_required_field_refused_before_sending(client: cent.Client) -> None:
+    with pytest.raises(cent.InvalidRequestError, match="channel is required"):
+        client.presence(channel="")
 
 
 def test_shared_poll_publish(client: cent.Client, unique: Callable[[str], str]) -> None:

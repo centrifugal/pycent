@@ -74,7 +74,12 @@ def test_user_and_token_control(pro: cent.Client, unique: Callable[[str], str]) 
 def test_devices_and_push(pro: cent.Client, unique: Callable[[str], str]) -> None:
     user = unique("")
     reg = pro.device_register(
-        provider="webpush", platform="web", token=webpush_token(), user=user, meta={"app": "pycent"}, topics=["news"]
+        provider=cent.PROVIDER_WEBPUSH,
+        platform=cent.PLATFORM_WEB,
+        token=webpush_token(),
+        user=user,
+        meta={"app": "pycent"},
+        topics=["news"],
     )
     assert reg.id
     by_user = cent.DeviceFilter(users=[user])
@@ -83,12 +88,20 @@ def test_devices_and_push(pro: cent.Client, unique: Callable[[str], str]) -> Non
     assert lst.items[0].id == reg.id
     assert lst.items[0].meta == {"app": "pycent"}
     assert "news" in lst.items[0].topics
-    pro.device_topic_update(device_id=reg.id, op="add", topics=["sport"])
+    pro.device_topic_update(device_id=reg.id, op=cent.OP_ADD, topics=["sport"])
     topics = pro.device_topic_list(filter=cent.DeviceTopicFilter(device_ids=[reg.id]), include_total_count=True)
     assert topics.total_count == 2
-    pro.device_update(ids=[reg.id], meta_update=cent.DeviceMetaUpdate(meta={"app": "updated"}))
-    assert pro.device_list(filter=by_user, include_meta=True).items[0].meta == {"app": "updated"}
-    pro.user_topic_update(user=user, op="add", topics=["alerts"])
+    pro.device_update(
+        ids=[reg.id],
+        meta_update=cent.DeviceMetaUpdate(meta={"app": "updated"}),
+        timezone_update=cent.DeviceTimezoneUpdate(timezone="Europe/Berlin"),
+    )
+    (dev,) = pro.device_list(filter=by_user, include_meta=True).items
+    assert (dev.meta, dev.timezone) == ({"app": "updated"}, "Europe/Berlin")
+    # An empty update is sent, and clears it.
+    pro.device_update(ids=[reg.id], timezone_update=cent.DeviceTimezoneUpdate(timezone=""))
+    assert pro.device_list(filter=by_user).items[0].timezone == ""
+    pro.user_topic_update(user=user, op=cent.OP_ADD, topics=["alerts"])
     ut = pro.user_topic_list(filter=cent.UserTopicFilter(users=[user]))
     assert [i.topic for i in ut.items] == ["alerts"]
     push = pro.send_push_notification(
@@ -101,9 +114,73 @@ def test_devices_and_push(pro: cent.Client, unique: Callable[[str], str]) -> Non
     # Push status needs push analytics in ClickHouse; without it, the method
     # is not available.
     with contextlib.suppress(cent.NotAvailableError):
-        pro.update_push_status(analytics_uid=push.uid, status="delivered", device_id=reg.id)
+        pro.update_push_status(analytics_uid=push.uid, status=cent.STATUS_DELIVERED, device_id=reg.id)
     pro.device_remove(ids=[reg.id])
     assert pro.device_list(filter=by_user).items == []
+
+
+def test_push_parts(pro: cent.Client, unique: Callable[[str], str]) -> None:
+    """Pushes with a rate limit and with a time limit, each setting exactly
+    what the API requires, so that a check stricter than Centrifugo's fails
+    here; a device detached by an empty user update; devices read page by
+    page."""
+    user = unique("")
+    ids = [
+        pro.device_register(
+            provider=cent.PROVIDER_WEBPUSH, platform=cent.PLATFORM_WEB, token=webpush_token(), user=user
+        ).id
+        for _ in range(3)
+    ]
+    try:
+        by_user = cent.DeviceFilter(users=[user])
+        assert sorted(d.id for d in pro.device_list_all(filter=by_user, limit=2)) == sorted(ids)
+        for strategy in (
+            cent.PushLimitStrategy(
+                rate_limit=cent.PushRateLimitStrategy(
+                    key="device.id", policies=[cent.RateLimitPolicy(rate=1, interval_ms=60000)]
+                )
+            ),
+            cent.PushLimitStrategy(
+                time_limit=cent.PushTimeLimitStrategy(
+                    send_after_time="09:00:00", send_before_time="21:00:00", no_tz_send_now=True
+                )
+            ),
+        ):
+            push = pro.send_push_notification(
+                recipient=cent.PushRecipient(filter=by_user),
+                # Centrifugo needs expire_at with a limit strategy: a push the
+                # limit holds back must not wait forever.
+                notification=cent.PushNotification(
+                    webpush=cent.WebPushPushNotification(payload={"title": "hi"}),
+                    expire_at=int(time.time()) + 7200,
+                ),
+                limit_strategy=strategy,
+                send_at=int(time.time()) + 3600,
+            )
+            assert push.uid
+            pro.cancel_push(uid=push.uid)
+        # An empty user update detaches the device.
+        pro.device_update(ids=ids[:1], user_update=cent.DeviceUserUpdate(user=""))
+        (dev,) = pro.device_list(filter=cent.DeviceFilter(ids=ids[:1])).items
+        assert dev.user == ""
+    finally:
+        pro.device_remove(ids=ids)
+
+
+async def test_async_device_list_all(pro: cent.Client, unique: Callable[[str], str]) -> None:
+    user = unique("")
+    ids = [
+        pro.device_register(
+            provider=cent.PROVIDER_WEBPUSH, platform=cent.PLATFORM_WEB, token=webpush_token(), user=user
+        ).id
+        for _ in range(3)
+    ]
+    try:
+        async with cent.AsyncClient(ADDR, api_key=API_KEY) as c:
+            got = [d.id async for d in c.device_list_all(filter=cent.DeviceFilter(users=[user]), limit=2)]
+        assert sorted(got) == sorted(ids)
+    finally:
+        pro.device_remove(ids=ids)
 
 
 def test_pro_batch(pro: cent.Client, unique: Callable[[str], str]) -> None:
@@ -111,7 +188,9 @@ def test_pro_batch(pro: cent.Client, unique: Callable[[str], str]) -> None:
     b = pro.new_batch()
     b.update_user_status(users=[user], state="busy")
     status = b.get_user_status(users=[user])
-    reg = b.device_register(provider="webpush", platform="web", token=webpush_token(), user=user)
+    reg = b.device_register(
+        provider=cent.PROVIDER_WEBPUSH, platform=cent.PLATFORM_WEB, token=webpush_token(), user=user
+    )
     conns = b.connections(user=user)
     b.send()
     assert status.result().statuses[0].state == "busy"
