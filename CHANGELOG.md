@@ -3,6 +3,8 @@ v6.0.0
 
 cent 6 is a rewrite of the Python SDK for Centrifugo's HTTP server API to the [Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/master/spec.md), version 0.3. It needs Python 3.11 or newer; httpx2 - the maintained fork of httpx - is its only dependency, and `cryptography` 49 or newer is optional, for RSA, ECDSA and Ed25519 tokens (`pip install cent[crypto]`). It works with Centrifugo v6 and Centrifugo PRO v6: the map and shared poll methods need Centrifugo v6.8.0 or newer, `ApiError.temporary` and `TooManyRequestsError` v6.10.0 or newer. Upgrading from cent 5: see the [migration guide](https://github.com/centrifugal/pycent/blob/master/MIGRATING.md).
 
+Generated from Centrifugo's protos at [e21aeb50](https://github.com/centrifugal/centrifugo/commit/e21aeb50ab6fc4d525fc817473574f728da6c3ad) on its master, after v6.10.2: the same messages as v6.10.2, with the comments the constants are generated from, and `ConnectResult.profile` for the connect proxy, which Centrifugo PRO newer than v6.10.2 reads.
+
 **Client and calls**
 
 * `Client` and `AsyncClient`, with the same methods, options and errors. Create one per process - an `AsyncClient` per event loop - and share it: both are safe for concurrent use. An `AsyncClient` used from a second event loop raises `InvalidConfigError`; a `Client` in a forked process starts its own connections.

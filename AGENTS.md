@@ -91,7 +91,7 @@ which Centrifugo reaches as `host.docker.internal`.
 
 ## Updating to a new Centrifugo API
 
-1. `make sync-proto CENTRIFUGO_REF=vX.Y.Z` - always a released tag.
+1. `make sync-proto CENTRIFUGO_REF=vX.Y.Z` - a released tag, or, when a release needs changes no tag has yet, a commit of Centrifugo's master, which the release's changelog entry names (spec section 2).
 2. Read the diff of `proto/`: a removed field is a breaking change.
 3. `make check`, then the integration tests against the new release.
 4. Bump the Centrifugo image in `.github/workflows/ci.yml` and
