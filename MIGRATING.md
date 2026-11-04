@@ -18,6 +18,9 @@ What changes most:
 3. **Exceptions have new names and more kinds**: [Errors](#errors).
 4. **Python 3.11 or newer**, and **httpx2** - the maintained fork of httpx -
    instead of requests and aiohttp.
+5. **A request the client can tell is wrong fails before sending**, with
+   `InvalidRequestError`: a required field given empty, which cent 5 sent
+   and Centrifugo refused with code 107. See [What is sent](#what-is-sent).
 
 ```
 pip install --upgrade "cent>=6"
@@ -282,6 +285,9 @@ client = cent.AsyncClient(api_url, api_key=api_key, request_timeout=5.0, http_cl
 - `api_key` is a keyword argument. `bearer_token_func` authenticates with
   Centrifugo PRO's API tokens instead - see `cent.token.APITokenSource`.
 - `timeout` per call stays: `client.publish(channel=..., data=..., timeout=1.0)`.
+  It replaces `request_timeout` for that call, longer or shorter. It must be
+  positive: `timeout=0` raises `InvalidRequestError`; leave it `None` for
+  `request_timeout`.
 - An `http_client` you pass is never changed - cent 5 set the API key in the
   headers of the session you gave it.
 - Redirects are not followed, so a misconfigured `http://` endpoint fails with
@@ -313,6 +319,54 @@ A batch has the same methods, and so do commands for async consumers:
   `cent.command.publish(...)` and the like: its `method` and `payload`, or
   `to_json()`. It validates the request first.
 
+## Types
+
+The request classes - `PublishRequest`, `BroadcastRequest`, `BatchRequest`
+and the rest - are gone from the public API: the methods take their fields
+as keyword arguments. So are `CentRequest`, `CentResult` and `Response`. The
+nested and result types keep their names and fields, as the protos name
+them, but for these:
+
+| cent 5 | cent 6 |
+|---|---|
+| `ChannelOptionsOverride` | `SubscribeOptionOverride` |
+| `BoolValue(value=True)` | `True`: the fields are `bool \| None` |
+| `Node` | `NodeResult` |
+| `ProcessStats` | `Process` |
+| `ChannelInfoResult` | `ChannelInfo` |
+
+They are dataclasses, not pydantic models: build them with keyword arguments,
+read their attributes, and render them with `cent.to_dict(result)` rather
+than `model_dump()`.
+
+A nested type's required fields are required keyword arguments, as they were
+mostly in cent 5's models: `cent.DeviceTopicsUpdate(op="add", topics=[...])`,
+`cent.RateLimitPolicy(rate=..., interval_ms=...)`. `DeviceTopicsUpdate.topics`
+and `PushRateLimitStrategy.policies`, required in cent 5, are optional now. Fixed sets of values have constants: `op=cent.OP_ADD`,
+`provider=cent.PROVIDER_FCM`, `status=cent.STATUS_DELIVERED`; the fields stay
+strings.
+
+## What is sent
+
+cent 5 sent every field which was not `None`. cent 6 sends what has a value:
+
+- **A required field given empty fails before sending.** `channel=""`,
+  `users=[]`, or a required nested message with nothing set raise
+  `InvalidRequestError` naming the field's path -
+  `invalid send_push_notification request: limit_strategy.rate_limit.policies[0].rate is required`.
+  cent 5 sent them, and Centrifugo answered with code 107,
+  `CentApiResponseError`. A required field whose empty value means something
+  is still sent empty: `invalidate_user_tokens(user="")` is anonymous users,
+  `user_topic_update(user="", ...)` the global binding.
+- **Zero values are not sent**: an empty string, 0, `False`, an empty list -
+  Centrifugo reads them as unset anyway.
+- **A nested message with nothing set is not sent.** cent 5 sent
+  `"limit_strategy": {}` for `PushLimitStrategy()`, which Centrifugo PRO
+  refuses with code 107. The exception is `device_update`'s updates: an
+  empty `cent.DeviceUserUpdate(user="")` is sent, and detaches the devices
+  from their user, as an empty timezone, locale or meta update clears it;
+  leave an update `None` to change nothing.
+
 ## Errors
 
 | cent 5 | cent 6 |
@@ -329,9 +383,18 @@ A batch has the same methods, and so do commands for async consumers:
 `cent.retryable(err)` says whether retrying may succeed. Retry a publication
 only with an `idempotency_key`.
 
+Two error paths are new: `api_endpoint_func` and `bearer_token_func`, which
+cent 5 did not have, fail a call with `InvalidConfigError` for an endpoint or
+token they return which cannot be sent, and with `FunctionError` - the
+function's exception as its `__cause__` - when they raise.
+
 ## New in cent 6
 
-Tokens (`cent.token`), the endpoints client SDKs call (`cent.endpoints`), the
-proxy handlers (`cent.proxy`), shared poll signatures (`cent.sharedpoll`),
-automatic batching, the map and shared poll API methods, `on_request` for
-metrics. See the [README](README.md).
+Tokens (`cent.token`, with `token.APITokenSource` for Centrifugo PRO's API
+tokens), the endpoints client SDKs call (`cent.endpoints`), the proxy
+handlers (`cent.proxy`), shared poll signatures (`cent.sharedpoll`),
+automatic batching, the map and shared poll API methods, `<method>_all`
+iterators over paged methods, `position()` on results holding a stream
+position, constants for fields with a fixed set of values, `on_request` for
+metrics. See the [README](README.md) and the
+[changelog](CHANGELOG.md).

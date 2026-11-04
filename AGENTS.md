@@ -10,7 +10,7 @@ concurrency and hard to misuse. Read this before changing code.
 
 | Path | What |
 |---|---|
-| `proto/api.proto`, `proto/proxy.proto` | Copies of Centrifugo's protos, from a released tag (`make sync-proto CENTRIFUGO_REF=v6.10.2`). Today from Centrifugo master, for the "One of:" sentences of centrifugo#1308-#1310, which no tag has yet: sync them from the tag before releasing |
+| `proto/api.proto`, `proto/proxy.proto` | Copies of Centrifugo's protos, from a released tag (`make sync-proto CENTRIFUGO_REF=v6.10.2`) - today from master: see [Before releasing](#before-releasing) |
 | `gen/required_fields.txt` | The fields the protos mark "Required.", made required keyword arguments - of the methods and of the nested dataclasses - and checked for a value before sending by each request's generated `_required`, but those whose empty value has a meaning (spec 3.3). Generation fails when the protos' list differs: a newly required field breaks every call without it, so review the change - fix the proto upstream if Centrifugo accepts the field absent - then `python gen/generate.py --accept-required` |
 | `gen/constants_api.txt`, `gen/constants_proxy.txt` | The names of the constants of the fields whose comments say "One of:", as spec 3.3 pins them for every SDK. Generation fails on a field with values but no pin, a pin no field uses, and one name over different values: a new field is named in the spec first, then here |
 | `gen/` | The generator: `proto.py` parses the protos, `generate.py` writes the code |
@@ -97,6 +97,15 @@ which Centrifugo reaches as `host.docker.internal`.
 4. Bump the Centrifugo image in `.github/workflows/ci.yml` and
    `testdata/centrifugo-pro.compose.yml`, and the versions table in the README
    when a feature needs the new release.
+
+## Before releasing
+
+- Sync `proto/` from a Centrifugo release tag: today the protos come from
+  Centrifugo master, for the "One of:" sentences of centrifugo#1308-#1310,
+  which no tag has yet (`make sync-proto CENTRIFUGO_REF=vX.Y.Z`), then
+  `make check` and both integration runs.
+- Set the version in `pyproject.toml`. The CHANGELOG entry is the release's
+  notes, pasted unchanged into the GitHub release: keep its links absolute.
 
 ## Things that look wrong but are deliberate
 
