@@ -189,8 +189,8 @@ Stops the client: calls made from now on raise ClosedError, and close
 waits for the calls in progress to end. A broadcast being retried stops
 at its next attempt. It raises CentTimeoutError when timeout, in
 seconds, passes first; the calls left go on then, and close may be
-called again. With its default HTTP client it then closes its
-connections.
+called again, concurrently too: each call waits the same way. With its
+default HTTP client it then closes its connections.
 
 Call it when the application shuts down, so that what was accepted is
 sent before the process exits. A Client is also a context manager
@@ -4688,7 +4688,8 @@ The key ID written as the tokens' "kid", if set.
 #### `rsa(private_key: rsa.RSAPrivateKey) -> Key`
 
 A key signing with RS256, whose public key is Centrifugo's
-client.token.rsa_public_key.
+client.token.rsa_public_key. A key under 2048 bits is refused, as an
+ECDSA key on another curve is.
 
 #### `with_key_id(kid: str) -> Key`
 
@@ -5113,8 +5114,10 @@ encoding "binary"; a result may answer with either field.
 Security: Centrifugo trusts what a proxy endpoint answers, and the endpoint
 trusts what Centrifugo sends - a SubscribeRequest's user is the user
 Centrifugo authenticated. Anyone else able to reach the endpoint could claim
-any user. Keep proxy endpoints reachable by Centrifugo only: on an internal
-network, or behind a check of a secret Centrifugo sends as a static header.
+any user. Keep proxy endpoints reachable by Centrifugo only: on a network only
+Centrifugo reaches, or behind a check of a secret header Centrifugo adds to
+every proxy request - the proxy's static_headers option - made before the
+handler; with TLS where the traffic leaves a trusted network.
 
 Centrifugo's GRPC proxy is not covered: generate GRPC code from proxy.proto
 for it.

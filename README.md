@@ -23,7 +23,7 @@ pip install cent[crypto]    # RSA, ECDSA and Ed25519 tokens, with cryptography
 
 cent 6 replaces cent 5: see [MIGRATING.md](MIGRATING.md). cent implements the
 [Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/master/spec.md),
-version 0.3.
+version 0.4.
 
 ## Example
 
@@ -500,13 +500,16 @@ The values of a request's fixed-set fields have constants in `cent.proxy`:
 `req.encoding == proxy.ENCODING_BINARY`, `proxy.ALLOW_SUB`, `proxy.CAPABILITY_MATCH_WILDCARD`,
 `proxy.CHANNEL_EVENT_TYPE_OCCUPIED`, `proxy.FILTER_NODE_OP_AND` - the names the API's
 constants have for the same field. Keep proxy endpoints reachable by Centrifugo only: whoever can call
-them can claim to be any user.
+them can claim to be any user. Put them on a network only Centrifugo reaches,
+or check a secret header Centrifugo adds to every proxy request with the
+proxy's `static_headers` option before the handler, and use TLS where the
+traffic leaves a trusted network.
 
 ## Tokens
 
 `cent.token` issues the JWTs Centrifugo authenticates clients with -
 connection and subscription tokens, with Centrifugo's claims, signed with
-HMAC, RSA, ECDSA or Ed25519 - and `cent.endpoints` serves the endpoints the
+HMAC, RSA (2048 bits or more), ECDSA or Ed25519 - and `cent.endpoints` serves the endpoints the
 `getToken` callbacks of client SDKs call:
 
 ```python
