@@ -1,7 +1,7 @@
 v6.0.0
 ======
 
-cent 6 is a rewrite of the Python SDK for Centrifugo's HTTP server API to the [Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/master/spec.md), version 0.3. It needs Python 3.11 or newer; httpx2 - the maintained fork of httpx - is its only dependency, and `cryptography` 49 or newer is optional, for RSA, ECDSA and Ed25519 tokens (`pip install cent[crypto]`). It works with Centrifugo v6 and Centrifugo PRO v6: the map and shared poll methods need Centrifugo v6.8.0 or newer, `ApiError.temporary` and `TooManyRequestsError` v6.10.0 or newer. Upgrading from cent 5: see the [migration guide](https://github.com/centrifugal/pycent/blob/master/MIGRATING.md).
+cent 6 is a rewrite of the Python SDK for Centrifugo's HTTP server API to the [Centrifugo server SDK specification](https://github.com/centrifugal/gocent/blob/master/spec.md), version 0.4. It needs Python 3.11 or newer; httpx2 - the maintained fork of httpx - is its only dependency, and `cryptography` 49 or newer is optional, for RSA, ECDSA and Ed25519 tokens (`pip install cent[crypto]`). It works with Centrifugo v6 and Centrifugo PRO v6: the map and shared poll methods need Centrifugo v6.8.0 or newer, `ApiError.temporary` and `TooManyRequestsError` v6.10.0 or newer. Upgrading from cent 5: see the [migration guide](https://github.com/centrifugal/pycent/blob/master/MIGRATING.md).
 
 Generated from Centrifugo's protos at [e21aeb50](https://github.com/centrifugal/centrifugo/commit/e21aeb50ab6fc4d525fc817473574f728da6c3ad) on its master, after v6.10.2: the same messages as v6.10.2, with the comments the constants are generated from, and `ConnectResult.profile` for the connect proxy, which Centrifugo PRO newer than v6.10.2 reads.
 
@@ -15,7 +15,7 @@ Generated from Centrifugo's protos at [e21aeb50](https://github.com/centrifugal/
 * Options: `api_endpoint` or `api_endpoint_func`, `api_key` or `bearer_token_func`, `http_client`, `request_timeout`, `headers`, `on_request`, `auto_batch`, `batch_context`. Each is checked at creation, `InvalidConfigError` naming the option and the fix.
 * `api_endpoint_func` and `bearer_token_func` are called per request, and may be coroutine functions on `AsyncClient`. An endpoint failing `api_endpoint`'s rules, or an empty token or one with control characters, fails the call with `InvalidConfigError` before sending. An exception either function raises fails the call with `FunctionError`, naming the function, the exception chained as its cause.
 * Requests are `POST`s to `{api_endpoint}/{method}`. Redirects are not followed: a redirect is an `HTTPError` with a hint to check the scheme and the path of `api_endpoint`. A caller's `http_client` is never changed: credentials and headers go on each request.
-* `close()` and `aclose()` refuse new calls with `ClosedError` and wait for those in progress, automatic batches included; both clients are context managers.
+* `close()` and `aclose()` refuse new calls with `ClosedError` and wait for those in progress, automatic batches included; a broadcast being retried stops at its next attempt. Called again, or concurrently, each waits the same way. Both clients are context managers.
 * `cent.to_dict` renders results, commands and errors as JSON-ready data with Centrifugo's field names.
 
 **Constants**
@@ -60,7 +60,7 @@ Generated from Centrifugo's protos at [e21aeb50](https://github.com/centrifugal/
 
 **Tokens and JWKS**
 
-* `cent.token`: connection and subscription tokens - `token.connection`, `token.subscription` with `ConnectionClaims` and `SubscriptionClaims`, the `profile` claim included - signed with `token.Key` HMAC, RSA, ECDSA (P-256, P-384, P-521) or Ed25519 keys. An expiry is required: an aware `datetime`, or `token.NEVER`. `token.jwks` and `endpoints.JWKS` publish public keys for rotation without restarting Centrifugo.
+* `cent.token`: connection and subscription tokens - `token.connection`, `token.subscription` with `ConnectionClaims` and `SubscriptionClaims`, the `profile` claim included - signed with `token.Key` HMAC, RSA (2048 bits or more), ECDSA (P-256, P-384, P-521) or Ed25519 keys. An expiry is required: an aware `datetime`, or `token.NEVER`. `token.jwks` and `endpoints.JWKS` publish public keys for rotation without restarting Centrifugo.
 
 **API tokens**
 

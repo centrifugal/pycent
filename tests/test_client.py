@@ -1130,8 +1130,6 @@ def test_close(api: Api, fake: Fake) -> None:
 
 
 def test_close_waits_for_calls_in_progress() -> None:
-    import threading
-
     started, release = threading.Event(), threading.Event()
 
     def slow(request: httpx2.Request) -> httpx2.Response:
@@ -1140,14 +1138,23 @@ def test_close_waits_for_calls_in_progress() -> None:
         return httpx2.Response(200, json={"result": {}})
 
     c = cent.Client(ENDPOINT, http_client=httpx2.Client(transport=httpx2.MockTransport(slow)))
-    t = threading.Thread(target=lambda: c.publish(channel="x", data=1))
+    out: list[Any] = []
+    t = threading.Thread(target=lambda: out.append(c.publish(channel="x", data=1)))
     t.start()
     assert started.wait(5)
+    # close's deadline ends first: it raises, and the call goes on.
     with pytest.raises(cent.CentTimeoutError):
         c.close(timeout=0.05)
+    # Calls made after close are refused, while it waits too.
+    with pytest.raises(cent.ClosedError):
+        c.publish(channel="x", data=1)
+    assert t.is_alive()
     release.set()
+    # Called again, close waits the same way.
     c.close(timeout=5)
+    assert not t.is_alive()
     t.join()
+    assert out == [cent.PublishResult()]
 
 
 async def test_aclose_waits_for_calls_in_progress() -> None:
@@ -1162,9 +1169,97 @@ async def test_aclose_waits_for_calls_in_progress() -> None:
     await asyncio.sleep(0.01)
     with pytest.raises(cent.CentTimeoutError):
         await c.aclose(timeout=0.05)
+    with pytest.raises(cent.ClosedError):
+        await c.publish(channel="x", data=1)
+    assert not task.done()
     release.set()
     await c.aclose(timeout=5)
-    await task
+    assert task.done()
+    assert await task == cent.PublishResult()
+
+
+def test_close_concurrently() -> None:
+    started, release = threading.Event(), threading.Event()
+
+    def slow(request: httpx2.Request) -> httpx2.Response:
+        started.set()
+        release.wait(5)
+        return httpx2.Response(200, json={"result": {}})
+
+    c = cent.Client(ENDPOINT, http_client=httpx2.Client(transport=httpx2.MockTransport(slow)))
+    call = threading.Thread(target=lambda: c.publish(channel="x", data=1))
+    call.start()
+    assert started.wait(5)
+    # Whether the call had ended when each close returned.
+    ended: list[bool] = []
+    errors: list[Exception] = []
+
+    def close() -> None:
+        try:
+            c.close(timeout=5)
+        except Exception as e:
+            errors.append(e)
+        ended.append(not call.is_alive())
+
+    closers = [threading.Thread(target=close) for _ in range(4)]
+    for t in closers:
+        t.start()
+    time.sleep(0.05)
+    assert ended == []
+    release.set()
+    for t in closers:
+        t.join(5)
+    call.join(5)
+    assert errors == []
+    assert ended == [True] * 4
+
+
+async def test_aclose_concurrently() -> None:
+    release = asyncio.Event()
+
+    async def slow(request: httpx2.Request) -> httpx2.Response:
+        await release.wait()
+        return httpx2.Response(200, json={"result": {}})
+
+    c = cent.AsyncClient(ENDPOINT, http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(slow)))
+    call = asyncio.create_task(c.publish(channel="x", data=1))
+    await asyncio.sleep(0.01)
+    ended: list[bool] = []
+
+    async def close() -> None:
+        await c.aclose(timeout=5)
+        ended.append(call.done())
+
+    closers = [asyncio.create_task(close()) for _ in range(4)]
+    await asyncio.sleep(0.05)
+    assert ended == []
+    release.set()
+    await asyncio.gather(*closers)
+    assert ended == [True] * 4
+    await call
+
+
+def test_close_stops_broadcast_retry(api: Api, fake: Fake) -> None:
+    closers: list[Any] = []
+
+    def close(a: cent.BroadcastAttempt) -> float:
+        # close while the retry waits for its next attempt.
+        if api.kind == "async":
+            closers.append(asyncio.get_running_loop().create_task(api.client.aclose()))
+            return 0.01
+        api.client.close()
+        return 0.0
+
+    with pytest.raises(cent.BroadcastFailedChannelsError) as e:
+        api.broadcast_with_retry(channels=["a", "flaky:1"], data=1, max_attempts=5, on_attempt_error=close)
+    assert len(fake.requests) == 1
+    (failed,) = e.value.failed
+    assert failed.channel == "flaky:1"
+    assert isinstance(failed.error, cent.ClosedError)
+    assert not cent.retryable(e.value)
+    assert e.value.result.channels[0].error is None
+    if closers:
+        assert closers[0].done()
 
 
 async def test_cancelled_call_is_not_retryable() -> None:

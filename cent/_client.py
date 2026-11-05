@@ -557,8 +557,8 @@ class Client(_ClientAPI):
         waits for the calls in progress to end. A broadcast being retried stops
         at its next attempt. It raises CentTimeoutError when timeout, in
         seconds, passes first; the calls left go on then, and close may be
-        called again. With its default HTTP client it then closes its
-        connections.
+        called again, concurrently too: each call waits the same way. With its
+        default HTTP client it then closes its connections.
 
         Call it when the application shuts down, so that what was accepted is
         sent before the process exits. A Client is also a context manager

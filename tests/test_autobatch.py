@@ -179,16 +179,132 @@ def test_queued_call_timing_out_is_not_sent() -> None:
 def test_close_waits_for_batches() -> None:
     gate = Gate()
     c = sync_client(gate)
-    threads = [threading.Thread(target=c.publish, kwargs=pub(i)) for i in range(5)]
+    results: dict[int, Any] = {}
+    threads = [threading.Thread(target=lambda i=i: results.update({i: c.publish(**pub(i))})) for i in range(5)]
     for t in threads:
         t.start()
-    time.sleep(0.05)
+    time.sleep(0.05)  # two in flight, three queued
     with pytest.raises(cent.CentTimeoutError):
         c.close(timeout=0.05)
+    with pytest.raises(cent.ClosedError):
+        c.publish(**pub(9))
     gate.open.set()
     c.close(timeout=5)
     for t in threads:
         t.join(5)
+    # The calls queued when close began were still sent.
+    assert {i: r.offset for i, r in results.items()} == {i: i for i in range(5)}
+    assert "batch" in gate.paths
+
+
+async def test_aclose_waits_for_batches() -> None:
+    gate = Gate()
+    c = async_client(gate)
+    tasks = [asyncio.create_task(c.publish(**pub(i))) for i in range(5)]
+    await asyncio.sleep(0.05)
+    with pytest.raises(cent.CentTimeoutError):
+        await c.aclose(timeout=0.05)
+    with pytest.raises(cent.ClosedError):
+        await c.publish(**pub(9))
+    gate.open.set()
+    await c.aclose(timeout=5)
+    assert all(t.done() for t in tasks)
+    assert [(await t).offset for t in tasks] == list(range(5))
+    assert "batch" in gate.paths
+
+
+class Delay:
+    """A fake Centrifugo answering every request after a delay, counting the
+    requests in flight."""
+
+    def __init__(self, seconds: float) -> None:
+        self.seconds = seconds
+        self.lock = threading.Lock()
+        self.in_flight = 0
+        self.paths: list[str] = []
+
+    def _reply(self, request: httpx2.Request) -> httpx2.Response:
+        method = request.url.path.rsplit("/", 1)[-1]
+        with self.lock:
+            self.paths.append(method)
+        if method == "batch":
+            n = len(json.loads(request.content)["commands"])
+            return httpx2.Response(200, json={"replies": [{"publish": {}} for _ in range(n)]})
+        return httpx2.Response(200, json={"result": {}})
+
+    def sync_handler(self, request: httpx2.Request) -> httpx2.Response:
+        with self.lock:
+            self.in_flight += 1
+        try:
+            time.sleep(self.seconds)
+            return self._reply(request)
+        finally:
+            with self.lock:
+                self.in_flight -= 1
+
+    async def async_handler(self, request: httpx2.Request) -> httpx2.Response:
+        with self.lock:
+            self.in_flight += 1
+        try:
+            await asyncio.sleep(self.seconds)
+            return self._reply(request)
+        finally:
+            with self.lock:
+                self.in_flight -= 1
+
+
+def test_close_waits_for_a_batch_whose_callers_left() -> None:
+    srv = Delay(0.3)
+    c = cent.Client(
+        ENDPOINT,
+        http_client=httpx2.Client(transport=httpx2.MockTransport(srv.sync_handler)),
+        auto_batch=cent.AutoBatch(max_in_flight=1),
+    )
+    first = threading.Thread(target=c.publish, kwargs=pub(1))
+    first.start()
+    time.sleep(0.05)
+    # Queued behind the first call, sent as a batch when it ends at 0.3 s, and
+    # left by their callers at 0.5 s, while the batch is in flight.
+    errors: list[Exception] = []
+
+    def leave() -> None:
+        try:
+            c.publish(**pub(2), timeout=0.45)
+        except Exception as e:
+            errors.append(e)
+
+    callers = [threading.Thread(target=leave) for _ in range(2)]
+    for t in callers:
+        t.start()
+    for t in callers:
+        t.join(5)
+    assert len(errors) == 2
+    # Sent, so not "before it was sent".
+    assert all(isinstance(e, cent.CentTimeoutError) and "before" not in str(e) for e in errors)
+    assert srv.paths == ["publish"]
+    assert srv.in_flight == 1  # the batch
+    c.close(timeout=5)
+    assert srv.in_flight == 0
+    assert srv.paths == ["publish", "batch"]
+    first.join(5)
+
+
+async def test_aclose_waits_for_a_batch_whose_callers_left() -> None:
+    srv = Delay(0.3)
+    c = cent.AsyncClient(
+        ENDPOINT,
+        http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(srv.async_handler)),
+        auto_batch=cent.AutoBatch(max_in_flight=1),
+    )
+    first = asyncio.create_task(c.publish(**pub(1)))
+    await asyncio.sleep(0.05)
+    results = await asyncio.gather(*(c.publish(**pub(2), timeout=0.45) for _ in range(2)), return_exceptions=True)
+    assert all(isinstance(r, cent.CentTimeoutError) and "before" not in str(r) for r in results)
+    assert srv.in_flight == 1
+    await c.aclose(timeout=5)
+    assert srv.in_flight == 0
+    assert srv.paths == ["publish", "batch"]
+    await first
 
 
 @pytest.mark.parametrize(

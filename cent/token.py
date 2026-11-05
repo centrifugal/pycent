@@ -91,6 +91,11 @@ _EC_ALGS = {
 }
 
 
+# The smallest RSA key signing tokens: the floor of NIST SP 800-131A, and the
+# default of key generators.
+_MIN_RSA_BITS = 2048
+
+
 class Key:
     """A key signing tokens, matching the one Centrifugo verifies with. Make one
     with Key.hmac, Key.rsa, Key.ecdsa, Key.ed25519 or Key.from_pem."""
@@ -138,10 +143,13 @@ class Key:
     @staticmethod
     def rsa(private_key: rsa.RSAPrivateKey) -> Key:
         """A key signing with RS256, whose public key is Centrifugo's
-        client.token.rsa_public_key."""
+        client.token.rsa_public_key. A key under 2048 bits is refused, as an
+        ECDSA key on another curve is."""
         hashes, _, _, _, padding, rsa_mod, _ = _crypto()
         if not isinstance(private_key, rsa_mod.RSAPrivateKey):
             raise TypeError("token: Key.rsa takes an RSAPrivateKey")
+        if private_key.key_size < _MIN_RSA_BITS:
+            raise InvalidRequestError(f"token: RSA key of {private_key.key_size} bits, want {_MIN_RSA_BITS} or more")
         pub = private_key.public_key().public_numbers()
         jwk = {
             "kty": "RSA",

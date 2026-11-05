@@ -202,6 +202,21 @@ def test_unsupported_curve() -> None:
         token.Key.ecdsa(ec.generate_private_key(ec.SECP256K1()))
 
 
+def test_rsa_under_2048_bits() -> None:
+    # Refused where a wrong curve is, with the same error, so that no
+    # connection, subscription or API token nor a JWKS is made with it.
+    small = rsa.generate_private_key(public_exponent=65537, key_size=1024)  # noqa: S505 - the small key refused
+    pem = small.private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
+    )
+    with pytest.raises(cent.InvalidRequestError, match="RSA key of 1024 bits, want 2048 or more"):
+        token.Key.rsa(small)
+    with pytest.raises(cent.InvalidRequestError, match="RSA key of 1024 bits, want 2048 or more"):
+        token.Key.from_pem(pem)
+    with pytest.raises(cent.InvalidRequestError, match="P-256, P-384 or P-521"):
+        token.Key.ecdsa(ec.generate_private_key(ec.SECP256K1()))
+
+
 # JWKS.
 
 
